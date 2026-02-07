@@ -1,0 +1,50 @@
+CREATE TABLE vocabulary (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kanji_form TEXT NOT NULL,
+    reading TEXT NOT NULL,
+    meanings_en TEXT NOT NULL,
+    jlpt_level INTEGER,
+    frequency INTEGER
+);
+
+getById:
+SELECT * FROM vocabulary WHERE id = ?;
+
+getByKanjiForm:
+SELECT * FROM vocabulary WHERE kanji_form = ?;
+
+getByJlptLevel:
+SELECT * FROM vocabulary WHERE jlpt_level = ? ORDER BY frequency ASC;
+
+search:
+SELECT * FROM vocabulary WHERE kanji_form LIKE ? OR reading LIKE ? OR meanings_en LIKE ? LIMIT ?;
+
+getForKanji:
+SELECT v.* FROM vocabulary v
+INNER JOIN kanji_vocabulary kv ON v.id = kv.vocab_id
+WHERE kv.kanji_id = ?
+ORDER BY v.frequency ASC;
+
+getByIds:
+SELECT * FROM vocabulary WHERE id IN ?;
+
+getForStudiedKanji:
+SELECT DISTINCT v.* FROM vocabulary v
+INNER JOIN kanji_vocabulary kv ON v.id = kv.vocab_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM kanji_vocabulary kv2
+    LEFT JOIN srs_card sc ON sc.kanji_id = kv2.kanji_id
+    WHERE kv2.vocab_id = v.id
+    AND (sc.kanji_id IS NULL OR sc.state = 'new')
+)
+ORDER BY v.frequency ASC;
+
+getAtOffset:
+SELECT * FROM vocabulary LIMIT 1 OFFSET ?;
+
+countAll:
+SELECT COUNT(*) FROM vocabulary;
+
+insert:
+INSERT OR REPLACE INTO vocabulary(id, kanji_form, reading, meanings_en, jlpt_level, frequency)
+VALUES (?, ?, ?, ?, ?, ?);

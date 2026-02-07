@@ -1,7 +1,11 @@
 package com.jworks.kanjiquest.core.engine
 
 import com.jworks.kanjiquest.core.domain.model.GameMode
+import com.jworks.kanjiquest.core.domain.model.SrsState
+import com.jworks.kanjiquest.core.domain.model.VocabSrsCard
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
+import com.jworks.kanjiquest.core.domain.repository.UserRepository
+import com.jworks.kanjiquest.core.domain.repository.VocabSrsRepository
 import com.jworks.kanjiquest.core.scoring.ScoringEngine
 import com.jworks.kanjiquest.core.srs.SrsAlgorithm
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +17,9 @@ class GameEngine(
     private val srsAlgorithm: SrsAlgorithm,
     private val srsRepository: SrsRepository,
     private val scoringEngine: ScoringEngine,
+    private val vocabSrsRepository: VocabSrsRepository? = null,
+    private val userRepository: UserRepository? = null,
+    private val wordOfTheDayVocabId: Long? = null,
     private val timeProvider: () -> Long = { kotlinx.datetime.Clock.System.now().epochSeconds }
 ) {
     private val _state = MutableStateFlow<GameState>(GameState.Idle)
@@ -26,6 +33,7 @@ class GameEngine(
     private var maxCombo: Int = 0
     private var sessionXp: Int = 0
     private var sessionStartTime: Long = 0L
+    private var playerLevel: Int = 1
 
     suspend fun onEvent(event: GameEvent) {
         when (event) {
@@ -48,14 +56,30 @@ class GameEngine(
 
         _state.value = GameState.Preparing(gameMode)
 
-        val ready = questionGenerator.prepareSession(totalQuestions, timeProvider())
+        // Cache player level for vocabulary question type gating
+        playerLevel = userRepository?.getProfile()?.level ?: 1
+
+        val ready = if (gameMode == GameMode.VOCABULARY) {
+            questionGenerator.prepareVocabSession(totalQuestions, timeProvider(), playerLevel)
+        } else {
+            questionGenerator.prepareSession(totalQuestions, timeProvider())
+        }
+
         if (!ready) {
-            _state.value = GameState.Error("No kanji available for study. Add kanji data first.")
+            val errorMsg = if (gameMode == GameMode.VOCABULARY) {
+                "No vocabulary available. Study more kanji first!"
+            } else {
+                "No kanji available for study. Add kanji data first."
+            }
+            _state.value = GameState.Error(errorMsg)
             return
         }
 
-        // Adjust total to what's actually available
-        totalQuestions = questionGenerator.remainingCount()
+        totalQuestions = if (gameMode == GameMode.VOCABULARY) {
+            questionGenerator.vocabRemainingCount()
+        } else {
+            questionGenerator.remainingCount()
+        }
         showNextQuestion()
     }
 
@@ -96,13 +120,30 @@ class GameEngine(
             isNewCard = question.isNewCard,
             gameMode = gameMode
         )
-        sessionXp += scoreResult.totalXp
+        var xpGained = scoreResult.totalXp
+
+        // Word of the Day 1.5x bonus
+        if (question.vocabId != null && wordOfTheDayVocabId != null && question.vocabId == wordOfTheDayVocabId) {
+            xpGained = (xpGained * 1.5f).toInt()
+        }
+        sessionXp += xpGained
 
         // Update SRS card
-        val card = srsRepository.getCard(question.kanjiId)
-        if (card != null) {
-            val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
-            srsRepository.saveCard(updatedCard)
+        if (gameMode == GameMode.VOCABULARY && question.vocabId != null) {
+            val vocabRepo = vocabSrsRepository
+            if (vocabRepo != null) {
+                val vocabCard = vocabRepo.getCard(question.vocabId)
+                if (vocabCard != null) {
+                    val updated = reviewVocabCard(vocabCard, quality, timeProvider())
+                    vocabRepo.saveCard(updated)
+                }
+            }
+        } else {
+            val card = srsRepository.getCard(question.kanjiId)
+            if (card != null) {
+                val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
+                srsRepository.saveCard(updatedCard)
+            }
         }
 
         _state.value = GameState.ShowingResult(
@@ -110,7 +151,7 @@ class GameEngine(
             selectedAnswer = event.answer,
             isCorrect = isCorrect,
             quality = quality,
-            xpGained = scoreResult.totalXp,
+            xpGained = xpGained,
             currentCombo = currentCombo,
             questionNumber = current.questionNumber,
             totalQuestions = current.totalQuestions,
@@ -118,8 +159,13 @@ class GameEngine(
         )
     }
 
-    private fun handleNextQuestion() {
-        if (questionGenerator.hasNextQuestion()) {
+    private suspend fun handleNextQuestion() {
+        val hasNext = if (gameMode == GameMode.VOCABULARY) {
+            questionGenerator.vocabRemainingCount() > 0
+        } else {
+            questionGenerator.hasNextQuestion()
+        }
+        if (hasNext) {
             showNextQuestion()
         } else {
             completeSession()
@@ -130,10 +176,11 @@ class GameEngine(
         completeSession()
     }
 
-    private fun showNextQuestion() {
+    private suspend fun showNextQuestion() {
         val question = when (gameMode) {
             GameMode.RECOGNITION -> questionGenerator.generateRecognitionQuestion()
             GameMode.WRITING -> questionGenerator.generateWritingQuestion()
+            GameMode.VOCABULARY -> questionGenerator.generateVocabularyQuestion(playerLevel)
             else -> questionGenerator.generateRecognitionQuestion()
         }
 
@@ -166,6 +213,41 @@ class GameEngine(
                 durationSec = elapsed
             )
         )
+    }
+
+    private fun reviewVocabCard(card: VocabSrsCard, quality: Int, currentTime: Long): VocabSrsCard {
+        val newTotalReviews = card.totalReviews + 1
+        val newCorrectCount = if (quality >= 3) card.correctCount + 1 else card.correctCount
+
+        return if (quality >= 3) {
+            val newRepetitions = card.repetitions + 1
+            val newInterval = when (newRepetitions) {
+                1 -> 1
+                2 -> 6
+                else -> (card.interval * card.easeFactor).toInt()
+            }
+            val newEase = (card.easeFactor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)).coerceAtLeast(1.3)
+            val newState = if (newInterval >= 21) SrsState.GRADUATED else SrsState.REVIEW
+
+            card.copy(
+                easeFactor = newEase,
+                interval = newInterval,
+                repetitions = newRepetitions,
+                nextReview = currentTime + newInterval * 86400L,
+                state = newState,
+                totalReviews = newTotalReviews,
+                correctCount = newCorrectCount
+            )
+        } else {
+            card.copy(
+                repetitions = 0,
+                interval = 0,
+                nextReview = currentTime + 60,
+                state = SrsState.LEARNING,
+                totalReviews = newTotalReviews,
+                correctCount = newCorrectCount
+            )
+        }
     }
 
     fun reset() {

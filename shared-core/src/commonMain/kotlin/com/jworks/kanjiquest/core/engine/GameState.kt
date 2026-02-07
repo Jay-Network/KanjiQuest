@@ -10,7 +10,13 @@ data class Question(
     val questionText: String,
     val isNewCard: Boolean,
     val strokePaths: List<String> = emptyList(),
-    val srsState: String = "new"
+    val srsState: String = "new",
+    val vocabId: Long? = null,
+    val vocabReading: String? = null,
+    val vocabQuestionType: String? = null,
+    val exampleSentenceJa: String? = null,
+    val exampleSentenceEn: String? = null,
+    val kanjiBreakdown: List<String> = emptyList()
 )
 
 data class SessionStats(
