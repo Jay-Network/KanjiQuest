@@ -1,0 +1,66 @@
+package com.jworks.kanjiquest.core.engine
+
+import com.jworks.kanjiquest.core.domain.model.GameMode
+
+data class Question(
+    val kanjiId: Int,
+    val kanjiLiteral: String,
+    val correctAnswer: String,
+    val choices: List<String>,
+    val questionText: String,
+    val isNewCard: Boolean,
+    val strokePaths: List<String> = emptyList(),
+    val srsState: String = "new"
+)
+
+data class SessionStats(
+    val gameMode: GameMode,
+    val cardsStudied: Int,
+    val correctCount: Int,
+    val comboMax: Int,
+    val xpEarned: Int,
+    val durationSec: Int
+)
+
+sealed class GameState {
+    data object Idle : GameState()
+
+    data class Preparing(
+        val gameMode: GameMode
+    ) : GameState()
+
+    data class AwaitingAnswer(
+        val question: Question,
+        val questionNumber: Int,
+        val totalQuestions: Int,
+        val currentCombo: Int,
+        val sessionXp: Int
+    ) : GameState()
+
+    data class ShowingResult(
+        val question: Question,
+        val selectedAnswer: String,
+        val isCorrect: Boolean,
+        val quality: Int,
+        val xpGained: Int,
+        val currentCombo: Int,
+        val questionNumber: Int,
+        val totalQuestions: Int,
+        val sessionXp: Int
+    ) : GameState()
+
+    data class SessionComplete(
+        val stats: SessionStats
+    ) : GameState()
+
+    data class Error(
+        val message: String
+    ) : GameState()
+}
+
+sealed class GameEvent {
+    data class StartSession(val gameMode: GameMode, val questionCount: Int = 10) : GameEvent()
+    data class SubmitAnswer(val answer: String) : GameEvent()
+    data object NextQuestion : GameEvent()
+    data object EndSession : GameEvent()
+}
