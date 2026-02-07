@@ -1,6 +1,8 @@
 package com.jworks.kanjiquest.android.di
 
 import android.content.Context
+import com.jworks.kanjiquest.android.network.OllamaClient
+import com.jworks.kanjiquest.android.ui.game.writing.HandwritingChecker
 import com.jworks.kanjiquest.core.data.DatabaseDriverFactory
 import com.jworks.kanjiquest.core.data.JCoinRepositoryImpl
 import com.jworks.kanjiquest.core.data.KanjiRepositoryImpl
@@ -126,5 +128,17 @@ object AppModule {
         jCoinRepository: JCoinRepository
     ): CompleteSessionUseCase {
         return CompleteSessionUseCase(userRepository, sessionRepository, scoringEngine, jCoinRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOllamaClient(): OllamaClient {
+        return OllamaClient("http://192.168.0.2:11434")
+    }
+
+    @Provides
+    @Singleton
+    fun provideHandwritingChecker(ollamaClient: OllamaClient): HandwritingChecker {
+        return HandwritingChecker(ollamaClient)
     }
 }

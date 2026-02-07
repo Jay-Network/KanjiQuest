@@ -24,13 +24,16 @@ data class WritingUiState(
     val sessionResult: SessionResult? = null,
     val completedStrokes: List<List<Offset>> = emptyList(),
     val activeStroke: List<Offset> = emptyList(),
-    val canvasSize: Float = 0f
+    val canvasSize: Float = 0f,
+    val aiFeedback: HandwritingFeedback? = null,
+    val aiLoading: Boolean = false
 )
 
 @HiltViewModel
 class WritingViewModel @Inject constructor(
     private val gameEngine: GameEngine,
-    private val completeSessionUseCase: CompleteSessionUseCase
+    private val completeSessionUseCase: CompleteSessionUseCase,
+    private val handwritingChecker: HandwritingChecker
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WritingUiState())
@@ -46,11 +49,13 @@ class WritingViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(sessionResult = result)
                 }
 
-                // Clear strokes when a new question appears
+                // Clear strokes and AI feedback when a new question appears
                 if (state is GameState.AwaitingAnswer) {
                     _uiState.value = _uiState.value.copy(
                         completedStrokes = emptyList(),
-                        activeStroke = emptyList()
+                        activeStroke = emptyList(),
+                        aiFeedback = null,
+                        aiLoading = false
                     )
                 }
             }
@@ -137,6 +142,30 @@ class WritingViewModel @Inject constructor(
 
         viewModelScope.launch {
             gameEngine.onEvent(GameEvent.SubmitAnswer(answer))
+        }
+
+        // Fire-and-forget AI check (runs in parallel, updates UI when done)
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(aiLoading = true)
+            try {
+                val feedback = handwritingChecker.evaluate(
+                    drawnStrokes = drawnStrokes,
+                    targetKanji = state.question.kanjiLiteral,
+                    strokeCount = state.question.strokePaths.size,
+                    canvasSize = canvasSize
+                )
+                _uiState.value = _uiState.value.copy(aiFeedback = feedback, aiLoading = false)
+            } catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    aiFeedback = HandwritingFeedback(
+                        overallComment = "",
+                        strokeFeedback = emptyList(),
+                        qualityRating = 0,
+                        isAvailable = false
+                    ),
+                    aiLoading = false
+                )
+            }
         }
     }
 

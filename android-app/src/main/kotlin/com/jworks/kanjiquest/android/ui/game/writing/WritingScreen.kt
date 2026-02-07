@@ -96,6 +96,8 @@ fun WritingScreen(
                 )
                 is GameState.ShowingResult -> WritingResultContent(
                     state = state,
+                    aiFeedback = uiState.aiFeedback,
+                    aiLoading = uiState.aiLoading,
                     onNext = { viewModel.nextQuestion() }
                 )
                 is GameState.SessionComplete -> SessionCompleteContent(
@@ -264,12 +266,15 @@ private fun WritingQuestionContent(
 @Composable
 private fun WritingResultContent(
     state: GameState.ShowingResult,
+    aiFeedback: HandwritingFeedback?,
+    aiLoading: Boolean,
     onNext: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -320,6 +325,67 @@ private fun WritingResultContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // AI Feedback Section
+        if (aiLoading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "AI analyzing your handwriting...",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        aiFeedback?.let { feedback ->
+            if (feedback.isAvailable) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "AI Feedback",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = buildString {
+                                    repeat(feedback.qualityRating) { append("\u2605") }
+                                    repeat(5 - feedback.qualityRating) { append("\u2606") }
+                                },
+                                fontSize = 16.sp
+                            )
+                        }
+                        if (feedback.overallComment.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = feedback.overallComment,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        feedback.strokeFeedback.forEach { tip ->
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "\u2022 $tip",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
