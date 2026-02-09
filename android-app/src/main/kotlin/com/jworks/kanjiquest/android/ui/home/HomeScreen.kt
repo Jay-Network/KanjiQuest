@@ -17,11 +17,15 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -110,6 +114,31 @@ fun HomeScreen(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
+                    }
+                },
+                actions = {
+                    // J Coin Shop icon
+                    IconButton(onClick = onShopClick) {
+                        Text(
+                            text = "J",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color(0xFFFFD700),
+                            modifier = Modifier
+                                .background(
+                                    color = Color.White.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    // Settings gear icon
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -243,29 +272,11 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Shop and Progress buttons row
+            // Progress and Achievements buttons row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
-                    onClick = onShopClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFD700)
-                    )
-                ) {
-                    Text(
-                        text = "J Coin Shop",
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black,
-                        fontSize = 14.sp
-                    )
-                }
-
                 Button(
                     onClick = onProgressClick,
                     modifier = Modifier
@@ -283,15 +294,7 @@ fun HomeScreen(
                         fontSize = 14.sp
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Achievements and Settings buttons row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
                 Button(
                     onClick = onAchievementsClick,
                     modifier = Modifier
@@ -306,24 +309,6 @@ fun HomeScreen(
                         text = "Achievements",
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        fontSize = 14.sp
-                    )
-                }
-
-                Button(
-                    onClick = onSettingsClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Text(
-                        text = "Settings",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp
                     )
                 }
