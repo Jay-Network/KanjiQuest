@@ -1,0 +1,19 @@
+CREATE TABLE example_sentence (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vocab_id INTEGER NOT NULL,
+    japanese TEXT NOT NULL,
+    english TEXT NOT NULL
+);
+
+getByVocabId:
+SELECT * FROM example_sentence WHERE vocab_id = ?;
+
+getRandomForVocab:
+SELECT * FROM example_sentence WHERE vocab_id = ? ORDER BY RANDOM() LIMIT 1;
+
+countAll:
+SELECT COUNT(*) FROM example_sentence;
+
+insert:
+INSERT OR REPLACE INTO example_sentence(id, vocab_id, japanese, english)
+VALUES (?, ?, ?, ?);

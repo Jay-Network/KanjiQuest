@@ -56,6 +56,10 @@ class KanjiRepositoryImpl(
         return db.kanjiVocabularyQueries.getKanjiIdsForVocab(vocabId).executeAsList()
     }
 
+    override suspend fun getUnseenKanjiByGrade(grade: Int, limit: Int): List<Kanji> {
+        return db.kanjiQueries.getUnseenByGrade(grade.toLong(), limit.toLong()).executeAsList().map { it.toKanji() }
+    }
+
     override suspend fun searchKanji(query: String, limit: Int): List<Kanji> {
         val pattern = "%$query%"
         return db.kanjiQueries.search(pattern, pattern, limit.toLong()).executeAsList().map { it.toKanji() }
@@ -63,6 +67,10 @@ class KanjiRepositoryImpl(
 
     override suspend fun getKanjiCount(): Long {
         return db.kanjiQueries.countAll().executeAsOne()
+    }
+
+    override suspend fun getKanjiCountByGrade(grade: Int): Long {
+        return db.kanjiQueries.countByGrade(grade.toLong()).executeAsOne()
     }
 }
 

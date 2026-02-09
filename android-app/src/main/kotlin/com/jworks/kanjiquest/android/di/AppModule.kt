@@ -1,8 +1,12 @@
 package com.jworks.kanjiquest.android.di
 
 import android.content.Context
-import com.jworks.kanjiquest.android.network.OllamaClient
+import com.jworks.kanjiquest.android.BuildConfig
+import com.jworks.kanjiquest.android.data.PreviewTrialManager
+import com.jworks.kanjiquest.android.network.GeminiClient
 import com.jworks.kanjiquest.android.ui.game.writing.HandwritingChecker
+import com.jworks.kanjiquest.core.data.AchievementRepositoryImpl
+import com.jworks.kanjiquest.core.data.AuthRepositoryImpl
 import com.jworks.kanjiquest.core.data.DatabaseDriverFactory
 import com.jworks.kanjiquest.core.data.JCoinRepositoryImpl
 import com.jworks.kanjiquest.core.data.KanjiRepositoryImpl
@@ -10,6 +14,10 @@ import com.jworks.kanjiquest.core.data.SessionRepositoryImpl
 import com.jworks.kanjiquest.core.data.SrsRepositoryImpl
 import com.jworks.kanjiquest.core.data.UserRepositoryImpl
 import com.jworks.kanjiquest.core.data.VocabSrsRepositoryImpl
+import com.jworks.kanjiquest.core.domain.UserSessionProvider
+import com.jworks.kanjiquest.core.domain.UserSessionProviderImpl
+import com.jworks.kanjiquest.core.domain.repository.AchievementRepository
+import com.jworks.kanjiquest.core.domain.repository.AuthRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
 import com.jworks.kanjiquest.core.domain.repository.SessionRepository
@@ -17,8 +25,10 @@ import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.domain.repository.VocabSrsRepository
 import com.jworks.kanjiquest.core.domain.usecase.CompleteSessionUseCase
+import com.jworks.kanjiquest.core.domain.usecase.MigrateLocalDataUseCase
 import com.jworks.kanjiquest.core.domain.usecase.WordOfTheDayUseCase
 import com.jworks.kanjiquest.core.engine.GameEngine
+import com.jworks.kanjiquest.core.engine.GradeMasteryProvider
 import com.jworks.kanjiquest.core.engine.QuestionGenerator
 import com.jworks.kanjiquest.core.scoring.ScoringEngine
 import com.jworks.kanjiquest.core.srs.Sm2Algorithm
@@ -92,6 +102,24 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideAchievementRepository(db: KanjiQuestDatabase): AchievementRepository {
+        return AchievementRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthRepository(): AuthRepository {
+        return AuthRepositoryImpl()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserSessionProvider(authRepository: AuthRepository): UserSessionProvider {
+        return UserSessionProviderImpl(authRepository)
+    }
+
+    @Provides
+    @Singleton
     fun provideWordOfTheDayUseCase(kanjiRepository: KanjiRepository): WordOfTheDayUseCase {
         return WordOfTheDayUseCase(kanjiRepository)
     }
@@ -102,7 +130,11 @@ object AppModule {
         srsRepository: SrsRepository,
         vocabSrsRepository: VocabSrsRepository
     ): QuestionGenerator {
-        return QuestionGenerator(kanjiRepository, srsRepository, vocabSrsRepository)
+        val masteryProvider = GradeMasteryProvider { grade ->
+            val total = kanjiRepository.getKanjiCountByGrade(grade)
+            srsRepository.getGradeMastery(grade, total)
+        }
+        return QuestionGenerator(kanjiRepository, srsRepository, vocabSrsRepository, masteryProvider)
     }
 
     @Provides
@@ -112,11 +144,13 @@ object AppModule {
         srsRepository: SrsRepository,
         scoringEngine: ScoringEngine,
         vocabSrsRepository: VocabSrsRepository,
-        userRepository: UserRepository
+        userRepository: UserRepository,
+        userSessionProvider: UserSessionProvider
     ): GameEngine {
         return GameEngine(
             questionGenerator, srsAlgorithm, srsRepository, scoringEngine,
-            vocabSrsRepository, userRepository
+            vocabSrsRepository, userRepository,
+            userSessionProvider = userSessionProvider
         )
     }
 
@@ -125,20 +159,32 @@ object AppModule {
         userRepository: UserRepository,
         sessionRepository: SessionRepository,
         scoringEngine: ScoringEngine,
-        jCoinRepository: JCoinRepository
+        jCoinRepository: JCoinRepository,
+        userSessionProvider: UserSessionProvider
     ): CompleteSessionUseCase {
-        return CompleteSessionUseCase(userRepository, sessionRepository, scoringEngine, jCoinRepository)
+        return CompleteSessionUseCase(userRepository, sessionRepository, scoringEngine, jCoinRepository, userSessionProvider)
+    }
+
+    @Provides
+    fun provideMigrateLocalDataUseCase(db: KanjiQuestDatabase): MigrateLocalDataUseCase {
+        return MigrateLocalDataUseCase(db)
     }
 
     @Provides
     @Singleton
-    fun provideOllamaClient(): OllamaClient {
-        return OllamaClient("http://192.168.0.2:11434")
+    fun providePreviewTrialManager(@ApplicationContext context: Context): PreviewTrialManager {
+        return PreviewTrialManager(context)
     }
 
     @Provides
     @Singleton
-    fun provideHandwritingChecker(ollamaClient: OllamaClient): HandwritingChecker {
-        return HandwritingChecker(ollamaClient)
+    fun provideGeminiClient(): GeminiClient {
+        return GeminiClient(BuildConfig.GEMINI_API_KEY)
+    }
+
+    @Provides
+    @Singleton
+    fun provideHandwritingChecker(geminiClient: GeminiClient): HandwritingChecker {
+        return HandwritingChecker(geminiClient)
     }
 }

@@ -1,0 +1,25 @@
+CREATE TABLE achievement (
+    id TEXT PRIMARY KEY NOT NULL,
+    unlocked_at INTEGER,
+    progress INTEGER NOT NULL DEFAULT 0,
+    target INTEGER NOT NULL
+);
+
+getById:
+SELECT * FROM achievement WHERE id = ?;
+
+getAll:
+SELECT * FROM achievement ORDER BY id;
+
+getUnlocked:
+SELECT * FROM achievement WHERE unlocked_at IS NOT NULL ORDER BY unlocked_at DESC;
+
+getLocked:
+SELECT * FROM achievement WHERE unlocked_at IS NULL ORDER BY id;
+
+updateProgress:
+UPDATE achievement SET progress = ?, unlocked_at = ? WHERE id = ?;
+
+upsert:
+INSERT OR REPLACE INTO achievement(id, unlocked_at, progress, target)
+VALUES (?, ?, ?, ?);

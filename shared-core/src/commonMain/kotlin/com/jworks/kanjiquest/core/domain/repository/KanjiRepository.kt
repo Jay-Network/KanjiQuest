@@ -16,6 +16,8 @@ interface KanjiRepository {
     suspend fun getVocabularyAtOffset(offset: Long): Vocabulary?
     suspend fun getVocabularyCount(): Long
     suspend fun getKanjiIdsForVocab(vocabId: Long): List<Long>
+    suspend fun getUnseenKanjiByGrade(grade: Int, limit: Int): List<Kanji>
     suspend fun searchKanji(query: String, limit: Int = 20): List<Kanji>
     suspend fun getKanjiCount(): Long
+    suspend fun getKanjiCountByGrade(grade: Int): Long
 }

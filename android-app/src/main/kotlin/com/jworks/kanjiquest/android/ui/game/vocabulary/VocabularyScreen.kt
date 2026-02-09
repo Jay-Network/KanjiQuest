@@ -465,6 +465,14 @@ private fun VocabSessionCompleteContent(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
+                    sessionResult.adaptiveMessage?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
                 }
             }
         }

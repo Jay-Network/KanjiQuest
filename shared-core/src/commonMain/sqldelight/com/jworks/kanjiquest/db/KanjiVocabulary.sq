@@ -1,0 +1,14 @@
+CREATE TABLE kanji_vocabulary (
+    kanji_id INTEGER NOT NULL,
+    vocab_id INTEGER NOT NULL,
+    PRIMARY KEY (kanji_id, vocab_id)
+);
+
+getVocabIdsForKanji:
+SELECT vocab_id FROM kanji_vocabulary WHERE kanji_id = ?;
+
+getKanjiIdsForVocab:
+SELECT kanji_id FROM kanji_vocabulary WHERE vocab_id = ?;
+
+insert:
+INSERT OR IGNORE INTO kanji_vocabulary(kanji_id, vocab_id) VALUES (?, ?);

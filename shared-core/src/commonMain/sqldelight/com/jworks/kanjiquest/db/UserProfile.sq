@@ -1,0 +1,24 @@
+CREATE TABLE user_profile (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    total_xp INTEGER NOT NULL DEFAULT 0,
+    level INTEGER NOT NULL DEFAULT 1,
+    current_streak INTEGER NOT NULL DEFAULT 0,
+    longest_streak INTEGER NOT NULL DEFAULT 0,
+    last_study_date TEXT,
+    daily_goal INTEGER NOT NULL DEFAULT 20
+);
+
+get:
+SELECT * FROM user_profile WHERE id = 1;
+
+updateXpAndLevel:
+UPDATE user_profile SET total_xp = ?, level = ? WHERE id = 1;
+
+updateStreak:
+UPDATE user_profile SET current_streak = ?, longest_streak = ?, last_study_date = ? WHERE id = 1;
+
+updateDailyGoal:
+UPDATE user_profile SET daily_goal = ? WHERE id = 1;
+
+initializeIfEmpty:
+INSERT OR IGNORE INTO user_profile(id) VALUES (1);

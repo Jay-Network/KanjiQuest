@@ -1,5 +1,6 @@
 package com.jworks.kanjiquest.core.engine
 
+import com.jworks.kanjiquest.core.domain.UserSessionProvider
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.SrsState
 import com.jworks.kanjiquest.core.domain.model.VocabSrsCard
@@ -8,9 +9,12 @@ import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.domain.repository.VocabSrsRepository
 import com.jworks.kanjiquest.core.scoring.ScoringEngine
 import com.jworks.kanjiquest.core.srs.SrsAlgorithm
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 class GameEngine(
     private val questionGenerator: QuestionGenerator,
@@ -20,6 +24,7 @@ class GameEngine(
     private val vocabSrsRepository: VocabSrsRepository? = null,
     private val userRepository: UserRepository? = null,
     private val wordOfTheDayVocabId: Long? = null,
+    private val userSessionProvider: UserSessionProvider? = null,
     private val timeProvider: () -> Long = { kotlinx.datetime.Clock.System.now().epochSeconds }
 ) {
     private val _state = MutableStateFlow<GameState>(GameState.Idle)
@@ -36,11 +41,15 @@ class GameEngine(
     private var playerLevel: Int = 1
 
     suspend fun onEvent(event: GameEvent) {
-        when (event) {
-            is GameEvent.StartSession -> handleStartSession(event)
-            is GameEvent.SubmitAnswer -> handleSubmitAnswer(event)
-            is GameEvent.NextQuestion -> handleNextQuestion()
-            is GameEvent.EndSession -> handleEndSession()
+        try {
+            when (event) {
+                is GameEvent.StartSession -> handleStartSession(event)
+                is GameEvent.SubmitAnswer -> handleSubmitAnswer(event)
+                is GameEvent.NextQuestion -> handleNextQuestion()
+                is GameEvent.EndSession -> handleEndSession()
+            }
+        } catch (e: Exception) {
+            _state.value = GameState.Error("Something went wrong: ${e.message}")
         }
     }
 
@@ -56,13 +65,17 @@ class GameEngine(
 
         _state.value = GameState.Preparing(gameMode)
 
-        // Cache player level for vocabulary question type gating
-        playerLevel = userRepository?.getProfile()?.level ?: 1
+        // Run DB-heavy session prep off the main thread
+        val ready = withContext(Dispatchers.IO) {
+            // Admin override takes precedence, then real profile level
+            playerLevel = userSessionProvider?.getAdminPlayerLevelOverride()
+                ?: userRepository?.getProfile()?.level ?: 1
 
-        val ready = if (gameMode == GameMode.VOCABULARY) {
-            questionGenerator.prepareVocabSession(totalQuestions, timeProvider(), playerLevel)
-        } else {
-            questionGenerator.prepareSession(totalQuestions, timeProvider())
+            if (gameMode == GameMode.VOCABULARY) {
+                questionGenerator.prepareVocabSession(totalQuestions, timeProvider(), playerLevel)
+            } else {
+                questionGenerator.prepareSession(totalQuestions, timeProvider(), playerLevel)
+            }
         }
 
         if (!ready) {
@@ -128,21 +141,23 @@ class GameEngine(
         }
         sessionXp += xpGained
 
-        // Update SRS card
-        if (gameMode == GameMode.VOCABULARY && question.vocabId != null) {
-            val vocabRepo = vocabSrsRepository
-            if (vocabRepo != null) {
-                val vocabCard = vocabRepo.getCard(question.vocabId)
-                if (vocabCard != null) {
-                    val updated = reviewVocabCard(vocabCard, quality, timeProvider())
-                    vocabRepo.saveCard(updated)
+        // Update SRS card (off main thread)
+        withContext(Dispatchers.IO) {
+            if (gameMode == GameMode.VOCABULARY && question.vocabId != null) {
+                val vocabRepo = vocabSrsRepository
+                if (vocabRepo != null) {
+                    val vocabCard = vocabRepo.getCard(question.vocabId)
+                    if (vocabCard != null) {
+                        val updated = reviewVocabCard(vocabCard, quality, timeProvider())
+                        vocabRepo.saveCard(updated)
+                    }
                 }
-            }
-        } else {
-            val card = srsRepository.getCard(question.kanjiId)
-            if (card != null) {
-                val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
-                srsRepository.saveCard(updatedCard)
+            } else {
+                val card = srsRepository.getCard(question.kanjiId)
+                if (card != null) {
+                    val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
+                    srsRepository.saveCard(updatedCard)
+                }
             }
         }
 
@@ -177,11 +192,13 @@ class GameEngine(
     }
 
     private suspend fun showNextQuestion() {
-        val question = when (gameMode) {
-            GameMode.RECOGNITION -> questionGenerator.generateRecognitionQuestion()
-            GameMode.WRITING -> questionGenerator.generateWritingQuestion()
-            GameMode.VOCABULARY -> questionGenerator.generateVocabularyQuestion(playerLevel)
-            else -> questionGenerator.generateRecognitionQuestion()
+        val question = withContext(Dispatchers.IO) {
+            when (gameMode) {
+                GameMode.RECOGNITION -> questionGenerator.generateRecognitionQuestion()
+                GameMode.WRITING -> questionGenerator.generateWritingQuestion()
+                GameMode.VOCABULARY -> questionGenerator.generateVocabularyQuestion(playerLevel)
+                else -> questionGenerator.generateRecognitionQuestion()
+            }
         }
 
         if (question == null) {

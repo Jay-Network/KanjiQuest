@@ -27,6 +27,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -55,10 +57,6 @@ fun WritingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.startGame()
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -83,7 +81,12 @@ fun WritingScreen(
                 .padding(padding)
         ) {
             when (val state = uiState.gameState) {
-                is GameState.Idle, is GameState.Preparing -> LoadingContent()
+                is GameState.Idle -> WritingSetupContent(
+                    aiEnabled = uiState.aiEnabled,
+                    onAiToggle = { viewModel.setAiEnabled(it) },
+                    onStart = { viewModel.startGame() }
+                )
+                is GameState.Preparing -> LoadingContent()
                 is GameState.AwaitingAnswer -> WritingQuestionContent(
                     question = state,
                     completedStrokes = uiState.completedStrokes,
@@ -115,6 +118,85 @@ fun WritingScreen(
                     onBack = onBack
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WritingSetupContent(
+    aiEnabled: Boolean,
+    onAiToggle: (Boolean) -> Unit,
+    onStart: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Writing Practice",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Trace kanji stroke by stroke with guided references",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // AI Feedback toggle
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "AI Handwriting Feedback",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Gemini analyzes your strokes after each submission",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = aiEnabled,
+                    onCheckedChange = onAiToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Start Practice", fontSize = 18.sp)
         }
     }
 }
@@ -463,6 +545,14 @@ private fun SessionCompleteContent(
                             text = "${sessionResult.currentStreak} day streak!",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    sessionResult.adaptiveMessage?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }

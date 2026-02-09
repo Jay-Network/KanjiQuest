@@ -26,7 +26,8 @@ data class WritingUiState(
     val activeStroke: List<Offset> = emptyList(),
     val canvasSize: Float = 0f,
     val aiFeedback: HandwritingFeedback? = null,
-    val aiLoading: Boolean = false
+    val aiLoading: Boolean = false,
+    val aiEnabled: Boolean = true
 )
 
 @HiltViewModel
@@ -102,6 +103,10 @@ class WritingViewModel @Inject constructor(
         }
     }
 
+    fun setAiEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(aiEnabled = enabled)
+    }
+
     fun clearStrokes() {
         _uiState.value = _uiState.value.copy(
             completedStrokes = emptyList(),
@@ -145,26 +150,28 @@ class WritingViewModel @Inject constructor(
         }
 
         // Fire-and-forget AI check (runs in parallel, updates UI when done)
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(aiLoading = true)
-            try {
-                val feedback = handwritingChecker.evaluate(
-                    drawnStrokes = drawnStrokes,
-                    targetKanji = state.question.kanjiLiteral,
-                    strokeCount = state.question.strokePaths.size,
-                    canvasSize = canvasSize
-                )
-                _uiState.value = _uiState.value.copy(aiFeedback = feedback, aiLoading = false)
-            } catch (_: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    aiFeedback = HandwritingFeedback(
-                        overallComment = "",
-                        strokeFeedback = emptyList(),
-                        qualityRating = 0,
-                        isAvailable = false
-                    ),
-                    aiLoading = false
-                )
+        if (_uiState.value.aiEnabled) {
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(aiLoading = true)
+                try {
+                    val feedback = handwritingChecker.evaluate(
+                        drawnStrokes = drawnStrokes,
+                        targetKanji = state.question.kanjiLiteral,
+                        strokeCount = state.question.strokePaths.size,
+                        canvasSize = canvasSize
+                    )
+                    _uiState.value = _uiState.value.copy(aiFeedback = feedback, aiLoading = false)
+                } catch (_: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        aiFeedback = HandwritingFeedback(
+                            overallComment = "",
+                            strokeFeedback = emptyList(),
+                            qualityRating = 0,
+                            isAvailable = false
+                        ),
+                        aiLoading = false
+                    )
+                }
             }
         }
     }

@@ -1,0 +1,30 @@
+CREATE TABLE daily_stats (
+    date TEXT PRIMARY KEY NOT NULL,
+    cards_reviewed INTEGER NOT NULL DEFAULT 0,
+    xp_earned INTEGER NOT NULL DEFAULT 0,
+    study_time_sec INTEGER NOT NULL DEFAULT 0
+);
+
+getByDate:
+SELECT * FROM daily_stats WHERE date = ?;
+
+getRange:
+SELECT * FROM daily_stats WHERE date >= ? AND date <= ? ORDER BY date ASC;
+
+getRecent:
+SELECT * FROM daily_stats ORDER BY date DESC LIMIT ?;
+
+getTotalStudyTime:
+SELECT COALESCE(SUM(study_time_sec), 0) FROM daily_stats;
+
+upsert:
+INSERT OR REPLACE INTO daily_stats(date, cards_reviewed, xp_earned, study_time_sec)
+VALUES (?, ?, ?, ?);
+
+incrementForToday:
+INSERT INTO daily_stats(date, cards_reviewed, xp_earned, study_time_sec)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(date) DO UPDATE SET
+    cards_reviewed = cards_reviewed + excluded.cards_reviewed,
+    xp_earned = xp_earned + excluded.xp_earned,
+    study_time_sec = study_time_sec + excluded.study_time_sec;

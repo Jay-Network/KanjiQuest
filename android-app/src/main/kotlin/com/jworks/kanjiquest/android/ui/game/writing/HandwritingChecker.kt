@@ -1,6 +1,6 @@
 package com.jworks.kanjiquest.android.ui.game.writing
 
-import com.jworks.kanjiquest.android.network.OllamaClient
+import com.jworks.kanjiquest.android.network.GeminiClient
 import com.jworks.kanjiquest.core.writing.Point
 import org.json.JSONObject
 
@@ -11,7 +11,7 @@ data class HandwritingFeedback(
     val isAvailable: Boolean = true
 )
 
-class HandwritingChecker(private val ollamaClient: OllamaClient) {
+class HandwritingChecker(private val geminiClient: GeminiClient) {
 
     suspend fun evaluate(
         drawnStrokes: List<List<Point>>,
@@ -28,7 +28,7 @@ class HandwritingChecker(private val ollamaClient: OllamaClient) {
         val prompt = buildPrompt(targetKanji, strokeCount)
 
         return try {
-            val response = ollamaClient.generateWithImage(prompt, imageBase64)
+            val response = geminiClient.generateWithImage(prompt, imageBase64)
             parseResponse(response)
         } catch (_: Exception) {
             unavailable()

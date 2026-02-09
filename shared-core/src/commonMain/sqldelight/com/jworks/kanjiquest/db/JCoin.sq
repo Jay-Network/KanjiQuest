@@ -1,0 +1,145 @@
+-- J Coin local storage: balance cache, sync queue, premium unlocks, boosters
+
+CREATE TABLE coin_balance (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    local_balance INTEGER NOT NULL DEFAULT 0,
+    synced_balance INTEGER NOT NULL DEFAULT 0,
+    lifetime_earned INTEGER NOT NULL DEFAULT 0,
+    lifetime_spent INTEGER NOT NULL DEFAULT 0,
+    tier TEXT NOT NULL DEFAULT 'bronze',
+    last_synced_at INTEGER NOT NULL DEFAULT 0,
+    needs_sync INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE coin_sync_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    user_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    source_business TEXT NOT NULL DEFAULT 'kanjiquests',
+    source_type TEXT NOT NULL,
+    base_amount INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL,
+    sync_status TEXT NOT NULL DEFAULT 'pending',
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_attempt_at INTEGER,
+    error_message TEXT
+);
+
+CREATE TABLE premium_content_unlocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    user_id TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    unlocked_at INTEGER NOT NULL,
+    cost_coins INTEGER NOT NULL,
+    UNIQUE(user_id, content_type, content_id)
+);
+
+CREATE TABLE active_boosters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    user_id TEXT NOT NULL,
+    booster_type TEXT NOT NULL,
+    multiplier REAL NOT NULL DEFAULT 1.0,
+    activated_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_sync_queue_status ON coin_sync_queue(sync_status, created_at);
+CREATE INDEX idx_unlocks_user ON premium_content_unlocks(user_id, content_type);
+CREATE INDEX idx_boosters_user ON active_boosters(user_id, expires_at);
+
+-- Balance queries
+getBalance:
+SELECT * FROM coin_balance WHERE user_id = ?;
+
+upsertBalance:
+INSERT INTO coin_balance(user_id, local_balance, synced_balance, lifetime_earned, lifetime_spent, tier, last_synced_at, needs_sync)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(user_id) DO UPDATE SET
+    local_balance = excluded.local_balance,
+    synced_balance = excluded.synced_balance,
+    lifetime_earned = excluded.lifetime_earned,
+    lifetime_spent = excluded.lifetime_spent,
+    tier = excluded.tier,
+    last_synced_at = excluded.last_synced_at,
+    needs_sync = excluded.needs_sync;
+
+addToBalance:
+UPDATE coin_balance SET
+    local_balance = local_balance + ?,
+    lifetime_earned = lifetime_earned + ?,
+    needs_sync = 1
+WHERE user_id = ?;
+
+initializeBalance:
+INSERT OR IGNORE INTO coin_balance(user_id, local_balance, synced_balance, lifetime_earned, lifetime_spent, tier, last_synced_at, needs_sync)
+VALUES (?, 0, 0, 0, 0, 'bronze', 0, 0);
+
+-- Sync queue queries
+getPendingEvents:
+SELECT * FROM coin_sync_queue
+WHERE sync_status IN ('pending', 'failed')
+AND retry_count < 5
+ORDER BY created_at ASC;
+
+getPendingCount:
+SELECT COUNT(*) FROM coin_sync_queue
+WHERE sync_status IN ('pending', 'failed');
+
+insertSyncEvent:
+INSERT INTO coin_sync_queue(user_id, event_type, source_business, source_type, base_amount, description, metadata, created_at, sync_status)
+VALUES (?, ?, 'kanjiquests', ?, ?, ?, ?, ?, 'pending');
+
+updateSyncStatus:
+UPDATE coin_sync_queue SET
+    sync_status = ?,
+    retry_count = retry_count + 1,
+    last_attempt_at = ?,
+    error_message = ?
+WHERE id = ?;
+
+deleteSyncedEvents:
+DELETE FROM coin_sync_queue WHERE sync_status = 'synced';
+
+deleteSyncEvent:
+DELETE FROM coin_sync_queue WHERE id = ?;
+
+-- Premium content queries
+getUnlock:
+SELECT * FROM premium_content_unlocks
+WHERE user_id = ? AND content_type = ? AND content_id = ?;
+
+getUnlockedByType:
+SELECT * FROM premium_content_unlocks
+WHERE user_id = ? AND content_type = ?;
+
+insertUnlock:
+INSERT OR IGNORE INTO premium_content_unlocks(user_id, content_type, content_id, unlocked_at, cost_coins)
+VALUES (?, ?, ?, ?, ?);
+
+-- Booster queries
+getActiveBoosters:
+SELECT * FROM active_boosters
+WHERE user_id = ? AND expires_at > ?;
+
+insertBooster:
+INSERT INTO active_boosters(user_id, booster_type, multiplier, activated_at, expires_at)
+VALUES (?, ?, ?, ?, ?);
+
+deleteExpiredBoosters:
+DELETE FROM active_boosters WHERE expires_at <= ?;
+
+-- Migration queries (local_user -> auth UUID)
+migrateBalanceUserId:
+UPDATE coin_balance SET user_id = ? WHERE user_id = ?;
+
+migrateSyncQueueUserId:
+UPDATE coin_sync_queue SET user_id = ? WHERE user_id = ?;
+
+migrateUnlocksUserId:
+UPDATE premium_content_unlocks SET user_id = ? WHERE user_id = ?;
+
+migrateBoostersUserId:
+UPDATE active_boosters SET user_id = ? WHERE user_id = ?;

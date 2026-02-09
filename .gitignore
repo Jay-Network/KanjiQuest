@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/*/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/raw-data/
+*.db
+!android-app/src/main/assets/kanjiquest.db
+
+# Signing
+keystore/
+*.jks
+*.keystore

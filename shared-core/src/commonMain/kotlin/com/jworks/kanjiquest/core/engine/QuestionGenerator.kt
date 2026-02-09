@@ -2,6 +2,7 @@ package com.jworks.kanjiquest.core.engine
 
 import com.jworks.kanjiquest.core.domain.model.ExampleSentence
 import com.jworks.kanjiquest.core.domain.model.Kanji
+import com.jworks.kanjiquest.core.domain.model.LevelProgression
 import com.jworks.kanjiquest.core.domain.model.SrsCard
 import com.jworks.kanjiquest.core.domain.model.SrsState
 import com.jworks.kanjiquest.core.domain.model.VocabQuestionType
@@ -18,7 +19,8 @@ import kotlin.random.Random
 class QuestionGenerator(
     private val kanjiRepository: KanjiRepository,
     private val srsRepository: SrsRepository,
-    private val vocabSrsRepository: VocabSrsRepository? = null
+    private val vocabSrsRepository: VocabSrsRepository? = null,
+    private val gradeMasteryProvider: GradeMasteryProvider? = null
 ) {
     private var questionQueue: MutableList<QueueEntry> = mutableListOf()
     private var distractorPool: List<Kanji> = emptyList()
@@ -39,31 +41,104 @@ class QuestionGenerator(
         val exampleSentence: ExampleSentence? = null
     )
 
-    suspend fun prepareSession(questionCount: Int, currentTime: Long): Boolean {
+    suspend fun prepareSession(questionCount: Int, currentTime: Long, playerLevel: Int = 1): Boolean {
         questionQueue.clear()
+        val addedKanjiIds = mutableSetOf<Int>()
 
         // 1. Gather due cards first (SRS review)
         val dueCards = srsRepository.getDueCards(currentTime)
         for (card in dueCards.take(questionCount)) {
             val kanji = kanjiRepository.getKanjiById(card.kanjiId) ?: continue
             questionQueue.add(QueueEntry(kanji, isNew = false, srsState = card.state.value))
+            addedKanjiIds.add(kanji.id)
         }
 
-        // 2. Fill remainder with new cards (Grade 1 first, then by frequency)
-        val remaining = questionCount - questionQueue.size
+        // 2. Fill with learning cards (cards studied before but not yet due — re-review)
+        var remaining = questionCount - questionQueue.size
+        if (remaining > 0) {
+            val learningCards = srsRepository.getLearningCards(remaining)
+            for (card in learningCards) {
+                if (card.kanjiId in addedKanjiIds) continue
+                val kanji = kanjiRepository.getKanjiById(card.kanjiId) ?: continue
+                questionQueue.add(QueueEntry(kanji, isNew = false, srsState = card.state.value))
+                addedKanjiIds.add(kanji.id)
+            }
+        }
+
+        // 3. Fill with new SRS cards (state = 'new')
+        remaining = questionCount - questionQueue.size
         if (remaining > 0) {
             val newCards = srsRepository.getNewCards(remaining)
-            if (newCards.isEmpty()) {
-                // No SRS cards at all - introduce fresh kanji from Grade 1
-                val grade1 = kanjiRepository.getKanjiByGrade(1)
-                for (kanji in grade1.take(remaining)) {
-                    srsRepository.ensureCardExists(kanji.id)
-                    questionQueue.add(QueueEntry(kanji, isNew = true))
+            for (card in newCards) {
+                if (card.kanjiId in addedKanjiIds) continue
+                val kanji = kanjiRepository.getKanjiById(card.kanjiId) ?: continue
+                questionQueue.add(QueueEntry(kanji, isNew = true))
+                addedKanjiIds.add(kanji.id)
+            }
+        }
+
+        // 4. Introduce unseen kanji with adaptive grade mixing
+        //    Grade gating: only introduce kanji from grades unlocked at the player's level
+        remaining = questionCount - questionQueue.size
+        if (remaining > 0) {
+            val unlockedGrades = LevelProgression.getUnlockedGrades(playerLevel)
+            val provider = gradeMasteryProvider
+
+            if (unlockedGrades.size >= 2 && provider != null) {
+                // Adaptive mode: check mastery of lower grades to determine new-grade mix
+                val highestGrade = unlockedGrades.last()
+                val lowerGrades = unlockedGrades.dropLast(1)
+
+                // Use the highest lower grade as the "gatekeeper"
+                val gatekeeperGrade = lowerGrades.last()
+                val gatekeeperMastery = provider.getGradeMastery(gatekeeperGrade)
+                val newGradeRatio = gatekeeperMastery.newGradeRatio
+
+                // Split remaining slots between lower grades and highest grade
+                val highestGradeSlots = (remaining * newGradeRatio).toInt()
+                val lowerGradeSlots = remaining - highestGradeSlots
+
+                // Fill lower grades first
+                var lowerRemaining = lowerGradeSlots
+                for (grade in lowerGrades) {
+                    if (lowerRemaining <= 0) break
+                    val unseen = kanjiRepository.getUnseenKanjiByGrade(grade, lowerRemaining)
+                    for (kanji in unseen) {
+                        if (kanji.id in addedKanjiIds) continue
+                        srsRepository.ensureCardExists(kanji.id)
+                        questionQueue.add(QueueEntry(kanji, isNew = true))
+                        addedKanjiIds.add(kanji.id)
+                        lowerRemaining--
+                        if (lowerRemaining <= 0) break
+                    }
+                }
+
+                // Fill highest grade slots
+                var highRemaining = highestGradeSlots + lowerRemaining // carry over unused lower slots
+                if (highRemaining > 0) {
+                    val unseen = kanjiRepository.getUnseenKanjiByGrade(highestGrade, highRemaining)
+                    for (kanji in unseen) {
+                        if (kanji.id in addedKanjiIds) continue
+                        srsRepository.ensureCardExists(kanji.id)
+                        questionQueue.add(QueueEntry(kanji, isNew = true))
+                        addedKanjiIds.add(kanji.id)
+                        highRemaining--
+                        if (highRemaining <= 0) break
+                    }
                 }
             } else {
-                for (card in newCards) {
-                    val kanji = kanjiRepository.getKanjiById(card.kanjiId) ?: continue
-                    questionQueue.add(QueueEntry(kanji, isNew = true))
+                // Single grade or no provider: original behavior
+                for (grade in unlockedGrades) {
+                    if (remaining <= 0) break
+                    val unseen = kanjiRepository.getUnseenKanjiByGrade(grade, remaining)
+                    for (kanji in unseen) {
+                        if (kanji.id in addedKanjiIds) continue
+                        srsRepository.ensureCardExists(kanji.id)
+                        questionQueue.add(QueueEntry(kanji, isNew = true))
+                        addedKanjiIds.add(kanji.id)
+                        remaining--
+                        if (remaining <= 0) break
+                    }
                 }
             }
         }
@@ -206,25 +281,20 @@ class QuestionGenerator(
 
         for (card in dueCards.take(questionCount)) {
             val vocab = studiedVocab.find { it.id == card.vocabId } ?: continue
-            val sentence = kanjiRepository.getExampleSentence(vocab.id)
-            vocabQueue.add(VocabQueueEntry(vocab, isNew = false, srsState = card.state.value, exampleSentence = sentence))
+            vocabQueue.add(VocabQueueEntry(vocab, isNew = false, srsState = card.state.value))
             addedIds.add(vocab.id)
         }
 
         // Fill remainder with new vocab (not yet in SRS or state=new)
         val remaining = questionCount - vocabQueue.size
         if (remaining > 0) {
-            for (vocab in studiedVocab) {
+            val candidates = studiedVocab.filter { it.id !in addedIds }.take(remaining * 3)
+            for (vocab in candidates) {
                 if (vocabQueue.size >= questionCount) break
-                if (vocab.id in addedIds) continue
 
-                val existingCard = repo.getCard(vocab.id)
-                if (existingCard == null || existingCard.state == SrsState.NEW) {
-                    repo.ensureCardExists(vocab.id)
-                    val sentence = kanjiRepository.getExampleSentence(vocab.id)
-                    vocabQueue.add(VocabQueueEntry(vocab, isNew = true, exampleSentence = sentence))
-                    addedIds.add(vocab.id)
-                }
+                repo.ensureCardExists(vocab.id)
+                vocabQueue.add(VocabQueueEntry(vocab, isNew = true))
+                addedIds.add(vocab.id)
             }
         }
 
@@ -233,8 +303,16 @@ class QuestionGenerator(
     }
 
     suspend fun generateVocabularyQuestion(playerLevel: Int): Question? {
-        val entry = vocabQueue.removeFirstOrNull() ?: return null
-        val vocab = entry.vocab
+        val rawEntry = vocabQueue.removeFirstOrNull() ?: return null
+        val vocab = rawEntry.vocab
+
+        // Lazy-load example sentence if not already fetched
+        val entry = if (rawEntry.exampleSentence == null) {
+            val sentence = kanjiRepository.getExampleSentence(vocab.id)
+            rawEntry.copy(exampleSentence = sentence)
+        } else {
+            rawEntry
+        }
 
         val availableTypes = VocabQuestionType.availableForLevel(playerLevel)
         if (availableTypes.isEmpty()) return null

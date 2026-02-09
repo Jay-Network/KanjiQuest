@@ -1,0 +1,46 @@
+CREATE TABLE kanji (
+    id INTEGER PRIMARY KEY NOT NULL,
+    literal TEXT NOT NULL UNIQUE,
+    grade INTEGER,
+    jlpt_level INTEGER,
+    frequency INTEGER,
+    stroke_count INTEGER NOT NULL,
+    meanings_en TEXT NOT NULL,
+    on_readings TEXT NOT NULL,
+    kun_readings TEXT NOT NULL,
+    stroke_svg TEXT
+);
+
+getById:
+SELECT * FROM kanji WHERE id = ?;
+
+getByLiteral:
+SELECT * FROM kanji WHERE literal = ?;
+
+getByGrade:
+SELECT * FROM kanji WHERE grade = ? ORDER BY frequency ASC;
+
+getByJlptLevel:
+SELECT * FROM kanji WHERE jlpt_level = ? ORDER BY frequency ASC;
+
+getByFrequencyRange:
+SELECT * FROM kanji WHERE frequency BETWEEN ? AND ? ORDER BY frequency ASC;
+
+countByGrade:
+SELECT COUNT(*) FROM kanji WHERE grade = ?;
+
+countByJlptLevel:
+SELECT COUNT(*) FROM kanji WHERE jlpt_level = ?;
+
+countAll:
+SELECT COUNT(*) FROM kanji;
+
+getUnseenByGrade:
+SELECT * FROM kanji WHERE grade = ? AND id NOT IN (SELECT kanji_id FROM srs_card) ORDER BY frequency ASC LIMIT ?;
+
+search:
+SELECT * FROM kanji WHERE literal LIKE ? OR meanings_en LIKE ? LIMIT ?;
+
+insert:
+INSERT OR REPLACE INTO kanji(id, literal, grade, jlpt_level, frequency, stroke_count, meanings_en, on_readings, kun_readings, stroke_svg)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

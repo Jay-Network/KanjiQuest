@@ -1,0 +1,58 @@
+CREATE TABLE srs_card (
+    kanji_id INTEGER PRIMARY KEY NOT NULL,
+    ease_factor REAL NOT NULL DEFAULT 2.5,
+    interval INTEGER NOT NULL DEFAULT 0,
+    repetitions INTEGER NOT NULL DEFAULT 0,
+    next_review INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'new',
+    total_reviews INTEGER NOT NULL DEFAULT 0,
+    correct_count INTEGER NOT NULL DEFAULT 0
+);
+
+getByKanjiId:
+SELECT * FROM srs_card WHERE kanji_id = ?;
+
+getDueCards:
+SELECT * FROM srs_card WHERE next_review <= ? AND state != 'graduated' ORDER BY next_review ASC;
+
+getNewCards:
+SELECT * FROM srs_card WHERE state = 'new' LIMIT ?;
+
+getDueCount:
+SELECT COUNT(*) FROM srs_card WHERE next_review <= ? AND state != 'graduated';
+
+getNewCount:
+SELECT COUNT(*) FROM srs_card WHERE state = 'new';
+
+getMasteredCount:
+SELECT COUNT(*) FROM srs_card WHERE state = 'graduated';
+
+getTotalCount:
+SELECT COUNT(*) FROM srs_card;
+
+getLearningCards:
+SELECT * FROM srs_card WHERE state = 'learning' ORDER BY next_review ASC LIMIT ?;
+
+getByState:
+SELECT * FROM srs_card WHERE state = ?;
+
+upsert:
+INSERT OR REPLACE INTO srs_card(kanji_id, ease_factor, interval, repetitions, next_review, state, total_reviews, correct_count)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+insertNew:
+INSERT OR IGNORE INTO srs_card(kanji_id) VALUES (?);
+
+getGradeStats:
+SELECT
+    COUNT(s.kanji_id) AS studied_count,
+    SUM(CASE WHEN s.state = 'graduated' THEN 1 ELSE 0 END) AS mastered_count,
+    CASE
+        WHEN SUM(CASE WHEN s.total_reviews > 0 THEN 1 ELSE 0 END) > 0
+        THEN CAST(SUM(CASE WHEN s.total_reviews > 0 THEN CAST(s.correct_count AS REAL) / s.total_reviews ELSE 0 END) AS REAL)
+             / SUM(CASE WHEN s.total_reviews > 0 THEN 1 ELSE 0 END)
+        ELSE 0.0
+    END AS avg_accuracy
+FROM srs_card s
+JOIN kanji k ON s.kanji_id = k.id
+WHERE s.state != 'new' AND k.grade = ?;
