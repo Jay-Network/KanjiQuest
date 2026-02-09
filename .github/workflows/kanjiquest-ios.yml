@@ -1,0 +1,65 @@
+name: KanjiQuest iOS Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: '17'
+  XCODE_VERSION: '15.0'
+
+jobs:
+  build-xcframework:
+    name: Build KMP XCFramework
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+      - run: chmod +x gradlew
+      - run: ./gradlew :shared-core:assembleSharedCoreReleaseXCFramework
+      - run: ./gradlew :shared-japanese:assembleSharedJapaneseReleaseXCFramework
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xcframeworks
+          path: |
+            shared-core/build/XCFrameworks/release/
+            shared-japanese/build/XCFrameworks/release/
+
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-14
+    needs: build-xcframework
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: xcframeworks
+      - run: sudo xcode-select -s /Applications/Xcode_15.0.app
+      - run: brew install xcodegen
+      - working-directory: ios-app
+        run: xcodegen
+      - name: Create xcconfig
+        working-directory: ios-app
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > KanjiQuest.xcconfig << EOF
+          SUPABASE_URL = ${SUPABASE_URL}
+          SUPABASE_ANON_KEY = ${SUPABASE_ANON_KEY}
+          GEMINI_API_KEY = ${GEMINI_API_KEY}
+          DEVELOPMENT_TEAM = ${APPLE_TEAM_ID}
+          EOF
+      - name: Build
+        working-directory: ios-app
+        run: |
+          xcodebuild archive \
+            -project KanjiQuest.xcodeproj \
+            -scheme KanjiQuest \
+            -archivePath build/KanjiQuest.xcarchive
