@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.jworks.kanjiquest.android.workers.CoinSyncWorker
+import com.jworks.kanjiquest.android.workers.LearningSyncWorker
 import com.jworks.kanjiquest.core.data.remote.AuthSupabaseClientFactory
 import com.jworks.kanjiquest.core.data.remote.SupabaseClientFactory
 import dagger.hilt.android.HiltAndroidApp
@@ -31,6 +32,9 @@ class KanjiQuestApplication : Application(), Configuration.Provider {
 
         // Schedule background J Coin sync
         CoinSyncWorker.schedule(this)
+
+        // Schedule background learning data sync
+        LearningSyncWorker.schedule(this)
     }
 
     private fun initializeSupabase() {

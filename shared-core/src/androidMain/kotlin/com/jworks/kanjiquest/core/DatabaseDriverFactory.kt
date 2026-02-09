@@ -127,6 +127,31 @@ actual class DatabaseDriverFactory(private val context: Context) {
                     correct_count INTEGER NOT NULL DEFAULT 0
                 )
             """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS learning_sync_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    sync_status TEXT NOT NULL DEFAULT 'pending',
+                    retry_count INTEGER NOT NULL DEFAULT 0,
+                    last_attempt_at INTEGER,
+                    error_message TEXT
+                )
+            """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS learning_sync_metadata (
+                    user_id TEXT PRIMARY KEY NOT NULL,
+                    last_synced_at INTEGER NOT NULL DEFAULT 0,
+                    last_push_at INTEGER NOT NULL DEFAULT 0,
+                    last_pull_at INTEGER NOT NULL DEFAULT 0
+                )
+            """.trimIndent())
+
+            it.execSQL("CREATE INDEX IF NOT EXISTS idx_learning_sync_status ON learning_sync_queue(sync_status, created_at)")
         }
     }
 

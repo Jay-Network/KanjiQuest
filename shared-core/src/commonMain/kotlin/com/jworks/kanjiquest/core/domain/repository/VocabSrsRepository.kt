@@ -8,4 +8,5 @@ interface VocabSrsRepository {
     suspend fun getNewCards(limit: Int): List<VocabSrsCard>
     suspend fun saveCard(card: VocabSrsCard)
     suspend fun ensureCardExists(vocabId: Long)
+    suspend fun getNotDueVocabIds(currentTime: Long): Set<Long>
 }

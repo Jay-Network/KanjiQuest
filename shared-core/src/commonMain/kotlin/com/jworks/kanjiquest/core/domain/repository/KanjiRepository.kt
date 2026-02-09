@@ -12,6 +12,8 @@ interface KanjiRepository {
     suspend fun getVocabularyForKanji(kanjiId: Int): List<Vocabulary>
     suspend fun getVocabularyByIds(ids: List<Long>): List<Vocabulary>
     suspend fun getStudiedKanjiVocabulary(): List<Vocabulary>
+    suspend fun getRandomStudiedVocabulary(): Vocabulary?
+    suspend fun getVocabularyById(id: Long): Vocabulary?
     suspend fun getExampleSentence(vocabId: Long): ExampleSentence?
     suspend fun getVocabularyAtOffset(offset: Long): Vocabulary?
     suspend fun getVocabularyCount(): Long

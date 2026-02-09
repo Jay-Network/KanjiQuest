@@ -36,7 +36,7 @@ countAll:
 SELECT COUNT(*) FROM kanji;
 
 getUnseenByGrade:
-SELECT * FROM kanji WHERE grade = ? AND id NOT IN (SELECT kanji_id FROM srs_card) ORDER BY frequency ASC LIMIT ?;
+SELECT * FROM kanji WHERE grade = ? AND id NOT IN (SELECT kanji_id FROM srs_card) ORDER BY RANDOM() LIMIT ?;
 
 search:
 SELECT * FROM kanji WHERE literal LIKE ? OR meanings_en LIKE ? LIMIT ?;

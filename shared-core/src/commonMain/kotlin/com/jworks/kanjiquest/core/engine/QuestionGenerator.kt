@@ -285,10 +285,12 @@ class QuestionGenerator(
             addedIds.add(vocab.id)
         }
 
-        // Fill remainder with new vocab (not yet in SRS or state=new)
+        // Fill remainder with truly new vocab (not yet reviewed or still in 'new' state)
+        // Exclude vocab that has been reviewed and is scheduled for future review
         val remaining = questionCount - vocabQueue.size
         if (remaining > 0) {
-            val candidates = studiedVocab.filter { it.id !in addedIds }.take(remaining * 3)
+            val notDueIds = repo.getNotDueVocabIds(currentTime)
+            val candidates = studiedVocab.filter { it.id !in addedIds && it.id !in notDueIds }.take(remaining * 3)
             for (vocab in candidates) {
                 if (vocabQueue.size >= questionCount) break
 
@@ -332,7 +334,19 @@ class QuestionGenerator(
         }
 
         // Gather the distractor pool from the rest of the vocabQueue + current entry
-        val pool = vocabQueue.map { it.vocab } + listOf(vocab)
+        // Expand pool from DB when session queue is too small for good distractors
+        val sessionPool = vocabQueue.map { it.vocab } + listOf(vocab)
+        val pool = if (sessionPool.size < 6) {
+            val existingIds = sessionPool.map { it.id }.toSet()
+            val extra = mutableListOf<Vocabulary>()
+            repeat(20) {
+                val v = kanjiRepository.getRandomStudiedVocabulary()
+                if (v != null && v.id !in existingIds && v.id !in extra.map { e -> e.id }) {
+                    extra.add(v)
+                }
+            }
+            sessionPool + extra
+        } else sessionPool
 
         return when (questionType) {
             VocabQuestionType.MEANING -> buildMeaningQuestion(vocab, entry, pool, breakdown)
@@ -347,15 +361,28 @@ class QuestionGenerator(
         pool: List<Vocabulary>, breakdown: List<String>
     ): Question {
         val correct = vocab.primaryMeaning
-        val distractors = pool
+        val correctLen = correct.length
+        // Prefer distractors with similar word length to avoid length-based guessing
+        val candidates = pool
             .filter { it.id != vocab.id && it.primaryMeaning != correct }
             .map { it.primaryMeaning }
             .distinct()
-            .shuffled()
-            .take(3)
-            .toMutableList()
-        while (distractors.size < 3) {
-            distractors.add("(no match ${distractors.size + 1})")
+        val similarLength = candidates.filter {
+            it.length in (correctLen - correctLen / 3 - 2)..(correctLen + correctLen / 3 + 2)
+        }.shuffled()
+        val otherLength = candidates.filter {
+            it.length !in (correctLen - correctLen / 3 - 2)..(correctLen + correctLen / 3 + 2)
+        }.shuffled()
+        val distractors = (similarLength + otherLength).take(3).toMutableList()
+        // Fallback meanings when pool is exhausted (should rarely happen with expanded pool)
+        val fallbackMeanings = listOf(
+            "to stand", "to eat", "mountain", "river", "person", "thing",
+            "to go", "school", "to read", "flower", "fire", "water",
+            "to write", "tree", "stone", "field", "to run", "to see"
+        ).filter { it != correct && it !in distractors }.shuffled()
+        var fallbackIdx = 0
+        while (distractors.size < 3 && fallbackIdx < fallbackMeanings.size) {
+            distractors.add(fallbackMeanings[fallbackIdx++])
         }
         val choices = (distractors + correct).shuffled()
 
@@ -381,18 +408,24 @@ class QuestionGenerator(
         pool: List<Vocabulary>, breakdown: List<String>
     ): Question {
         val correct = vocab.reading
-        val distractors = pool
+        val correctLen = correct.length
+        // Prefer distractors with similar character length (±1) to avoid length-based guessing
+        val candidates = pool
             .filter { it.id != vocab.id && it.reading != correct }
             .map { it.reading }
             .distinct()
-            .shuffled()
-            .take(3)
-            .toMutableList()
-        while (distractors.size < 3) {
-            val hiragana = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん"
-            val len = correct.length.coerceIn(2, 4)
-            val fake = buildString { repeat(len) { append(hiragana[Random.nextInt(hiragana.length)]) } }
-            if (fake != correct && fake !in distractors) distractors.add(fake)
+        val similarLength = candidates.filter { it.length in (correctLen - 1)..(correctLen + 1) }.shuffled()
+        val otherLength = candidates.filter { it.length !in (correctLen - 1)..(correctLen + 1) }.shuffled()
+        val distractors = (similarLength + otherLength).take(3).toMutableList()
+        // Fallback readings: common real Japanese readings instead of random gibberish
+        val fallbackReadings = listOf(
+            "たべる", "のむ", "はしる", "よむ", "かく", "みる", "いく",
+            "くる", "する", "なる", "ある", "おおきい", "ちいさい",
+            "あたらしい", "ふるい", "やすい", "たかい", "はやい"
+        ).filter { it != correct && it !in distractors }.shuffled()
+        var fallbackIdx = 0
+        while (distractors.size < 3 && fallbackIdx < fallbackReadings.size) {
+            distractors.add(fallbackReadings[fallbackIdx++])
         }
         val choices = (distractors + correct).shuffled()
 
@@ -443,8 +476,13 @@ class QuestionGenerator(
                 distractors.add(ch)
             }
         }
-        while (distractors.size < 3) {
-            distractors.add("?${distractors.size + 1}")
+        // Fallback kanji from common Grade 1-2 kanji
+        val fallbackKanji = listOf("山", "川", "田", "林", "森", "火", "水", "土", "金", "木",
+            "日", "月", "年", "人", "子", "女", "男", "大", "小", "中")
+            .filter { it != firstKanjiLiteral && it !in distractors }.shuffled()
+        var fIdx = 0
+        while (distractors.size < 3 && fIdx < fallbackKanji.size) {
+            distractors.add(fallbackKanji[fIdx++])
         }
         val choices = (distractors.take(3) + firstKanjiLiteral).shuffled()
 
@@ -485,8 +523,13 @@ class QuestionGenerator(
             .shuffled()
             .take(3)
             .toMutableList()
-        while (distractors.size < 3) {
-            distractors.add("--${distractors.size + 1}--")
+        // Fallback vocab from pool or common words
+        val fallbackWords = pool
+            .filter { it.id != vocab.id && it.kanjiForm != correct && it.kanjiForm !in distractors }
+            .map { it.kanjiForm }.shuffled()
+        var fIdx = 0
+        while (distractors.size < 3 && fIdx < fallbackWords.size) {
+            distractors.add(fallbackWords[fIdx++])
         }
         val choices = (distractors + correct).shuffled()
 

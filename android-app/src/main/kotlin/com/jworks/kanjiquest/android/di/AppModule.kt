@@ -10,6 +10,7 @@ import com.jworks.kanjiquest.core.data.AuthRepositoryImpl
 import com.jworks.kanjiquest.core.data.DatabaseDriverFactory
 import com.jworks.kanjiquest.core.data.JCoinRepositoryImpl
 import com.jworks.kanjiquest.core.data.KanjiRepositoryImpl
+import com.jworks.kanjiquest.core.data.LearningSyncRepositoryImpl
 import com.jworks.kanjiquest.core.data.SessionRepositoryImpl
 import com.jworks.kanjiquest.core.data.SrsRepositoryImpl
 import com.jworks.kanjiquest.core.data.UserRepositoryImpl
@@ -20,11 +21,13 @@ import com.jworks.kanjiquest.core.domain.repository.AchievementRepository
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
+import com.jworks.kanjiquest.core.domain.repository.LearningSyncRepository
 import com.jworks.kanjiquest.core.domain.repository.SessionRepository
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.domain.repository.VocabSrsRepository
 import com.jworks.kanjiquest.core.domain.usecase.CompleteSessionUseCase
+import com.jworks.kanjiquest.core.domain.usecase.DataRestorationUseCase
 import com.jworks.kanjiquest.core.domain.usecase.MigrateLocalDataUseCase
 import com.jworks.kanjiquest.core.domain.usecase.WordOfTheDayUseCase
 import com.jworks.kanjiquest.core.engine.GameEngine
@@ -114,6 +117,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideLearningSyncRepository(db: KanjiQuestDatabase): LearningSyncRepository {
+        return LearningSyncRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
     fun provideUserSessionProvider(authRepository: AuthRepository): UserSessionProvider {
         return UserSessionProviderImpl(authRepository)
     }
@@ -160,14 +169,29 @@ object AppModule {
         sessionRepository: SessionRepository,
         scoringEngine: ScoringEngine,
         jCoinRepository: JCoinRepository,
-        userSessionProvider: UserSessionProvider
+        userSessionProvider: UserSessionProvider,
+        learningSyncRepository: LearningSyncRepository,
+        achievementRepository: AchievementRepository
     ): CompleteSessionUseCase {
-        return CompleteSessionUseCase(userRepository, sessionRepository, scoringEngine, jCoinRepository, userSessionProvider)
+        return CompleteSessionUseCase(
+            userRepository, sessionRepository, scoringEngine,
+            jCoinRepository, userSessionProvider,
+            learningSyncRepository, achievementRepository
+        )
     }
 
     @Provides
     fun provideMigrateLocalDataUseCase(db: KanjiQuestDatabase): MigrateLocalDataUseCase {
         return MigrateLocalDataUseCase(db)
+    }
+
+    @Provides
+    fun provideDataRestorationUseCase(
+        learningSyncRepository: LearningSyncRepository,
+        userRepository: UserRepository,
+        srsRepository: SrsRepository
+    ): DataRestorationUseCase {
+        return DataRestorationUseCase(learningSyncRepository, userRepository, srsRepository)
     }
 
     @Provides

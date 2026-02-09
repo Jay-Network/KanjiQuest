@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
 import com.jworks.kanjiquest.core.domain.repository.AuthState
+import com.jworks.kanjiquest.core.domain.usecase.DataRestorationUseCase
 import com.jworks.kanjiquest.core.domain.usecase.MigrateLocalDataUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,8 @@ data class AuthUiState(
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val migrateLocalDataUseCase: MigrateLocalDataUseCase
+    private val migrateLocalDataUseCase: MigrateLocalDataUseCase,
+    private val dataRestorationUseCase: DataRestorationUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -51,6 +53,8 @@ class AuthViewModel @Inject constructor(
             result.onSuccess { userId ->
                 // Migrate local data to the authenticated user
                 migrateLocalDataUseCase.execute(userId)
+                // Restore/sync learning data with cloud
+                dataRestorationUseCase.execute(userId)
                 _uiState.value = _uiState.value.copy(isLoading = false, isLoggedIn = true)
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(
@@ -67,6 +71,8 @@ class AuthViewModel @Inject constructor(
             val result = authRepository.signUp(email, password)
             result.onSuccess { userId ->
                 migrateLocalDataUseCase.execute(userId)
+                // Restore/sync learning data with cloud
+                dataRestorationUseCase.execute(userId)
                 _uiState.value = _uiState.value.copy(isLoading = false, isLoggedIn = true)
             }.onFailure { e ->
                 _uiState.value = _uiState.value.copy(

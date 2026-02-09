@@ -28,6 +28,9 @@ mlkit-digital-ink = "18.1.0"
 # Kuromoji
 kuromoji = "0.9.0"
 
+# SKIE (Swift-Kotlin Interface Enhancer)
+skie = "0.10.10"
+
 # Coroutines
 coroutines = "1.9.0"
 
@@ -83,6 +86,7 @@ kuromoji-ipadic = { module = "com.atilika.kuromoji:kuromoji-ipadic", version.ref
 # SQLDelight
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 
 # Coroutines
@@ -99,6 +103,7 @@ supabase-postgrest-kt = { module = "io.github.jan-tennert.supabase:postgrest-kt"
 supabase-functions-kt = { module = "io.github.jan-tennert.supabase:functions-kt", version.ref = "supabase" }
 supabase-auth-kt = { module = "io.github.jan-tennert.supabase:gotrue-kt", version.ref = "supabase" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 
 # Testing
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -117,3 +122,4 @@ compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version = "2.1.20-1.0.31" }
+skie = { id = "co.touchlab.skie", version.ref = "skie" }

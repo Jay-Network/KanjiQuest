@@ -30,7 +30,7 @@ fun main(args: Array<String>) {
         val kanjidic2File = File(rawDataDir, "kanjidic2.xml")
         if (kanjidic2File.exists()) {
             println("\nParsing KANJIDIC2...")
-            val count = Kanjidic2Parser.parse(kanjidic2File, connection)
+            val count = Kanjidic2Parser.parse(kanjidic2File, connection, rawDataDir)
             println("  Inserted $count kanji entries")
         } else {
             println("WARNING: kanjidic2.xml not found in $rawDataDir")
@@ -205,6 +205,12 @@ private fun printStats(conn: Connection) {
         }
         stmt.executeQuery("SELECT COUNT(*) FROM kanji WHERE stroke_svg IS NOT NULL").use { rs ->
             rs.next(); println("  With stroke data: ${rs.getInt(1)}")
+        }
+        stmt.executeQuery("SELECT jlpt_level, COUNT(*) FROM kanji WHERE jlpt_level IS NOT NULL GROUP BY jlpt_level ORDER BY jlpt_level DESC").use { rs ->
+            println("  JLPT levels:")
+            while (rs.next()) {
+                println("    N${rs.getInt(1)}: ${rs.getInt(2)} kanji")
+            }
         }
         stmt.executeQuery("SELECT COUNT(*) FROM vocabulary").use { rs ->
             rs.next(); println("  Vocabulary: ${rs.getInt(1)}")

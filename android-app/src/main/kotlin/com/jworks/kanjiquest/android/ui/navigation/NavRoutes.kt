@@ -15,4 +15,7 @@ sealed class NavRoute(val route: String) {
     data object Settings : NavRoute("settings")
     data object Achievements : NavRoute("achievements")
     data object Subscription : NavRoute("subscription")
+    data object WordDetail : NavRoute("word/{wordId}") {
+        fun createRoute(wordId: Long) = "word/$wordId"
+    }
 }

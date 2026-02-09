@@ -36,18 +36,34 @@ class HandwritingChecker(private val geminiClient: GeminiClient) {
     }
 
     private fun buildPrompt(kanji: String, strokeCount: Int): String = """
-Evaluate the handwriting in this image. The student is writing the kanji「$kanji」which has exactly $strokeCount stroke(s). Each stroke is drawn in a different color with a number label.
+You are a Japanese calligraphy teacher evaluating a student's handwritten kanji on a smartphone touchscreen. The kanji is「$kanji」with $strokeCount stroke(s). Each stroke is color-coded and numbered at its starting point.
+
+Focus on these 3 aspects IN ORDER OF IMPORTANCE:
+
+1. OVERALL BALANCE (バランス): Are the components proportioned correctly? Is the kanji centered? Are radicals/parts spaced properly relative to each other?
+
+2. STROKE ORDER (筆順): The numbered labels show the order the student drew each stroke. Check if the stroke order follows standard Japanese conventions (top-to-bottom, left-to-right, horizontal before vertical).
+
+3. STROKE ENDINGS (止め・はね・はらい): Check if strokes end correctly:
+   - 止め (tome): firm stop where required
+   - はね (hane): upward flick where required
+   - はらい (harai): gradual taper/sweep where required
+
+DO NOT criticize:
+- Wobbly or non-straight lines (this is a smartphone touchscreen, not paper)
+- Minor thickness variations
+- Small positioning imprecision
 
 Rules:
-- ONLY discuss strokes visible in the image. There are at most $strokeCount strokes.
-- Do NOT invent or hallucinate extra strokes beyond what you see.
-- If the drawing looks good, the "strokes" array should be empty.
-- Be encouraging but specific about any issues you see.
+- ONLY discuss strokes visible in the image (at most $strokeCount).
+- Do NOT invent extra strokes beyond what you see.
+- If the writing looks good, the "strokes" array should be empty.
+- Be encouraging. Praise what is done well before noting issues.
 
 Respond with ONLY this JSON (no other text):
-{"rating":3,"overall":"one sentence","strokes":["issue with stroke N"]}
+{"rating":3,"overall":"one sentence summary","strokes":["specific feedback for stroke N"]}
 
-rating: 1=poor 3=okay 5=excellent. strokes: empty array if no issues.
+rating: 1=wrong kanji/major errors, 2=recognizable but significant balance/order issues, 3=acceptable with minor issues, 4=good with correct order and balance, 5=excellent form. strokes: empty if no issues.
 """.trimIndent()
 
     private fun parseResponse(response: String): HandwritingFeedback {

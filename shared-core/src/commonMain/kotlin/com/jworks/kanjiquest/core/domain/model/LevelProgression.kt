@@ -46,7 +46,7 @@ object LevelProgression {
         ),
         PlayerTier(
             ordinal = 8, nameEn = "Master", nameJp = "師範",
-            levelRange = 37..Int.MAX_VALUE, unlockedGrades = listOf(1, 2, 3, 4, 5, 6, 8, 9, 10)
+            levelRange = 37..Int.MAX_VALUE, unlockedGrades = listOf(1, 2, 3, 4, 5, 6, 8)
         )
     )
 

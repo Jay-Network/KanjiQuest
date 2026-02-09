@@ -35,6 +35,12 @@ INNER JOIN srs_card sc ON sc.kanji_id = kv.kanji_id
 ORDER BY v.frequency ASC
 LIMIT 200;
 
+getRandomForStudiedKanji:
+SELECT DISTINCT v.* FROM vocabulary v
+INNER JOIN kanji_vocabulary kv ON v.id = kv.vocab_id
+INNER JOIN srs_card sc ON sc.kanji_id = kv.kanji_id
+ORDER BY RANDOM() LIMIT 1;
+
 getAtOffset:
 SELECT * FROM vocabulary LIMIT 1 OFFSET ?;
 

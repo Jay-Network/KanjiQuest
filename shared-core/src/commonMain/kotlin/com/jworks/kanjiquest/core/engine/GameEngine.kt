@@ -39,6 +39,8 @@ class GameEngine(
     private var sessionXp: Int = 0
     private var sessionStartTime: Long = 0L
     private var playerLevel: Int = 1
+    private val touchedKanjiIds = mutableListOf<Int>()
+    private val touchedVocabIds = mutableListOf<Long>()
 
     suspend fun onEvent(event: GameEvent) {
         try {
@@ -62,6 +64,8 @@ class GameEngine(
         maxCombo = 0
         sessionXp = 0
         sessionStartTime = timeProvider()
+        touchedKanjiIds.clear()
+        touchedVocabIds.clear()
 
         _state.value = GameState.Preparing(gameMode)
 
@@ -141,7 +145,7 @@ class GameEngine(
         }
         sessionXp += xpGained
 
-        // Update SRS card (off main thread)
+        // Update SRS card (off main thread) and track touched IDs
         withContext(Dispatchers.IO) {
             if (gameMode == GameMode.VOCABULARY && question.vocabId != null) {
                 val vocabRepo = vocabSrsRepository
@@ -152,12 +156,14 @@ class GameEngine(
                         vocabRepo.saveCard(updated)
                     }
                 }
+                touchedVocabIds.add(question.vocabId)
             } else {
                 val card = srsRepository.getCard(question.kanjiId)
                 if (card != null) {
                     val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
                     srsRepository.saveCard(updatedCard)
                 }
+                touchedKanjiIds.add(question.kanjiId)
             }
         }
 
@@ -227,7 +233,9 @@ class GameEngine(
                 correctCount = correctCount,
                 comboMax = maxCombo,
                 xpEarned = sessionXp,
-                durationSec = elapsed
+                durationSec = elapsed,
+                touchedKanjiIds = touchedKanjiIds.toList(),
+                touchedVocabIds = touchedVocabIds.toList()
             )
         )
     }

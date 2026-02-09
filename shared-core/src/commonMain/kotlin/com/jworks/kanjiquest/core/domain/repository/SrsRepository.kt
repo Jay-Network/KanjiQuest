@@ -14,4 +14,5 @@ interface SrsRepository {
     suspend fun saveCard(card: SrsCard)
     suspend fun ensureCardExists(kanjiId: Int)
     suspend fun getGradeMastery(grade: Int, totalKanjiInGrade: Long): GradeMastery
+    suspend fun getNonNewCardCount(): Long
 }

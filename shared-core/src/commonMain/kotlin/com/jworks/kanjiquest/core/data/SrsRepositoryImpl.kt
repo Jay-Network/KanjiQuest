@@ -55,6 +55,10 @@ class SrsRepositoryImpl(
         db.srsCardQueries.insertNew(kanjiId.toLong())
     }
 
+    override suspend fun getNonNewCardCount(): Long {
+        return db.srsCardQueries.getAllNonNewCards().executeAsList().size.toLong()
+    }
+
     override suspend fun getGradeMastery(grade: Int, totalKanjiInGrade: Long): GradeMastery {
         val stats = db.srsCardQueries.getGradeStats(grade.toLong()).executeAsOneOrNull()
         val studiedCount = stats?.studied_count ?: 0L

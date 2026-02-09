@@ -25,7 +25,9 @@ data class SessionStats(
     val correctCount: Int,
     val comboMax: Int,
     val xpEarned: Int,
-    val durationSec: Int
+    val durationSec: Int,
+    val touchedKanjiIds: List<Int> = emptyList(),
+    val touchedVocabIds: List<Long> = emptyList()
 )
 
 sealed class GameState {

@@ -16,7 +16,7 @@ getDueCards:
 SELECT * FROM srs_card WHERE next_review <= ? AND state != 'graduated' ORDER BY next_review ASC;
 
 getNewCards:
-SELECT * FROM srs_card WHERE state = 'new' LIMIT ?;
+SELECT * FROM srs_card WHERE state = 'new' ORDER BY RANDOM() LIMIT ?;
 
 getDueCount:
 SELECT COUNT(*) FROM srs_card WHERE next_review <= ? AND state != 'graduated';
@@ -31,7 +31,7 @@ getTotalCount:
 SELECT COUNT(*) FROM srs_card;
 
 getLearningCards:
-SELECT * FROM srs_card WHERE state = 'learning' ORDER BY next_review ASC LIMIT ?;
+SELECT * FROM srs_card WHERE state = 'learning' ORDER BY RANDOM() LIMIT ?;
 
 getByState:
 SELECT * FROM srs_card WHERE state = ?;
@@ -42,6 +42,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 insertNew:
 INSERT OR IGNORE INTO srs_card(kanji_id) VALUES (?);
+
+getAllNonNewCards:
+SELECT * FROM srs_card WHERE state != 'new';
+
+getCardsByIds:
+SELECT * FROM srs_card WHERE kanji_id IN ?;
 
 getGradeStats:
 SELECT

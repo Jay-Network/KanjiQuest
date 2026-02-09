@@ -37,6 +37,10 @@ class VocabSrsRepositoryImpl(
     override suspend fun ensureCardExists(vocabId: Long) {
         db.vocabSrsCardQueries.insertNew(vocabId)
     }
+
+    override suspend fun getNotDueVocabIds(currentTime: Long): Set<Long> {
+        return db.vocabSrsCardQueries.getNotDueVocabIds(currentTime).executeAsList().toSet()
+    }
 }
 
 internal fun com.jworks.kanjiquest.db.Vocab_srs_card.toVocabSrsCard(): VocabSrsCard = VocabSrsCard(

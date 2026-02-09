@@ -1,10 +1,13 @@
 package com.jworks.kanjiquest.core.domain.usecase
 
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
+import com.jworks.kanjiquest.core.domain.model.DailyStatsData
 import com.jworks.kanjiquest.core.domain.model.LOCAL_USER_ID
 import com.jworks.kanjiquest.core.domain.model.StudySession
 import com.jworks.kanjiquest.core.domain.model.UserProfile
+import com.jworks.kanjiquest.core.domain.repository.AchievementRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
+import com.jworks.kanjiquest.core.domain.repository.LearningSyncRepository
 import com.jworks.kanjiquest.core.domain.repository.SessionRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.engine.SessionStats
@@ -18,7 +21,9 @@ class CompleteSessionUseCase(
     private val sessionRepository: SessionRepository,
     private val scoringEngine: ScoringEngine,
     private val jCoinRepository: JCoinRepository? = null,
-    private val userSessionProvider: UserSessionProvider? = null
+    private val userSessionProvider: UserSessionProvider? = null,
+    private val learningSyncRepository: LearningSyncRepository? = null,
+    private val achievementRepository: AchievementRepository? = null
 ) {
     suspend fun execute(stats: SessionStats): SessionResult {
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
@@ -87,6 +92,33 @@ class CompleteSessionUseCase(
             awardCoins(stats, streakResult)
         } else {
             0
+        }
+
+        // 6. Queue learning data sync (for logged-in users)
+        val userId = userSessionProvider?.getUserId()
+        if (userId != null && userId != LOCAL_USER_ID) {
+            try {
+                val updatedProfile = userRepository.getProfile()
+                val dailyStatsData = DailyStatsData(
+                    date = today,
+                    cardsReviewed = stats.cardsStudied,
+                    xpEarned = totalXpEarned,
+                    studyTimeSec = stats.durationSec
+                )
+                val achievements = achievementRepository?.getAllAchievements() ?: emptyList()
+
+                learningSyncRepository?.queueSessionSync(
+                    userId = userId,
+                    touchedKanjiIds = stats.touchedKanjiIds,
+                    touchedVocabIds = stats.touchedVocabIds,
+                    profile = updatedProfile,
+                    session = session,
+                    dailyStats = dailyStatsData,
+                    achievements = achievements
+                )
+            } catch (_: Exception) {
+                // Sync queueing is best-effort; don't fail the session
+            }
         }
 
         return SessionResult(

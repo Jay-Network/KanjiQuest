@@ -40,6 +40,14 @@ class KanjiRepositoryImpl(
         return db.vocabularyQueries.getForStudiedKanji().executeAsList().map { it.toVocabulary() }
     }
 
+    override suspend fun getRandomStudiedVocabulary(): Vocabulary? {
+        return db.vocabularyQueries.getRandomForStudiedKanji().executeAsOneOrNull()?.toVocabulary()
+    }
+
+    override suspend fun getVocabularyById(id: Long): Vocabulary? {
+        return db.vocabularyQueries.getById(id).executeAsOneOrNull()?.toVocabulary()
+    }
+
     override suspend fun getExampleSentence(vocabId: Long): ExampleSentence? {
         return db.exampleSentenceQueries.getRandomForVocab(vocabId).executeAsOneOrNull()?.toExampleSentence()
     }

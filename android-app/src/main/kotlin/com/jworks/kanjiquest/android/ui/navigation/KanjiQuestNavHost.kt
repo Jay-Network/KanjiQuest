@@ -23,6 +23,7 @@ import com.jworks.kanjiquest.android.ui.progress.ProgressScreen
 import com.jworks.kanjiquest.android.ui.settings.SettingsScreen
 import com.jworks.kanjiquest.android.ui.shop.ShopScreen
 import com.jworks.kanjiquest.android.ui.subscription.SubscriptionScreen
+import com.jworks.kanjiquest.android.ui.worddetail.WordDetailScreen
 import com.jworks.kanjiquest.core.domain.model.GameMode
 
 @Composable
@@ -62,6 +63,9 @@ fun KanjiQuestNavHost() {
                         GameMode.VOCABULARY -> navController.navigate(NavRoute.Vocabulary.route)
                         GameMode.CAMERA_CHALLENGE -> navController.navigate(NavRoute.Camera.route)
                     }
+                },
+                onWordOfDayClick = { wordId ->
+                    navController.navigate(NavRoute.WordDetail.createRoute(wordId))
                 },
                 onPreviewModeClick = { mode ->
                     // Consume a preview trial then navigate
@@ -156,6 +160,20 @@ fun KanjiQuestNavHost() {
         composable(NavRoute.Subscription.route) {
             SubscriptionScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = NavRoute.WordDetail.route,
+            arguments = listOf(navArgument("wordId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val wordId = backStackEntry.arguments?.getLong("wordId") ?: return@composable
+            WordDetailScreen(
+                wordId = wordId,
+                onBack = { navController.popBackStack() },
+                onKanjiClick = { kanjiId ->
+                    navController.navigate(NavRoute.KanjiDetail.createRoute(kanjiId))
+                }
             )
         }
     }

@@ -1,0 +1,53 @@
+CREATE TABLE learning_sync_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    user_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    sync_status TEXT NOT NULL DEFAULT 'pending',
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_attempt_at INTEGER,
+    error_message TEXT
+);
+
+CREATE TABLE learning_sync_metadata (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    last_synced_at INTEGER NOT NULL DEFAULT 0,
+    last_push_at INTEGER NOT NULL DEFAULT 0,
+    last_pull_at INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_learning_sync_status ON learning_sync_queue(sync_status, created_at);
+
+insertEvent:
+INSERT INTO learning_sync_queue(user_id, event_type, payload, created_at)
+VALUES (?, ?, ?, ?);
+
+getPendingEvents:
+SELECT * FROM learning_sync_queue
+WHERE sync_status IN ('pending', 'failed')
+AND retry_count < 5
+ORDER BY created_at ASC;
+
+getPendingCount:
+SELECT COUNT(*) FROM learning_sync_queue
+WHERE sync_status IN ('pending', 'failed')
+AND retry_count < 5;
+
+updateSyncStatus:
+UPDATE learning_sync_queue
+SET sync_status = ?, last_attempt_at = ?, error_message = ?, retry_count = retry_count + 1
+WHERE id = ?;
+
+deleteEvent:
+DELETE FROM learning_sync_queue WHERE id = ?;
+
+deleteAllForUser:
+DELETE FROM learning_sync_queue WHERE user_id = ?;
+
+getSyncMetadata:
+SELECT * FROM learning_sync_metadata WHERE user_id = ?;
+
+upsertSyncMetadata:
+INSERT OR REPLACE INTO learning_sync_metadata(user_id, last_synced_at, last_push_at, last_pull_at)
+VALUES (?, ?, ?, ?);

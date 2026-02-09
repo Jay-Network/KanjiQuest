@@ -28,5 +28,14 @@ upsert:
 INSERT OR REPLACE INTO vocab_srs_card(vocab_id, ease_factor, interval, repetitions, next_review, state, total_reviews, correct_count)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
+getAllNonNewCards:
+SELECT * FROM vocab_srs_card WHERE state != 'new';
+
+getCardsByIds:
+SELECT * FROM vocab_srs_card WHERE vocab_id IN ?;
+
+getNotDueVocabIds:
+SELECT vocab_id FROM vocab_srs_card WHERE next_review > ? AND state != 'new';
+
 insertNew:
 INSERT OR IGNORE INTO vocab_srs_card(vocab_id) VALUES (?);

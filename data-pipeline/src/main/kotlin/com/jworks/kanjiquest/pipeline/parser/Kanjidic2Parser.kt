@@ -10,15 +10,21 @@ import org.xml.sax.helpers.DefaultHandler
 
 /**
  * Parses KANJIDIC2 XML into the kanji table.
- * Maps JLPT levels based on known kanji sets.
+ * Maps JLPT levels from raw-data/jlpt-mapping.csv (community-consensus lists).
  */
 object Kanjidic2Parser {
 
     // JLPT mapping: literal -> level (N5=5 through N1=1)
-    // These are approximate mappings based on common JLPT kanji lists
-    private val jlptMap: Map<String, Int> by lazy { loadJlptMap() }
+    // Loaded from raw-data/jlpt-mapping.csv
+    private lateinit var jlptMap: Map<String, Int>
 
-    fun parse(file: File, conn: Connection): Int {
+    private var rawDataDir: String = "raw-data"
+
+    fun parse(file: File, conn: Connection, dataDir: String = "raw-data"): Int {
+        rawDataDir = dataDir
+        jlptMap = loadJlptMap()
+        println("  Loaded ${jlptMap.size} JLPT kanji mappings from jlpt-mapping.csv")
+
         val stmt = conn.prepareStatement(
             """INSERT OR REPLACE INTO kanji(id, literal, grade, jlpt_level, frequency, stroke_count, meanings_en, on_readings, kun_readings)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
@@ -125,20 +131,25 @@ object Kanjidic2Parser {
 
     private fun loadJlptMap(): Map<String, Int> {
         val map = mutableMapOf<String, Int>()
+        val csvFile = File(rawDataDir, "jlpt-mapping.csv")
 
-        // N5 kanji (103)
-        val n5 = "一二三四五六七八九十百千万円時日月火水木金土曜何年半毎前後午上下中大小長高安新古間東西南北右左口目耳手足体頭顔首名人女男子学生先私友父母兄姉弟妹家族夫妻主彼自今朝昼夜晩去来行出入帰食飲見聞読書話買教外天気雨雪風花山川海空田休会出立走歩止住持待使送受着作入出来回通過問答知分話言語英国外社会車電鉄道店医者病院映画歌音楽"
-        n5.forEach { map[it.toString()] = 5 }
+        if (!csvFile.exists()) {
+            println("  WARNING: jlpt-mapping.csv not found in $rawDataDir - no JLPT data will be set")
+            return map
+        }
 
-        // N4 kanji (181 additional)
-        val n4 = "不世両並主乗届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届"
-        // Use a curated set instead
-        val n4Real = "不世両主乗予事仕代以低届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届届"
-
-        // Note: Full JLPT mapping would come from an external data file.
-        // For the pipeline, we use grade-based approximation:
-        // Grade 1-2 ≈ N5, Grade 3-4 ≈ N4, Grade 5-6 ≈ N3, Junior high ≈ N2-N1
-        // The actual JLPT mapping should be loaded from a curated CSV in raw-data/
+        csvFile.forEachLine { line ->
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("literal")) return@forEachLine
+            val parts = trimmed.split(",")
+            if (parts.size == 2) {
+                val kanji = parts[0].trim()
+                val level = parts[1].trim().toIntOrNull()
+                if (kanji.isNotEmpty() && level != null && level in 1..5) {
+                    map[kanji] = level
+                }
+            }
+        }
 
         return map
     }

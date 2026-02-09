@@ -1,0 +1,15 @@
+# Xcode secrets
+KanjiQuest.xcconfig
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+build/
+
+# CocoaPods (not used, but just in case)
+Pods/
+
+# SPM
+.build/
+
+# OS
+.DS_Store

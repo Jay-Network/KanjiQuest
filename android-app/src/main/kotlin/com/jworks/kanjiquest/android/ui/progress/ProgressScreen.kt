@@ -379,7 +379,7 @@ private fun RecentSessionsCard(sessions: List<StudySession>) {
 @Composable
 private fun SessionItem(session: StudySession) {
     val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
-    val sessionDate = dateFormat.format(Date(session.startedAt))
+    val sessionDate = dateFormat.format(Date(session.startedAt * 1000))
     val accuracy = if (session.cardsStudied > 0) {
         ((session.correctCount.toFloat() / session.cardsStudied.toFloat()) * 100).roundToInt()
     } else {

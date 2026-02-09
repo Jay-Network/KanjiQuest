@@ -66,6 +66,7 @@ import com.jworks.kanjiquest.core.domain.model.UserLevel
 fun HomeScreen(
     onKanjiClick: (Int) -> Unit,
     onGameModeClick: (GameMode) -> Unit,
+    onWordOfDayClick: (Long) -> Unit = {},
     onShopClick: () -> Unit = {},
     onProgressClick: () -> Unit = {},
     onAchievementsClick: () -> Unit = {},
@@ -342,7 +343,7 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onGameModeClick(GameMode.VOCABULARY) },
+                        .clickable { onWordOfDayClick(wotd.id) },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer
                     )

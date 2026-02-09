@@ -20,5 +20,9 @@ UPDATE user_profile SET current_streak = ?, longest_streak = ?, last_study_date 
 updateDailyGoal:
 UPDATE user_profile SET daily_goal = ? WHERE id = 1;
 
+upsert:
+INSERT OR REPLACE INTO user_profile(id, total_xp, level, current_streak, longest_streak, last_study_date, daily_goal)
+VALUES (1, ?, ?, ?, ?, ?, ?);
+
 initializeIfEmpty:
 INSERT OR IGNORE INTO user_profile(id) VALUES (1);
