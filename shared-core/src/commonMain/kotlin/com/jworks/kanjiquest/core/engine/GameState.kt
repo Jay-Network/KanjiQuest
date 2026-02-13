@@ -67,7 +67,7 @@ sealed class GameState {
 }
 
 sealed class GameEvent {
-    data class StartSession(val gameMode: GameMode, val questionCount: Int = 10) : GameEvent()
+    data class StartSession(val gameMode: GameMode, val questionCount: Int = 10, val targetKanjiId: Int? = null) : GameEvent()
     data class SubmitAnswer(val answer: String) : GameEvent()
     data object NextQuestion : GameEvent()
     data object EndSession : GameEvent()

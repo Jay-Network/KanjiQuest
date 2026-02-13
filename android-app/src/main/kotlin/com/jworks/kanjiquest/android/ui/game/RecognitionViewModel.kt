@@ -62,9 +62,9 @@ class RecognitionViewModel @Inject constructor(
         }
     }
 
-    fun startGame(questionCount: Int = 10) {
+    fun startGame(questionCount: Int = 10, targetKanjiId: Int? = null) {
         viewModelScope.launch {
-            gameEngine.onEvent(GameEvent.StartSession(GameMode.RECOGNITION, questionCount))
+            gameEngine.onEvent(GameEvent.StartSession(GameMode.RECOGNITION, questionCount, targetKanjiId))
         }
     }
 

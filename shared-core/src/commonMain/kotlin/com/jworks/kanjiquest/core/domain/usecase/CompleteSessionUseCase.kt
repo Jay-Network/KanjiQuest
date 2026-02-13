@@ -3,12 +3,15 @@ package com.jworks.kanjiquest.core.domain.usecase
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
 import com.jworks.kanjiquest.core.domain.model.DailyStatsData
 import com.jworks.kanjiquest.core.domain.model.LOCAL_USER_ID
+import com.jworks.kanjiquest.core.domain.model.LevelProgression
 import com.jworks.kanjiquest.core.domain.model.StudySession
 import com.jworks.kanjiquest.core.domain.model.UserProfile
 import com.jworks.kanjiquest.core.domain.repository.AchievementRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
+import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
 import com.jworks.kanjiquest.core.domain.repository.LearningSyncRepository
 import com.jworks.kanjiquest.core.domain.repository.SessionRepository
+import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.engine.SessionStats
 import com.jworks.kanjiquest.core.scoring.ScoringEngine
@@ -23,7 +26,9 @@ class CompleteSessionUseCase(
     private val jCoinRepository: JCoinRepository? = null,
     private val userSessionProvider: UserSessionProvider? = null,
     private val learningSyncRepository: LearningSyncRepository? = null,
-    private val achievementRepository: AchievementRepository? = null
+    private val achievementRepository: AchievementRepository? = null,
+    private val srsRepository: SrsRepository? = null,
+    private val kanjiRepository: KanjiRepository? = null
 ) {
     suspend fun execute(stats: SessionStats): SessionResult {
         val today = Clock.System.todayIn(TimeZone.currentSystemDefault()).toString()
@@ -74,9 +79,19 @@ class CompleteSessionUseCase(
         // 3. Update user XP and level
         val profile = userRepository.getProfile()
         val newTotalXp = profile.totalXp + totalXpEarned
-        val newLevel = scoringEngine.calculateLevel(newTotalXp)
+        var newLevel = scoringEngine.calculateLevel(newTotalXp)
         val leveledUp = newLevel > profile.level
         userRepository.updateXpAndLevel(newTotalXp, newLevel)
+
+        // 3b. Check for performance-based demotion
+        var demoted = false
+        val demotionResult = checkDemotion(newLevel)
+        if (demotionResult != null) {
+            newLevel = demotionResult.newLevel
+            val demotedXp = ScoringEngine.xpForLevel(newLevel)
+            userRepository.updateXpAndLevel(demotedXp, newLevel)
+            demoted = true
+        }
 
         // 4. Update streak
         val streakResult = calculateStreak(profile, today)
@@ -123,14 +138,18 @@ class CompleteSessionUseCase(
 
         return SessionResult(
             xpEarned = totalXpEarned,
-            newTotalXp = newTotalXp,
+            newTotalXp = if (demoted) ScoringEngine.xpForLevel(newLevel) else newTotalXp,
             newLevel = newLevel,
-            leveledUp = leveledUp,
+            leveledUp = leveledUp && !demoted,
             currentStreak = streakResult.currentStreak,
             streakIncreased = streakResult.increased,
             coinsEarned = coinsEarned,
             adaptiveXpBonus = adaptiveXpBonus,
-            adaptiveMessage = adaptiveMessage
+            adaptiveMessage = adaptiveMessage,
+            demoted = demoted,
+            demotionMessage = demotionResult?.let {
+                "Grade ${it.grade} accuracy too low (${(it.accuracy * 100).toInt()}%). Level adjusted to ${it.newLevel}."
+            }
         )
     }
 
@@ -193,6 +212,35 @@ class CompleteSessionUseCase(
         return total
     }
 
+    private suspend fun checkDemotion(currentLevel: Int): DemotionResult? {
+        val srs = srsRepository ?: return null
+        val kanji = kanjiRepository ?: return null
+
+        val tier = LevelProgression.getTierForLevel(currentLevel)
+        val highestGrade = tier.unlockedGrades.maxOrNull() ?: return null
+
+        // Don't demote below Beginner (grade 1, level 1)
+        val tierIndex = LevelProgression.tiers.indexOf(tier)
+        if (tierIndex <= 0) return null
+
+        val gradeKanji = kanji.getKanjiByGrade(highestGrade)
+        if (gradeKanji.isEmpty()) return null
+
+        val kanjiIds = gradeKanji.map { it.id.toLong() }
+        val cards = srs.getCardsByIds(kanjiIds)
+
+        val totalReviews = cards.sumOf { it.totalReviews }
+        val totalCorrect = cards.sumOf { it.correctCount }
+
+        if (totalReviews < 30) return null
+
+        val accuracy = totalCorrect.toFloat() / totalReviews.toFloat()
+        if (accuracy >= 0.40f) return null
+
+        val prevTier = LevelProgression.tiers[tierIndex - 1]
+        return DemotionResult(prevTier.levelRange.first, highestGrade, accuracy)
+    }
+
     private fun calculateStreak(profile: UserProfile, today: String): StreakResult {
         val lastDate = profile.lastStudyDate
 
@@ -250,7 +298,15 @@ data class SessionResult(
     val streakIncreased: Boolean,
     val coinsEarned: Int = 0,
     val adaptiveXpBonus: Int = 0,
-    val adaptiveMessage: String? = null
+    val adaptiveMessage: String? = null,
+    val demoted: Boolean = false,
+    val demotionMessage: String? = null
+)
+
+private data class DemotionResult(
+    val newLevel: Int,
+    val grade: Int,
+    val accuracy: Float
 )
 
 private data class StreakResult(

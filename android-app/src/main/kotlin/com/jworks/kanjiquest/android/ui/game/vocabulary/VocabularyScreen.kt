@@ -49,12 +49,17 @@ import com.jworks.kanjiquest.core.engine.Question
 @Composable
 fun VocabularyScreen(
     onBack: () -> Unit,
+    targetKanjiId: Int? = null,
     viewModel: VocabularyViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.startGame()
+    LaunchedEffect(targetKanjiId) {
+        if (targetKanjiId != null && uiState.gameState is GameState.Idle) {
+            viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId)
+        } else if (targetKanjiId == null) {
+            viewModel.startGame()
+        }
     }
 
     Scaffold(

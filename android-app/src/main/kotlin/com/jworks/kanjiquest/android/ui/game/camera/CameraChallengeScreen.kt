@@ -41,6 +41,7 @@ import java.util.concurrent.Executors
 @Composable
 fun CameraChallengeScreen(
     onBack: () -> Unit,
+    targetKanjiId: Int? = null,
     viewModel: CameraChallengeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -61,13 +62,13 @@ fun CameraChallengeScreen(
     ) { isGranted ->
         hasCameraPermission = isGranted
         if (isGranted) {
-            viewModel.startSession()
+            viewModel.startSession(targetKanjiId)
         }
     }
 
     LaunchedEffect(Unit) {
         if (hasCameraPermission) {
-            viewModel.startSession()
+            viewModel.startSession(targetKanjiId)
         } else {
             launcher.launch(Manifest.permission.CAMERA)
         }
@@ -269,7 +270,7 @@ private fun TargetOverlay(state: CameraChallengeState.ShowTarget) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
+                com.jworks.kanjiquest.android.ui.theme.KanjiText(
                     text = state.targetKanji.literal,
                     fontSize = 96.sp,
                     fontWeight = FontWeight.Bold,
@@ -341,7 +342,7 @@ private fun SuccessOverlay(
                         color = Color(0xFFFFD700)
                     )
                     Spacer(modifier = Modifier.height(32.dp))
-                    Text(
+                    com.jworks.kanjiquest.android.ui.theme.KanjiText(
                         text = state.targetKanji.literal,
                         fontSize = 80.sp,
                         color = Color.White

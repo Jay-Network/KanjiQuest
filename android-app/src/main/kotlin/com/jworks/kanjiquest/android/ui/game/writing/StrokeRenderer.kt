@@ -10,7 +10,7 @@ import java.io.ByteArrayOutputStream
 
 object StrokeRenderer {
 
-    private const val IMAGE_SIZE = 256
+    private const val IMAGE_SIZE = 512
     private val STROKE_COLORS = intArrayOf(
         Color.RED,
         Color.BLUE,
@@ -24,6 +24,13 @@ object StrokeRenderer {
         Color.DKGRAY
     )
 
+    private val STROKE_COLOR_NAMES = arrayOf(
+        "red", "blue", "green", "orange", "purple",
+        "teal", "crimson", "olive", "magenta", "gray"
+    )
+
+    fun getColorName(index: Int): String = STROKE_COLOR_NAMES[index % STROKE_COLOR_NAMES.size]
+
     fun renderToBase64(strokes: List<List<Point>>, canvasSize: Float): String {
         val bitmap = Bitmap.createBitmap(IMAGE_SIZE, IMAGE_SIZE, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -35,14 +42,14 @@ object StrokeRenderer {
 
         val strokePaint = Paint().apply {
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 5f
             isAntiAlias = true
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
         }
 
         val textPaint = Paint().apply {
-            textSize = 14f
+            textSize = 22f
             isAntiAlias = true
             isFakeBoldText = true
         }
@@ -50,6 +57,13 @@ object StrokeRenderer {
         val bgPaint = Paint().apply {
             style = Paint.Style.FILL
             color = Color.WHITE
+            isAntiAlias = true
+        }
+
+        val borderPaint = Paint().apply {
+            style = Paint.Style.STROKE
+            color = Color.DKGRAY
+            strokeWidth = 1.5f
             isAntiAlias = true
         }
 
@@ -74,10 +88,17 @@ object StrokeRenderer {
             val startY = stroke.first().y * scale
             val label = "${index + 1}"
             val textWidth = textPaint.measureText(label)
+            val textHeight = textPaint.textSize
 
-            // Small white background circle behind the number for readability
-            canvas.drawCircle(startX, startY - 5f, textWidth * 0.8f, bgPaint)
-            canvas.drawText(label, startX - textWidth / 2f, startY, textPaint)
+            // Offset the label slightly above-left of stroke start to avoid overlap
+            val labelX = (startX - textWidth / 2f).coerceIn(2f, IMAGE_SIZE - textWidth - 2f)
+            val labelY = (startY - 4f).coerceIn(textHeight + 2f, IMAGE_SIZE - 2f)
+            val circleRadius = textWidth * 0.9f
+
+            // White background circle with dark border for readability
+            canvas.drawCircle(labelX + textWidth / 2f, labelY - textHeight / 3f, circleRadius, bgPaint)
+            canvas.drawCircle(labelX + textWidth / 2f, labelY - textHeight / 3f, circleRadius, borderPaint)
+            canvas.drawText(label, labelX, labelY, textPaint)
         }
 
         // Encode to base64

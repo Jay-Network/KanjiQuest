@@ -48,12 +48,17 @@ import com.jworks.kanjiquest.core.engine.GameState
 @Composable
 fun RecognitionScreen(
     onBack: () -> Unit,
+    targetKanjiId: Int? = null,
     viewModel: RecognitionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.startGame()
+    LaunchedEffect(targetKanjiId) {
+        if (targetKanjiId != null && uiState.gameState is GameState.Idle) {
+            viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId)
+        } else if (targetKanjiId == null) {
+            viewModel.startGame()
+        }
     }
 
     Scaffold(
@@ -215,7 +220,7 @@ private fun QuestionContent(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                com.jworks.kanjiquest.android.ui.theme.KanjiText(
                     text = kanjiLiteral,
                     fontSize = 96.sp,
                     textAlign = TextAlign.Center

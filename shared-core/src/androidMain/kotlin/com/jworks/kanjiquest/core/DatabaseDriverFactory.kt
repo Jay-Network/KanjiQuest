@@ -152,6 +152,26 @@ actual class DatabaseDriverFactory(private val context: Context) {
             """.trimIndent())
 
             it.execSQL("CREATE INDEX IF NOT EXISTS idx_learning_sync_status ON learning_sync_queue(sync_status, created_at)")
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS flashcard_deck (
+                    kanji_id INTEGER NOT NULL PRIMARY KEY,
+                    added_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    last_studied_at TEXT,
+                    study_count INTEGER NOT NULL DEFAULT 0,
+                    notes TEXT
+                )
+            """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS kanji_mode_stats (
+                    kanji_id INTEGER NOT NULL,
+                    game_mode TEXT NOT NULL,
+                    review_count INTEGER NOT NULL DEFAULT 0,
+                    correct_count INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (kanji_id, game_mode)
+                )
+            """.trimIndent())
         }
     }
 

@@ -73,6 +73,7 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     onSubscriptionClick: () -> Unit = {},
     onPreviewModeClick: (GameMode) -> Unit = {},
+    onFlashcardsClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -401,6 +402,7 @@ fun HomeScreen(
                     label = "Recognition",
                     subtitle = "Free",
                     modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFF2196F3),
                     onClick = { onGameModeClick(GameMode.RECOGNITION) }
                 )
                 PreviewableGameModeButton(
@@ -409,6 +411,7 @@ fun HomeScreen(
                     isPremium = uiState.isPremium,
                     trialInfo = uiState.previewTrials[GameMode.WRITING],
                     modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFF4CAF50),
                     onPremiumClick = { onGameModeClick(GameMode.WRITING) },
                     onPreviewClick = { onPreviewModeClick(GameMode.WRITING) },
                     onUpgradeClick = onSubscriptionClick
@@ -427,6 +430,7 @@ fun HomeScreen(
                     isPremium = uiState.isPremium,
                     trialInfo = uiState.previewTrials[GameMode.VOCABULARY],
                     modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFFFF9800),
                     onPremiumClick = { onGameModeClick(GameMode.VOCABULARY) },
                     onPreviewClick = { onPreviewModeClick(GameMode.VOCABULARY) },
                     onUpgradeClick = onSubscriptionClick
@@ -437,20 +441,75 @@ fun HomeScreen(
                     isPremium = uiState.isPremium,
                     trialInfo = uiState.previewTrials[GameMode.CAMERA_CHALLENGE],
                     modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFF9C27B0),
                     onPremiumClick = { onGameModeClick(GameMode.CAMERA_CHALLENGE) },
                     onPreviewClick = { onPreviewModeClick(GameMode.CAMERA_CHALLENGE) },
                     onUpgradeClick = onSubscriptionClick
                 )
             }
 
+            // Flashcard deck button (bookmarked kanji)
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onFlashcardsClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Text(
+                    text = if (uiState.flashcardDeckCount > 0)
+                        "Flashcards (${uiState.flashcardDeckCount})"
+                    else
+                        "Flashcards",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    fontSize = 14.sp
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Kanji grid — shows highest unlocked grade
-            Text(
-                text = "Grade ${uiState.highestUnlockedGrade} Kanji",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            // Kanji grid — with grade selector
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Grade ${uiState.selectedGrade} Kanji",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (uiState.unlockedGrades.size > 1) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        uiState.unlockedGrades.forEach { grade ->
+                            val isSelected = grade == uiState.selectedGrade
+                            Text(
+                                text = "G$grade",
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .background(
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary
+                                                else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable { viewModel.selectGrade(grade) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -464,6 +523,8 @@ fun HomeScreen(
                     rowKanji.forEach { kanji ->
                         KanjiGridItem(
                             kanji = kanji,
+                            practiceCount = uiState.kanjiPracticeCounts[kanji.id] ?: 0,
+                            modeStats = uiState.kanjiModeStats[kanji.id] ?: emptyMap(),
                             modifier = Modifier.weight(1f),
                             onClick = { onKanjiClick(kanji.id) }
                         )
@@ -485,6 +546,8 @@ fun HomeScreen(
 @Composable
 private fun KanjiGridItem(
     kanji: Kanji,
+    practiceCount: Int = 0,
+    modeStats: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -494,16 +557,54 @@ private fun KanjiGridItem(
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
+        Box(modifier = Modifier.fillMaxSize()) {
+            com.jworks.kanjiquest.android.ui.theme.KanjiText(
                 text = kanji.literal,
                 fontSize = 28.sp,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center)
             )
+            // 4-corner per-mode badges
+            val recCount = modeStats["recognition"] ?: 0
+            val vocCount = modeStats["vocabulary"] ?: 0
+            val wrtCount = modeStats["writing"] ?: 0
+            val camCount = modeStats["camera_challenge"] ?: 0
+            if (recCount > 0) {
+                Text(
+                    text = "$recCount",
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2196F3),
+                    modifier = Modifier.align(Alignment.TopStart).padding(3.dp)
+                )
+            }
+            if (vocCount > 0) {
+                Text(
+                    text = "$vocCount",
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF9800),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(3.dp)
+                )
+            }
+            if (wrtCount > 0) {
+                Text(
+                    text = "$wrtCount",
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF4CAF50),
+                    modifier = Modifier.align(Alignment.BottomStart).padding(3.dp)
+                )
+            }
+            if (camCount > 0) {
+                Text(
+                    text = "$camCount",
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF9C27B0),
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp)
+                )
+            }
         }
     }
 }
@@ -514,15 +615,17 @@ private fun GameModeButton(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    modeColor: Color = Color.Unspecified,
     onClick: () -> Unit
 ) {
+    val containerColor = if (modeColor != Color.Unspecified) modeColor else MaterialTheme.colorScheme.primary
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(if (subtitle != null) 64.dp else 56.dp),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = containerColor,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
@@ -530,13 +633,13 @@ private fun GameModeButton(
             Text(
                 text = label,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = Color.White,
                 fontSize = 14.sp
             )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                    color = Color.White.copy(alpha = 0.7f),
                     fontSize = 10.sp
                 )
             }
@@ -557,6 +660,7 @@ private fun PreviewableGameModeButton(
     isPremium: Boolean,
     trialInfo: PreviewTrialInfo?,
     modifier: Modifier = Modifier,
+    modeColor: Color = Color.Unspecified,
     onPremiumClick: () -> Unit,
     onPreviewClick: () -> Unit,
     onUpgradeClick: () -> Unit
@@ -565,6 +669,7 @@ private fun PreviewableGameModeButton(
         GameModeButton(
             label = label,
             modifier = modifier,
+            modeColor = modeColor,
             onClick = onPremiumClick
         )
     } else {

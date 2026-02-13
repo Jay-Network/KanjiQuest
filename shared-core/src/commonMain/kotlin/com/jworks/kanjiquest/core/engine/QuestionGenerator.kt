@@ -160,6 +160,30 @@ class QuestionGenerator(
         return questionQueue.isNotEmpty()
     }
 
+    suspend fun prepareTargetedSession(kanjiId: Int, repeatCount: Int = 5): Boolean {
+        questionQueue.clear()
+        val kanji = kanjiRepository.getKanjiById(kanjiId) ?: return false
+        val card = srsRepository.getCard(kanjiId)
+        val srsState = card?.state?.value ?: "new"
+        val isNew = card == null || card.state == SrsState.NEW
+
+        srsRepository.ensureCardExists(kanjiId)
+
+        repeat(repeatCount) {
+            questionQueue.add(QueueEntry(kanji, isNew = isNew, srsState = srsState))
+        }
+
+        // Build distractor pool from same grade
+        val grade = kanji.grade ?: 1
+        val pool = kanjiRepository.getKanjiByGrade(grade).toMutableList()
+        if (pool.size < 20) {
+            pool.addAll(kanjiRepository.getKanjiByGrade(1))
+        }
+        distractorPool = pool.distinctBy { it.id }
+
+        return true
+    }
+
     fun hasNextQuestion(): Boolean = questionQueue.isNotEmpty()
 
     fun generateRecognitionQuestion(): Question? {

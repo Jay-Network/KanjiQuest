@@ -75,7 +75,7 @@ fun WordDetailScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Large kanji form display
-                Text(
+                com.jworks.kanjiquest.android.ui.theme.KanjiText(
                     text = vocab.kanjiForm,
                     fontSize = 80.sp,
                     textAlign = TextAlign.Center,
@@ -179,7 +179,7 @@ private fun RelatedKanjiItem(kanji: Kanji, onClick: () -> Unit) {
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
+        com.jworks.kanjiquest.android.ui.theme.KanjiText(
             text = kanji.literal,
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold

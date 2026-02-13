@@ -8,7 +8,8 @@ data class HandwritingFeedback(
     val overallComment: String,
     val strokeFeedback: List<String>,
     val qualityRating: Int,
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    val analyzedImageBase64: String? = null
 )
 
 class HandwritingChecker(private val geminiClient: GeminiClient) {
@@ -17,7 +18,8 @@ class HandwritingChecker(private val geminiClient: GeminiClient) {
         drawnStrokes: List<List<Point>>,
         targetKanji: String,
         strokeCount: Int,
-        canvasSize: Float
+        canvasSize: Float,
+        language: String = "en"
     ): HandwritingFeedback {
         if (drawnStrokes.isEmpty()) {
             return unavailable()
@@ -25,24 +27,53 @@ class HandwritingChecker(private val geminiClient: GeminiClient) {
 
         val imageBase64 = StrokeRenderer.renderToBase64(drawnStrokes, canvasSize)
 
-        val prompt = buildPrompt(targetKanji, strokeCount)
+        // Build color legend for textual cross-reference
+        val colorLegend = drawnStrokes.indices.joinToString(", ") { i ->
+            "stroke ${i + 1} = ${StrokeRenderer.getColorName(i)}"
+        }
+
+        val prompt = buildPrompt(targetKanji, strokeCount, language, drawnStrokes.size, colorLegend)
 
         return try {
             val response = geminiClient.generateWithImage(prompt, imageBase64)
-            parseResponse(response)
+            parseResponse(response).copy(analyzedImageBase64 = imageBase64)
         } catch (_: Exception) {
-            unavailable()
+            unavailable().copy(analyzedImageBase64 = imageBase64)
         }
     }
 
-    private fun buildPrompt(kanji: String, strokeCount: Int): String = """
-You are a Japanese calligraphy teacher evaluating a student's handwritten kanji on a smartphone touchscreen. The kanji is「$kanji」with $strokeCount stroke(s). Each stroke is color-coded and numbered at its starting point.
+    private fun buildPrompt(
+        kanji: String,
+        strokeCount: Int,
+        language: String = "en",
+        drawnStrokeCount: Int = strokeCount,
+        colorLegend: String = ""
+    ): String {
+        val langInstruction = if (language == "ja") {
+            "IMPORTANT: Respond entirely in Japanese (日本語で回答してください)."
+        } else {
+            "IMPORTANT: Respond entirely in English. Do NOT use Japanese except for technical terms (止め, はね, はらい)."
+        }
+        val strokeInfo = if (drawnStrokeCount != strokeCount) {
+            "The student drew $drawnStrokeCount stroke(s), but the correct kanji has $strokeCount stroke(s)."
+        } else {
+            "The student drew $drawnStrokeCount stroke(s), matching the expected stroke count."
+        }
+        val legendInfo = if (colorLegend.isNotBlank()) {
+            "\nColor legend: $colorLegend"
+        } else ""
+        return """
+You are a Japanese calligraphy teacher evaluating a student's handwritten kanji on a smartphone touchscreen. The kanji is「$kanji」with $strokeCount stroke(s). Each stroke is color-coded and numbered at its starting point. The student will see this same color-coded image alongside your feedback.
+
+$strokeInfo$legendInfo
+
+$langInstruction
 
 Focus on these 3 aspects IN ORDER OF IMPORTANCE:
 
 1. OVERALL BALANCE (バランス): Are the components proportioned correctly? Is the kanji centered? Are radicals/parts spaced properly relative to each other?
 
-2. STROKE ORDER (筆順): The numbered labels show the order the student drew each stroke. Check if the stroke order follows standard Japanese conventions (top-to-bottom, left-to-right, horizontal before vertical).
+2. STROKE ORDER (筆順): The numbered labels show the order the student drew each stroke. Check if the stroke order follows standard Japanese conventions (top-to-bottom, left-to-right, horizontal before vertical). IMPORTANT: Read the numbers carefully from the image. The number at the START of each colored line indicates when that stroke was drawn.
 
 3. STROKE ENDINGS (止め・はね・はらい): Check if strokes end correctly:
    - 止め (tome): firm stop where required
@@ -55,8 +86,9 @@ DO NOT criticize:
 - Small positioning imprecision
 
 Rules:
-- ONLY discuss strokes visible in the image (at most $strokeCount).
+- ONLY discuss strokes visible in the image (at most $drawnStrokeCount).
 - Do NOT invent extra strokes beyond what you see.
+- Reference strokes by their number and color (e.g., "stroke 1 (red)", "stroke 3 (green)") so the student can identify them in the color-coded image.
 - If the writing looks good, the "strokes" array should be empty.
 - Be encouraging. Praise what is done well before noting issues.
 
@@ -65,6 +97,7 @@ Respond with ONLY this JSON (no other text):
 
 rating: 1=wrong kanji/major errors, 2=recognizable but significant balance/order issues, 3=acceptable with minor issues, 4=good with correct order and balance, 5=excellent form. strokes: empty if no issues.
 """.trimIndent()
+    }
 
     private fun parseResponse(response: String): HandwritingFeedback {
         // Try to extract JSON from the response (model may include extra text)

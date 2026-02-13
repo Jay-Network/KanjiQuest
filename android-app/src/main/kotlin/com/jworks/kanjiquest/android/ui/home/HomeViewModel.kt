@@ -15,6 +15,7 @@ import com.jworks.kanjiquest.core.domain.model.UserProfile
 import com.jworks.kanjiquest.core.domain.model.Vocabulary
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
+import com.jworks.kanjiquest.core.domain.repository.FlashcardRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
@@ -50,7 +51,12 @@ data class HomeUiState(
     val nextTierLevel: Int? = 5,
     val highestUnlockedGrade: Int = 1,
     val gradeMasteryList: List<GradeMastery> = emptyList(),
-    val displayLevel: Int = 1
+    val displayLevel: Int = 1,
+    val kanjiPracticeCounts: Map<Int, Int> = emptyMap(),
+    val kanjiModeStats: Map<Int, Map<String, Int>> = emptyMap(),
+    val flashcardDeckCount: Long = 0,
+    val unlockedGrades: List<Int> = listOf(1),
+    val selectedGrade: Int = 1
 )
 
 @HiltViewModel
@@ -62,7 +68,8 @@ class HomeViewModel @Inject constructor(
     private val wordOfTheDayUseCase: WordOfTheDayUseCase,
     private val userSessionProvider: UserSessionProvider,
     private val authRepository: AuthRepository,
-    private val previewTrialManager: PreviewTrialManager
+    private val previewTrialManager: PreviewTrialManager,
+    private val flashcardRepository: FlashcardRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -102,6 +109,22 @@ class HomeViewModel @Inject constructor(
                 srsRepository.getGradeMastery(grade, total)
             }
 
+            // Load practice counts for displayed kanji
+            val kanjiIds = gradeKanji.map { it.id.toLong() }
+            val practiceCounts = if (kanjiIds.isNotEmpty()) {
+                try {
+                    val cards = srsRepository.getCardsByIds(kanjiIds)
+                    cards.associate { it.kanjiId to it.totalReviews }
+                } catch (_: Exception) { emptyMap() }
+            } else emptyMap()
+
+            // Load per-mode stats
+            val modeStats = if (kanjiIds.isNotEmpty()) {
+                try { srsRepository.getModeStatsByIds(kanjiIds) } catch (_: Exception) { emptyMap() }
+            } else emptyMap()
+
+            val deckCount = flashcardRepository.getDeckCount()
+
             _uiState.value = HomeUiState(
                 profile = profile,
                 gradeOneKanji = gradeKanji,
@@ -120,7 +143,12 @@ class HomeViewModel @Inject constructor(
                 nextTierLevel = nextTier?.levelRange?.first,
                 highestUnlockedGrade = highestGrade,
                 gradeMasteryList = gradeMasteryList,
-                displayLevel = playerLevel
+                displayLevel = playerLevel,
+                kanjiPracticeCounts = practiceCounts,
+                kanjiModeStats = modeStats,
+                flashcardDeckCount = deckCount,
+                unlockedGrades = tier.unlockedGrades,
+                selectedGrade = highestGrade
             )
         }
     }
@@ -153,6 +181,30 @@ class HomeViewModel @Inject constructor(
 
     fun refreshTrials() {
         _uiState.value = _uiState.value.copy(previewTrials = loadPreviewTrials())
+    }
+
+    fun selectGrade(grade: Int) {
+        viewModelScope.launch {
+            val gradeKanji = kanjiRepository.getKanjiByGrade(grade)
+            val kanjiIds = gradeKanji.map { it.id.toLong() }
+            val practiceCounts = if (kanjiIds.isNotEmpty()) {
+                try {
+                    val cards = srsRepository.getCardsByIds(kanjiIds)
+                    cards.associate { it.kanjiId to it.totalReviews }
+                } catch (_: Exception) { emptyMap() }
+            } else emptyMap()
+
+            val modeStats = if (kanjiIds.isNotEmpty()) {
+                try { srsRepository.getModeStatsByIds(kanjiIds) } catch (_: Exception) { emptyMap() }
+            } else emptyMap()
+
+            _uiState.value = _uiState.value.copy(
+                gradeOneKanji = gradeKanji,
+                selectedGrade = grade,
+                kanjiPracticeCounts = practiceCounts,
+                kanjiModeStats = modeStats
+            )
+        }
     }
 
     fun refresh() {

@@ -34,6 +34,7 @@ fun DrawingCanvas(
     onDragEnd: () -> Unit,
     enabled: Boolean = true,
     srsState: String = "new",
+    writingDifficulty: WritingDifficulty = WritingDifficulty.GUIDED,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -63,8 +64,8 @@ fun DrawingCanvas(
         ) {
             val canvasSize = size.minDimension
 
-            // Draw ghost reference strokes
-            drawGhostStrokes(referenceStrokePaths, currentStrokeIndex, canvasSize, srsState)
+            // Draw ghost reference strokes based on difficulty level
+            drawGhostStrokes(referenceStrokePaths, currentStrokeIndex, canvasSize, writingDifficulty)
 
             // Draw completed user strokes (black)
             for (stroke in completedStrokes) {
@@ -83,29 +84,35 @@ private fun DrawScope.drawGhostStrokes(
     strokePaths: List<String>,
     currentStrokeIndex: Int,
     canvasSize: Float,
-    srsState: String = "new"
+    difficulty: WritingDifficulty = WritingDifficulty.GUIDED
 ) {
-    // No ghost strokes for review/graduated (recall from memory)
-    if (srsState == "review" || srsState == "graduated") return
+    // BLANK mode: no reference at all
+    if (difficulty == WritingDifficulty.BLANK) return
 
-    // SRS-aware alpha: new = full tracing, learning = fading hints
-    val currentAlpha = when (srsState) {
-        "new" -> 0.50f
-        "learning" -> 0.25f
-        else -> 0.35f
-    }
-    val otherAlpha = when (srsState) {
-        "new" -> 0.30f
-        "learning" -> 0.10f
-        else -> 0.15f
+    if (difficulty == WritingDifficulty.NO_ORDER) {
+        // NO_ORDER mode: show all strokes at uniform low alpha, no current-stroke highlighting
+        for (pathData in strokePaths) {
+            val path = SvgPathRenderer.svgToComposePath(pathData, canvasSize)
+            drawPath(
+                path = path,
+                color = Color.Gray.copy(alpha = 0.15f),
+                style = Stroke(
+                    width = 4f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round
+                )
+            )
+        }
+        return
     }
 
+    // GUIDED mode: show stroke order with current-stroke highlighting
     for ((index, pathData) in strokePaths.withIndex()) {
         val path = SvgPathRenderer.svgToComposePath(pathData, canvasSize)
         val alpha = when {
-            index < currentStrokeIndex -> otherAlpha * 0.5f  // already drawn strokes
-            index == currentStrokeIndex -> currentAlpha       // current stroke to trace
-            else -> otherAlpha                                // upcoming strokes
+            index < currentStrokeIndex -> 0.15f   // already drawn strokes
+            index == currentStrokeIndex -> 0.50f   // current stroke to trace
+            else -> 0.30f                          // upcoming strokes
         }
         val strokeWidth = if (index == currentStrokeIndex) 6f else 4f
 

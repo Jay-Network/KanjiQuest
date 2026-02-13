@@ -58,15 +58,30 @@ class CameraChallengeViewModel @Inject constructor(
     private val totalChallenges = 5
     private var successCount = 0
     private var sessionXp = 0
+    private var targetKanjiId: Int? = null
 
-    fun startSession() {
+    fun startSession(targetKanjiId: Int? = null) {
+        this.targetKanjiId = targetKanjiId
         viewModelScope.launch {
             try {
-                // Load easier kanji (grades 1-3) for camera challenges
-                val grade1 = kanjiRepository.getKanjiByGrade(1)
-                val grade2 = kanjiRepository.getKanjiByGrade(2)
-                val grade3 = kanjiRepository.getKanjiByGrade(3)
-                availableKanji = (grade1 + grade2 + grade3).shuffled()
+                if (targetKanjiId != null) {
+                    // Targeted session: use the specific kanji
+                    val kanji = kanjiRepository.getKanjiById(targetKanjiId)
+                    if (kanji != null) {
+                        availableKanji = listOf(kanji)
+                    } else {
+                        _uiState.value = CameraChallengeUiState(
+                            state = CameraChallengeState.Error("Kanji not found")
+                        )
+                        return@launch
+                    }
+                } else {
+                    // Load easier kanji (grades 1-3) for camera challenges
+                    val grade1 = kanjiRepository.getKanjiByGrade(1)
+                    val grade2 = kanjiRepository.getKanjiByGrade(2)
+                    val grade3 = kanjiRepository.getKanjiByGrade(3)
+                    availableKanji = (grade1 + grade2 + grade3).shuffled()
+                }
 
                 if (availableKanji.isEmpty()) {
                     _uiState.value = CameraChallengeUiState(

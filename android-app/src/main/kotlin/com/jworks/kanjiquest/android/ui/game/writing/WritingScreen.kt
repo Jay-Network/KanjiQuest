@@ -45,6 +45,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jworks.kanjiquest.core.engine.GameState
 import com.jworks.kanjiquest.core.engine.SessionStats
@@ -53,9 +58,17 @@ import com.jworks.kanjiquest.core.engine.SessionStats
 @Composable
 fun WritingScreen(
     onBack: () -> Unit,
+    targetKanjiId: Int? = null,
     viewModel: WritingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // Auto-start for targeted kanji sessions
+    LaunchedEffect(targetKanjiId) {
+        if (targetKanjiId != null && uiState.gameState is GameState.Idle) {
+            viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -84,6 +97,11 @@ fun WritingScreen(
                 is GameState.Idle -> WritingSetupContent(
                     aiEnabled = uiState.aiEnabled,
                     onAiToggle = { viewModel.setAiEnabled(it) },
+                    aiFeedbackLanguage = uiState.aiFeedbackLanguage,
+                    onLanguageToggle = { viewModel.setAiFeedbackLanguage(it) },
+                    isAdmin = uiState.isAdmin,
+                    adminDifficultyOverride = uiState.adminDifficultyOverride,
+                    onAdminDifficultyChange = { viewModel.setAdminDifficultyOverride(it) },
                     onStart = { viewModel.startGame() }
                 )
                 is GameState.Preparing -> LoadingContent()
@@ -91,6 +109,7 @@ fun WritingScreen(
                     question = state,
                     completedStrokes = uiState.completedStrokes,
                     activeStroke = uiState.activeStroke,
+                    writingDifficulty = uiState.effectiveDifficulty,
                     onCanvasSizeChanged = { viewModel.onCanvasSizeChanged(it) },
                     onDragStart = { viewModel.onDragStart(it) },
                     onDrag = { viewModel.onDrag(it) },
@@ -103,6 +122,9 @@ fun WritingScreen(
                     state = state,
                     aiFeedback = uiState.aiFeedback,
                     aiLoading = uiState.aiLoading,
+                    analyzedImageBase64 = uiState.analyzedImageBase64,
+                    aiReportSubmitted = uiState.aiReportSubmitted,
+                    onReportAi = { viewModel.reportAiFeedback() },
                     onNext = { viewModel.nextQuestion() }
                 )
                 is GameState.SessionComplete -> SessionCompleteContent(
@@ -126,6 +148,11 @@ fun WritingScreen(
 private fun WritingSetupContent(
     aiEnabled: Boolean,
     onAiToggle: (Boolean) -> Unit,
+    aiFeedbackLanguage: String,
+    onLanguageToggle: (String) -> Unit,
+    isAdmin: Boolean = false,
+    adminDifficultyOverride: WritingDifficulty? = null,
+    onAdminDifficultyChange: (WritingDifficulty?) -> Unit = {},
     onStart: () -> Unit
 ) {
     Column(
@@ -187,6 +214,93 @@ private fun WritingSetupContent(
             }
         }
 
+        // AI Feedback Language toggle (only visible when AI is enabled)
+        if (aiEnabled) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Feedback Language",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (aiFeedbackLanguage == "ja") "Japanese (日本語)" else "English",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = aiFeedbackLanguage == "ja",
+                        onCheckedChange = { isJapanese ->
+                            onLanguageToggle(if (isJapanese) "ja" else "en")
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    )
+                }
+            }
+        }
+
+        // Admin difficulty override selector
+        if (isAdmin) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Debug: Writing Difficulty",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE65100)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Auto option
+                        OutlinedButton(
+                            onClick = { onAdminDifficultyChange(null) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = if (adminDifficultyOverride == null) {
+                                ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFE65100).copy(alpha = 0.15f))
+                            } else ButtonDefaults.outlinedButtonColors()
+                        ) {
+                            Text("Auto", fontSize = 11.sp)
+                        }
+                        WritingDifficulty.entries.forEach { diff ->
+                            OutlinedButton(
+                                onClick = { onAdminDifficultyChange(diff) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = if (adminDifficultyOverride == diff) {
+                                    ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFFE65100).copy(alpha = 0.15f))
+                                } else ButtonDefaults.outlinedButtonColors()
+                            ) {
+                                Text(diff.label, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
@@ -223,6 +337,7 @@ private fun WritingQuestionContent(
     question: GameState.AwaitingAnswer,
     completedStrokes: List<List<androidx.compose.ui.geometry.Offset>>,
     activeStroke: List<androidx.compose.ui.geometry.Offset>,
+    writingDifficulty: WritingDifficulty = WritingDifficulty.GUIDED,
     onCanvasSizeChanged: (Float) -> Unit,
     onDragStart: (androidx.compose.ui.geometry.Offset) -> Unit,
     onDrag: (androidx.compose.ui.geometry.Offset) -> Unit,
@@ -285,12 +400,26 @@ private fun WritingQuestionContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Stroke counter
-        Text(
-            text = "Stroke ${(currentStrokeIndex + 1).coerceAtMost(totalRefStrokes)} / $totalRefStrokes",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // Stroke counter + difficulty indicator
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Stroke ${(currentStrokeIndex + 1).coerceAtMost(totalRefStrokes)} / $totalRefStrokes",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = writingDifficulty.label,
+                style = MaterialTheme.typography.bodySmall,
+                color = when (writingDifficulty) {
+                    WritingDifficulty.GUIDED -> MaterialTheme.colorScheme.primary
+                    WritingDifficulty.NO_ORDER -> MaterialTheme.colorScheme.tertiary
+                    WritingDifficulty.BLANK -> MaterialTheme.colorScheme.error
+                }
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -303,7 +432,7 @@ private fun WritingQuestionContent(
             onDragStart = onDragStart,
             onDrag = onDrag,
             onDragEnd = onDragEnd,
-            srsState = question.question.srsState,
+            writingDifficulty = writingDifficulty,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -352,6 +481,9 @@ private fun WritingResultContent(
     state: GameState.ShowingResult,
     aiFeedback: HandwritingFeedback?,
     aiLoading: Boolean,
+    analyzedImageBase64: String? = null,
+    aiReportSubmitted: Boolean = false,
+    onReportAi: () -> Unit = {},
     onNext: () -> Unit
 ) {
     Column(
@@ -374,7 +506,7 @@ private fun WritingResultContent(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                com.jworks.kanjiquest.android.ui.theme.KanjiText(
                     text = state.question.kanjiLiteral,
                     fontSize = 80.sp,
                     textAlign = TextAlign.Center
@@ -413,6 +545,30 @@ private fun WritingResultContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Show the color-coded stroke image immediately (rendered locally, not dependent on AI)
+        val imageBase64 = analyzedImageBase64 ?: aiFeedback?.analyzedImageBase64
+        imageBase64?.let { base64 ->
+            val bytes = Base64.decode(base64, Base64.NO_WRAP)
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            if (bitmap != null) {
+                Text(
+                    text = "Your Strokes (color-coded)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Analyzed handwriting with numbered strokes",
+                    modifier = Modifier
+                        .size(160.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+
         // AI Feedback Section
         if (aiLoading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -427,6 +583,7 @@ private fun WritingResultContent(
         aiFeedback?.let { feedback ->
             if (feedback.isAvailable) {
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -467,6 +624,28 @@ private fun WritingResultContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+
+                // Report Issue button
+                Spacer(modifier = Modifier.height(6.dp))
+                if (aiReportSubmitted) {
+                    Text(
+                        text = "Reported - thank you!",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = onReportAi,
+                        modifier = Modifier.align(Alignment.End),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Report Incorrect AI", fontSize = 12.sp)
                     }
                 }
             }

@@ -56,6 +56,8 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onDevChat: () -> Unit = {},
+    onRetakeAssessment: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -130,6 +132,12 @@ fun SettingsScreen(
                     checked = uiState.showHints,
                     onCheckedChange = { viewModel.toggleShowHints() }
                 )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                ClickableSetting(
+                    title = "Retake Assessment",
+                    subtitle = "Re-test your kanji proficiency level",
+                    onClick = onRetakeAssessment
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -159,6 +167,19 @@ fun SettingsScreen(
                     subtitle = uiState.theme.displayName,
                     onClick = { showThemeDialog = true }
                 )
+            }
+
+            // Developer Section (only visible to registered developers)
+            if (uiState.isDeveloper) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingsSection(title = "Developer", icon = Icons.Default.Build) {
+                    ClickableSetting(
+                        title = "Dev Chat",
+                        subtitle = "Chat with the KanjiQuest dev agent",
+                        onClick = onDevChat
+                    )
+                }
             }
 
             // Admin Section (only visible to admins)

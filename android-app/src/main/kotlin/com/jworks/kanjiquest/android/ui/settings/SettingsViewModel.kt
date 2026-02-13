@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
 import com.jworks.kanjiquest.core.domain.model.LevelProgression
 import com.jworks.kanjiquest.core.domain.model.UserLevel
+import com.jworks.kanjiquest.core.domain.repository.DevChatRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,6 +27,7 @@ data class SettingsUiState(
     val showHints: Boolean = true,
     val theme: AppTheme = AppTheme.SYSTEM,
     val isAdmin: Boolean = false,
+    val isDeveloper: Boolean = false,
     val effectiveLevel: UserLevel = UserLevel.FREE,
     val adminOverrideLevel: UserLevel? = null,
     val adminPlayerLevelOverride: Int? = null,
@@ -48,7 +50,8 @@ enum class AppTheme(val displayName: String) {
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val userRepository: UserRepository,
-    private val userSessionProvider: UserSessionProvider
+    private val userSessionProvider: UserSessionProvider,
+    private val devChatRepository: DevChatRepository
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("kanjiquest_settings", Context.MODE_PRIVATE)
@@ -63,6 +66,10 @@ class SettingsViewModel @Inject constructor(
     private fun loadSettings() {
         viewModelScope.launch {
             val profile = try { userRepository.getProfile() } catch (_: Exception) { null }
+            val email = userSessionProvider.getUserEmail()
+            val isDev = if (email != null) {
+                try { devChatRepository.isDeveloper(email) } catch (_: Exception) { false }
+            } else false
             _uiState.value = SettingsUiState(
                 soundEnabled = prefs.getBoolean("sound_enabled", true),
                 musicEnabled = prefs.getBoolean("music_enabled", true),
@@ -78,6 +85,7 @@ class SettingsViewModel @Inject constructor(
                     prefs.getString("theme", AppTheme.SYSTEM.name) ?: AppTheme.SYSTEM.name
                 ),
                 isAdmin = userSessionProvider.isAdmin(),
+                isDeveloper = isDev,
                 effectiveLevel = userSessionProvider.getEffectiveLevel(),
                 adminOverrideLevel = userSessionProvider.getAdminOverrideLevel(),
                 adminPlayerLevelOverride = userSessionProvider.getAdminPlayerLevelOverride(),

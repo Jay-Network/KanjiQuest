@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    // Firebase/Google Services temporarily disabled for local feedback polling tests
 }
 
 android {
@@ -159,7 +160,13 @@ dependencies {
     implementation(libs.androidx.hilt.work)
     ksp(libs.hilt.compiler)
 
+    // Firebase Cloud Messaging for feedback push notifications (plugin disabled, libs kept for compile)
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
+
     // Testing
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+// Google Services plugin disabled (no google-services.json required for polling tests)

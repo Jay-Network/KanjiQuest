@@ -3,6 +3,7 @@ package com.jworks.kanjiquest.core.domain
 import com.jworks.kanjiquest.core.domain.model.LOCAL_USER_ID
 import com.jworks.kanjiquest.core.domain.model.UserLevel
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
+import kotlinx.coroutines.flow.firstOrNull
 
 interface UserSessionProvider {
     suspend fun getUserId(): String
@@ -31,8 +32,7 @@ class UserSessionProviderImpl(
 
     override suspend fun getUserEmail(): String? {
         if (cachedEmail == null) {
-            val state = authRepository.observeAuthState()
-            // Just return null if not available synchronously
+            cachedEmail = authRepository.observeAuthState().firstOrNull()?.email
         }
         return cachedEmail
     }

@@ -75,7 +75,9 @@ class GameEngine(
             playerLevel = userSessionProvider?.getAdminPlayerLevelOverride()
                 ?: userRepository?.getProfile()?.level ?: 1
 
-            if (gameMode == GameMode.VOCABULARY) {
+            if (event.targetKanjiId != null) {
+                questionGenerator.prepareTargetedSession(event.targetKanjiId, totalQuestions)
+            } else if (gameMode == GameMode.VOCABULARY) {
                 questionGenerator.prepareVocabSession(totalQuestions, timeProvider(), playerLevel)
             } else {
                 questionGenerator.prepareSession(totalQuestions, timeProvider(), playerLevel)
@@ -165,6 +167,8 @@ class GameEngine(
                 }
                 touchedKanjiIds.add(question.kanjiId)
             }
+            // Track per-mode stats
+            srsRepository.incrementModeStats(question.kanjiId, gameMode.name.lowercase(), isCorrect)
         }
 
         _state.value = GameState.ShowingResult(

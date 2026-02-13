@@ -4,9 +4,13 @@ import android.content.Context
 import com.jworks.kanjiquest.android.BuildConfig
 import com.jworks.kanjiquest.android.data.PreviewTrialManager
 import com.jworks.kanjiquest.android.network.GeminiClient
+import com.jworks.kanjiquest.android.ui.game.writing.AiFeedbackReporter
 import com.jworks.kanjiquest.android.ui.game.writing.HandwritingChecker
 import com.jworks.kanjiquest.core.data.AchievementRepositoryImpl
 import com.jworks.kanjiquest.core.data.AuthRepositoryImpl
+import com.jworks.kanjiquest.core.data.DevChatRepositoryImpl
+import com.jworks.kanjiquest.core.data.FeedbackRepositoryImpl
+import com.jworks.kanjiquest.core.data.FlashcardRepositoryImpl
 import com.jworks.kanjiquest.core.data.DatabaseDriverFactory
 import com.jworks.kanjiquest.core.data.JCoinRepositoryImpl
 import com.jworks.kanjiquest.core.data.KanjiRepositoryImpl
@@ -19,6 +23,9 @@ import com.jworks.kanjiquest.core.domain.UserSessionProvider
 import com.jworks.kanjiquest.core.domain.UserSessionProviderImpl
 import com.jworks.kanjiquest.core.domain.repository.AchievementRepository
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
+import com.jworks.kanjiquest.core.domain.repository.DevChatRepository
+import com.jworks.kanjiquest.core.domain.repository.FeedbackRepository
+import com.jworks.kanjiquest.core.domain.repository.FlashcardRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
 import com.jworks.kanjiquest.core.domain.repository.LearningSyncRepository
@@ -117,6 +124,24 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideDevChatRepository(): DevChatRepository {
+        return DevChatRepositoryImpl()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFeedbackRepository(): FeedbackRepository {
+        return FeedbackRepositoryImpl()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFlashcardRepository(db: KanjiQuestDatabase): FlashcardRepository {
+        return FlashcardRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
     fun provideLearningSyncRepository(db: KanjiQuestDatabase): LearningSyncRepository {
         return LearningSyncRepositoryImpl(db)
     }
@@ -171,12 +196,15 @@ object AppModule {
         jCoinRepository: JCoinRepository,
         userSessionProvider: UserSessionProvider,
         learningSyncRepository: LearningSyncRepository,
-        achievementRepository: AchievementRepository
+        achievementRepository: AchievementRepository,
+        srsRepository: SrsRepository,
+        kanjiRepository: KanjiRepository
     ): CompleteSessionUseCase {
         return CompleteSessionUseCase(
             userRepository, sessionRepository, scoringEngine,
             jCoinRepository, userSessionProvider,
-            learningSyncRepository, achievementRepository
+            learningSyncRepository, achievementRepository,
+            srsRepository, kanjiRepository
         )
     }
 
@@ -210,5 +238,11 @@ object AppModule {
     @Singleton
     fun provideHandwritingChecker(geminiClient: GeminiClient): HandwritingChecker {
         return HandwritingChecker(geminiClient)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAiFeedbackReporter(@ApplicationContext context: Context): AiFeedbackReporter {
+        return AiFeedbackReporter(context)
     }
 }
