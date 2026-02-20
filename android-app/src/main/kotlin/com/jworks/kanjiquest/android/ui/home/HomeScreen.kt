@@ -41,6 +41,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.GradeMastery
 import com.jworks.kanjiquest.core.domain.model.Kanji
+import com.jworks.kanjiquest.core.domain.model.KanaType
 import com.jworks.kanjiquest.core.domain.model.MasteryLevel
 import com.jworks.kanjiquest.core.domain.model.UserLevel
 
@@ -74,6 +76,7 @@ fun HomeScreen(
     onSubscriptionClick: () -> Unit = {},
     onPreviewModeClick: (GameMode) -> Unit = {},
     onFlashcardsClick: () -> Unit = {},
+    onKanaModeClick: (KanaType, Boolean) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -385,9 +388,108 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Game mode buttons
+            // Learning Path
             Text(
-                text = "Study Modes",
+                text = "Learning Path",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                LearningPathCard(
+                    title = "Hiragana",
+                    subtitle = "ひらがな",
+                    progress = uiState.hiraganaProgress,
+                    color = Color(0xFFE91E63)
+                )
+                LearningPathCard(
+                    title = "Katakana",
+                    subtitle = "カタカナ",
+                    progress = uiState.katakanaProgress,
+                    color = Color(0xFF00BCD4)
+                )
+                LearningPathCard(
+                    title = "Radicals",
+                    subtitle = "部首",
+                    progress = uiState.radicalProgress,
+                    color = Color(0xFF795548)
+                )
+                uiState.gradeMasteryList.forEach { mastery ->
+                    LearningPathCard(
+                        title = "Grade ${mastery.grade}",
+                        subtitle = "漢字",
+                        progress = mastery.masteryScore,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Kana modes (always free)
+            Text(
+                text = "Kana Practice",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                GameModeButton(
+                    label = "Hiragana",
+                    subtitle = "Recognition",
+                    modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFFE91E63),
+                    onClick = { onKanaModeClick(KanaType.HIRAGANA, false) }
+                )
+                GameModeButton(
+                    label = "Katakana",
+                    subtitle = "Recognition",
+                    modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFF00BCD4),
+                    onClick = { onKanaModeClick(KanaType.KATAKANA, false) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Radical modes
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                GameModeButton(
+                    label = "Radicals",
+                    subtitle = "Free",
+                    modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFF795548),
+                    onClick = { onGameModeClick(GameMode.RADICAL_RECOGNITION) }
+                )
+                PreviewableGameModeButton(
+                    mode = GameMode.RADICAL_BUILDER,
+                    label = "Radical Builder",
+                    isPremium = uiState.isPremium,
+                    trialInfo = uiState.previewTrials[GameMode.RADICAL_BUILDER],
+                    modifier = Modifier.weight(1f),
+                    modeColor = Color(0xFF795548),
+                    onPremiumClick = { onGameModeClick(GameMode.RADICAL_BUILDER) },
+                    onPreviewClick = { onPreviewModeClick(GameMode.RADICAL_BUILDER) },
+                    onUpgradeClick = onSubscriptionClick
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Kanji game modes
+            Text(
+                text = "Kanji Study Modes",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -711,6 +813,37 @@ private fun PreviewableGameModeButton(
                     fontWeight = if (!hasTrials) FontWeight.Bold else FontWeight.Normal
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LearningPathCard(
+    title: String,
+    subtitle: String,
+    progress: Float,
+    color: Color
+) {
+    Card(
+        modifier = Modifier.size(width = 100.dp, height = 80.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                color = color
+            )
+            Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall,
+                color = color, fontSize = 9.sp)
         }
     }
 }

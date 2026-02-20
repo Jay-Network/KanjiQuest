@@ -1,0 +1,71 @@
+CREATE TABLE radical (
+    id INTEGER PRIMARY KEY NOT NULL,
+    literal TEXT NOT NULL,
+    meaning_en TEXT NOT NULL,
+    meaning_jp TEXT,
+    stroke_count INTEGER NOT NULL,
+    stroke_svg TEXT,
+    frequency INTEGER NOT NULL DEFAULT 0,
+    example_kanji TEXT NOT NULL DEFAULT '[]',
+    position TEXT
+);
+
+CREATE TABLE kanji_radical (
+    kanji_id INTEGER NOT NULL,
+    radical_id INTEGER NOT NULL,
+    PRIMARY KEY (kanji_id, radical_id)
+);
+
+getById:
+SELECT * FROM radical WHERE id = ?;
+
+getByLiteral:
+SELECT * FROM radical WHERE literal = ?;
+
+getAll:
+SELECT * FROM radical ORDER BY id ASC;
+
+getByStrokeCount:
+SELECT * FROM radical WHERE stroke_count = ? ORDER BY id ASC;
+
+countAll:
+SELECT COUNT(*) FROM radical;
+
+getRandom:
+SELECT * FROM radical ORDER BY RANDOM() LIMIT ?;
+
+getUnseen:
+SELECT * FROM radical WHERE id NOT IN (SELECT radical_id FROM radical_srs_card) ORDER BY frequency DESC LIMIT ?;
+
+insert:
+INSERT OR REPLACE INTO radical(id, literal, meaning_en, meaning_jp, stroke_count, stroke_svg, frequency, example_kanji, position)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+insertKanjiRadical:
+INSERT OR IGNORE INTO kanji_radical(kanji_id, radical_id) VALUES (?, ?);
+
+getRadicalsForKanji:
+SELECT r.* FROM radical r
+INNER JOIN kanji_radical kr ON r.id = kr.radical_id
+WHERE kr.kanji_id = ?
+ORDER BY r.id ASC;
+
+getKanjiForRadical:
+SELECT kr.kanji_id FROM kanji_radical kr WHERE kr.radical_id = ?;
+
+getKanjiContainingAllRadicals:
+SELECT kr.kanji_id FROM kanji_radical kr
+WHERE kr.radical_id IN ?
+GROUP BY kr.kanji_id
+HAVING COUNT(DISTINCT kr.radical_id) = ?;
+
+getKanjiContainingSomeRadicals:
+SELECT kr.kanji_id, COUNT(DISTINCT kr.radical_id) AS match_count FROM kanji_radical kr
+WHERE kr.radical_id IN ?
+GROUP BY kr.kanji_id
+HAVING COUNT(DISTINCT kr.radical_id) < ?
+ORDER BY RANDOM()
+LIMIT ?;
+
+search:
+SELECT * FROM radical WHERE literal LIKE ? OR meaning_en LIKE ? LIMIT ?;

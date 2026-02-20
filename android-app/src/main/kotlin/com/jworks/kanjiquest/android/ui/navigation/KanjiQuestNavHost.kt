@@ -24,6 +24,10 @@ import com.jworks.kanjiquest.android.ui.feedback.FeedbackFAB
 import com.jworks.kanjiquest.android.ui.feedback.FeedbackViewModel
 import com.jworks.kanjiquest.android.ui.game.RecognitionScreen
 import com.jworks.kanjiquest.android.ui.game.camera.CameraChallengeScreen
+import com.jworks.kanjiquest.android.ui.game.kana.KanaRecognitionScreen
+import com.jworks.kanjiquest.android.ui.game.kana.KanaWritingScreen
+import com.jworks.kanjiquest.android.ui.game.radical.RadicalBuilderScreen
+import com.jworks.kanjiquest.android.ui.game.radical.RadicalRecognitionScreen
 import com.jworks.kanjiquest.android.ui.game.vocabulary.VocabularyScreen
 import com.jworks.kanjiquest.android.ui.game.writing.WritingScreen
 import com.jworks.kanjiquest.android.ui.home.HomeScreen
@@ -39,6 +43,7 @@ import com.jworks.kanjiquest.android.ui.subscription.SubscriptionScreen
 import com.jworks.kanjiquest.android.ui.worddetail.WordDetailScreen
 import androidx.compose.ui.platform.LocalContext
 import com.jworks.kanjiquest.core.domain.model.GameMode
+import com.jworks.kanjiquest.core.domain.model.KanaType
 
 @Composable
 fun KanjiQuestNavHost() {
@@ -106,6 +111,17 @@ fun KanjiQuestNavHost() {
                         GameMode.WRITING -> navController.navigate(NavRoute.Writing.route)
                         GameMode.VOCABULARY -> navController.navigate(NavRoute.Vocabulary.route)
                         GameMode.CAMERA_CHALLENGE -> navController.navigate(NavRoute.Camera.route)
+                        GameMode.KANA_RECOGNITION -> {} // handled by onKanaModeClick
+                        GameMode.KANA_WRITING -> {} // handled by onKanaModeClick
+                        GameMode.RADICAL_RECOGNITION -> navController.navigate(NavRoute.RadicalRecognition.route)
+                        GameMode.RADICAL_BUILDER -> navController.navigate(NavRoute.RadicalBuilder.route)
+                    }
+                },
+                onKanaModeClick = { kanaType, isWriting ->
+                    if (isWriting) {
+                        navController.navigate(NavRoute.KanaWriting.createRoute(kanaType.name))
+                    } else {
+                        navController.navigate(NavRoute.KanaRecognition.createRoute(kanaType.name))
                     }
                 },
                 onWordOfDayClick = { wordId ->
@@ -265,6 +281,42 @@ fun KanjiQuestNavHost() {
                         popUpTo(NavRoute.PlacementTest.route) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable(
+            route = NavRoute.KanaRecognition.route,
+            arguments = listOf(navArgument("kanaType") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val kanaTypeStr = backStackEntry.arguments?.getString("kanaType") ?: "HIRAGANA"
+            val kanaType = KanaType.valueOf(kanaTypeStr)
+            KanaRecognitionScreen(
+                kanaType = kanaType,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = NavRoute.KanaWriting.route,
+            arguments = listOf(navArgument("kanaType") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val kanaTypeStr = backStackEntry.arguments?.getString("kanaType") ?: "HIRAGANA"
+            val kanaType = KanaType.valueOf(kanaTypeStr)
+            KanaWritingScreen(
+                kanaType = kanaType,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoute.RadicalRecognition.route) {
+            RadicalRecognitionScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoute.RadicalBuilder.route) {
+            RadicalBuilderScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

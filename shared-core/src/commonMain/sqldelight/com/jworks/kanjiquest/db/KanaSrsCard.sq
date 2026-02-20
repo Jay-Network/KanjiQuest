@@ -1,0 +1,61 @@
+CREATE TABLE kana_srs_card (
+    kana_id INTEGER PRIMARY KEY NOT NULL,
+    ease_factor REAL NOT NULL DEFAULT 2.5,
+    interval INTEGER NOT NULL DEFAULT 0,
+    repetitions INTEGER NOT NULL DEFAULT 0,
+    next_review INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'new',
+    total_reviews INTEGER NOT NULL DEFAULT 0,
+    correct_count INTEGER NOT NULL DEFAULT 0
+);
+
+getByKanaId:
+SELECT * FROM kana_srs_card WHERE kana_id = ?;
+
+getDueCards:
+SELECT * FROM kana_srs_card WHERE next_review <= ? AND state != 'graduated' ORDER BY next_review ASC;
+
+getNewCards:
+SELECT * FROM kana_srs_card WHERE state = 'new' ORDER BY RANDOM() LIMIT ?;
+
+getDueCount:
+SELECT COUNT(*) FROM kana_srs_card WHERE next_review <= ? AND state != 'graduated';
+
+getNewCount:
+SELECT COUNT(*) FROM kana_srs_card WHERE state = 'new';
+
+getLearningCards:
+SELECT * FROM kana_srs_card WHERE state = 'learning' ORDER BY RANDOM() LIMIT ?;
+
+getMasteredCount:
+SELECT COUNT(*) FROM kana_srs_card WHERE state = 'graduated';
+
+getTotalCount:
+SELECT COUNT(*) FROM kana_srs_card;
+
+getNonNewCount:
+SELECT COUNT(*) FROM kana_srs_card WHERE state != 'new';
+
+upsert:
+INSERT OR REPLACE INTO kana_srs_card(kana_id, ease_factor, interval, repetitions, next_review, state, total_reviews, correct_count)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+insertNew:
+INSERT OR IGNORE INTO kana_srs_card(kana_id) VALUES (?);
+
+getCardsByIds:
+SELECT * FROM kana_srs_card WHERE kana_id IN ?;
+
+getTypeStats:
+SELECT
+    COUNT(ks.kana_id) AS studied_count,
+    SUM(CASE WHEN ks.state = 'graduated' THEN 1 ELSE 0 END) AS mastered_count,
+    CASE
+        WHEN SUM(CASE WHEN ks.total_reviews > 0 THEN 1 ELSE 0 END) > 0
+        THEN CAST(SUM(CASE WHEN ks.total_reviews > 0 THEN CAST(ks.correct_count AS REAL) / ks.total_reviews ELSE 0 END) AS REAL)
+             / SUM(CASE WHEN ks.total_reviews > 0 THEN 1 ELSE 0 END)
+        ELSE 0.0
+    END AS avg_accuracy
+FROM kana_srs_card ks
+JOIN kana k ON ks.kana_id = k.id
+WHERE ks.state != 'new' AND k.type = ?;

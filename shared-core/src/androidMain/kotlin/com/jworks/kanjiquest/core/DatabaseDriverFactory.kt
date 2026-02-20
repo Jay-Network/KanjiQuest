@@ -172,6 +172,73 @@ actual class DatabaseDriverFactory(private val context: Context) {
                     PRIMARY KEY (kanji_id, game_mode)
                 )
             """.trimIndent())
+
+            // Kana + Radical tables (added for hiragana/katakana/radical learning modes)
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS kana (
+                    id INTEGER PRIMARY KEY NOT NULL,
+                    literal TEXT NOT NULL UNIQUE,
+                    type TEXT NOT NULL,
+                    romanization TEXT NOT NULL,
+                    kana_group TEXT NOT NULL,
+                    stroke_count INTEGER NOT NULL,
+                    stroke_svg TEXT,
+                    variant TEXT NOT NULL DEFAULT 'basic',
+                    base_kana_id INTEGER
+                )
+            """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS radical (
+                    id INTEGER PRIMARY KEY NOT NULL,
+                    literal TEXT NOT NULL,
+                    meaning_en TEXT NOT NULL,
+                    meaning_jp TEXT,
+                    stroke_count INTEGER NOT NULL,
+                    stroke_svg TEXT,
+                    frequency INTEGER NOT NULL DEFAULT 0,
+                    example_kanji TEXT NOT NULL DEFAULT '[]',
+                    position TEXT
+                )
+            """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS kanji_radical (
+                    kanji_id INTEGER NOT NULL,
+                    radical_id INTEGER NOT NULL,
+                    PRIMARY KEY (kanji_id, radical_id)
+                )
+            """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS kana_srs_card (
+                    kana_id INTEGER PRIMARY KEY NOT NULL,
+                    ease_factor REAL NOT NULL DEFAULT 2.5,
+                    interval INTEGER NOT NULL DEFAULT 0,
+                    repetitions INTEGER NOT NULL DEFAULT 0,
+                    next_review INTEGER NOT NULL DEFAULT 0,
+                    state TEXT NOT NULL DEFAULT 'new',
+                    total_reviews INTEGER NOT NULL DEFAULT 0,
+                    correct_count INTEGER NOT NULL DEFAULT 0
+                )
+            """.trimIndent())
+
+            it.execSQL("""
+                CREATE TABLE IF NOT EXISTS radical_srs_card (
+                    radical_id INTEGER PRIMARY KEY NOT NULL,
+                    ease_factor REAL NOT NULL DEFAULT 2.5,
+                    interval INTEGER NOT NULL DEFAULT 0,
+                    repetitions INTEGER NOT NULL DEFAULT 0,
+                    next_review INTEGER NOT NULL DEFAULT 0,
+                    state TEXT NOT NULL DEFAULT 'new',
+                    total_reviews INTEGER NOT NULL DEFAULT 0,
+                    correct_count INTEGER NOT NULL DEFAULT 0
+                )
+            """.trimIndent())
+
+            it.execSQL("CREATE INDEX IF NOT EXISTS idx_kana_type ON kana(type)")
+            it.execSQL("CREATE INDEX IF NOT EXISTS idx_kanji_radical_kid ON kanji_radical(kanji_id)")
+            it.execSQL("CREATE INDEX IF NOT EXISTS idx_kanji_radical_rid ON kanji_radical(radical_id)")
         }
     }
 

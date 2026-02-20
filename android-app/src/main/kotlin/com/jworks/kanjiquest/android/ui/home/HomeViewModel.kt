@@ -16,7 +16,11 @@ import com.jworks.kanjiquest.core.domain.model.Vocabulary
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
 import com.jworks.kanjiquest.core.domain.repository.FlashcardRepository
+import com.jworks.kanjiquest.core.domain.repository.KanaRepository
+import com.jworks.kanjiquest.core.domain.repository.KanaSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
+import com.jworks.kanjiquest.core.domain.repository.RadicalRepository
+import com.jworks.kanjiquest.core.domain.repository.RadicalSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.domain.usecase.WordOfTheDayUseCase
@@ -56,7 +60,10 @@ data class HomeUiState(
     val kanjiModeStats: Map<Int, Map<String, Int>> = emptyMap(),
     val flashcardDeckCount: Long = 0,
     val unlockedGrades: List<Int> = listOf(1),
-    val selectedGrade: Int = 1
+    val selectedGrade: Int = 1,
+    val hiraganaProgress: Float = 0f,
+    val katakanaProgress: Float = 0f,
+    val radicalProgress: Float = 0f
 )
 
 @HiltViewModel
@@ -69,7 +76,11 @@ class HomeViewModel @Inject constructor(
     private val userSessionProvider: UserSessionProvider,
     private val authRepository: AuthRepository,
     private val previewTrialManager: PreviewTrialManager,
-    private val flashcardRepository: FlashcardRepository
+    private val flashcardRepository: FlashcardRepository,
+    private val kanaRepository: KanaRepository,
+    private val kanaSrsRepository: KanaSrsRepository,
+    private val radicalRepository: RadicalRepository,
+    private val radicalSrsRepository: RadicalSrsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -125,6 +136,14 @@ class HomeViewModel @Inject constructor(
 
             val deckCount = flashcardRepository.getDeckCount()
 
+            // Kana & radical progress
+            val hiraganaTotal = try { kanaRepository.countByType(com.jworks.kanjiquest.core.domain.model.KanaType.HIRAGANA) } catch (_: Exception) { 0L }
+            val hiraganaStudied = try { kanaSrsRepository.getTypeStudiedCount("HIRAGANA") } catch (_: Exception) { 0L }
+            val katakanaTotal = try { kanaRepository.countByType(com.jworks.kanjiquest.core.domain.model.KanaType.KATAKANA) } catch (_: Exception) { 0L }
+            val katakanaStudied = try { kanaSrsRepository.getTypeStudiedCount("KATAKANA") } catch (_: Exception) { 0L }
+            val radicalTotal = try { radicalRepository.countAll() } catch (_: Exception) { 0L }
+            val radicalStudied = try { radicalSrsRepository.getStudiedCount() } catch (_: Exception) { 0L }
+
             _uiState.value = HomeUiState(
                 profile = profile,
                 gradeOneKanji = gradeKanji,
@@ -148,7 +167,10 @@ class HomeViewModel @Inject constructor(
                 kanjiModeStats = modeStats,
                 flashcardDeckCount = deckCount,
                 unlockedGrades = tier.unlockedGrades,
-                selectedGrade = highestGrade
+                selectedGrade = highestGrade,
+                hiraganaProgress = if (hiraganaTotal > 0) hiraganaStudied.toFloat() / hiraganaTotal else 0f,
+                katakanaProgress = if (katakanaTotal > 0) katakanaStudied.toFloat() / katakanaTotal else 0f,
+                radicalProgress = if (radicalTotal > 0) radicalStudied.toFloat() / radicalTotal else 0f
             )
         }
     }

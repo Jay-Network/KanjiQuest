@@ -1,0 +1,48 @@
+CREATE TABLE kana (
+    id INTEGER PRIMARY KEY NOT NULL,
+    literal TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    romanization TEXT NOT NULL,
+    kana_group TEXT NOT NULL,
+    stroke_count INTEGER NOT NULL,
+    stroke_svg TEXT,
+    variant TEXT NOT NULL DEFAULT 'basic',
+    base_kana_id INTEGER
+);
+
+getById:
+SELECT * FROM kana WHERE id = ?;
+
+getByLiteral:
+SELECT * FROM kana WHERE literal = ?;
+
+getByType:
+SELECT * FROM kana WHERE type = ? ORDER BY id ASC;
+
+getByTypeAndVariant:
+SELECT * FROM kana WHERE type = ? AND variant = ? ORDER BY id ASC;
+
+getByGroup:
+SELECT * FROM kana WHERE type = ? AND kana_group = ? ORDER BY id ASC;
+
+countByType:
+SELECT COUNT(*) FROM kana WHERE type = ?;
+
+countAll:
+SELECT COUNT(*) FROM kana;
+
+getRandomByType:
+SELECT * FROM kana WHERE type = ? AND variant = 'basic' ORDER BY RANDOM() LIMIT ?;
+
+getByGroupForDistractors:
+SELECT * FROM kana WHERE type = ? AND kana_group = ? AND id != ? ORDER BY RANDOM() LIMIT ?;
+
+insert:
+INSERT OR REPLACE INTO kana(id, literal, type, romanization, kana_group, stroke_count, stroke_svg, variant, base_kana_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getUnseen:
+SELECT * FROM kana WHERE type = ? AND id NOT IN (SELECT kana_id FROM kana_srs_card) ORDER BY id ASC LIMIT ?;
+
+search:
+SELECT * FROM kana WHERE literal LIKE ? OR romanization LIKE ? LIMIT ?;

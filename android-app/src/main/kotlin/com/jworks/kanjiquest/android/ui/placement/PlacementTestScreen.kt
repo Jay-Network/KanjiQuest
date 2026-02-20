@@ -41,6 +41,12 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jworks.kanjiquest.android.ui.theme.KanjiText
 
+private fun formatTime(seconds: Int): String {
+    val min = seconds / 60
+    val sec = seconds % 60
+    return "%d:%02d".format(min, sec)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlacementTestScreen(
@@ -52,7 +58,7 @@ fun PlacementTestScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Kanji Assessment") },
+                title = { Text("Placement Test") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
@@ -66,6 +72,12 @@ fun PlacementTestScreen(
                 .padding(padding)
         ) {
             when {
+                uiState.showIntro -> {
+                    IntroContent(
+                        isLoading = uiState.isLoading,
+                        onStart = { viewModel.beginAssessment() }
+                    )
+                }
                 uiState.isLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -103,17 +115,23 @@ private fun QuestionContent(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Grade and progress
+        // Timer and progress
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Grade ${uiState.currentGrade}",
+                text = uiState.currentStage.displayName,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = formatTime(uiState.remainingSeconds),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (uiState.remainingSeconds <= 30) Color(0xFFF44336) else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = "${uiState.questionIndex + 1} / 5",
@@ -132,7 +150,7 @@ private fun QuestionContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Kanji display
+        // Character display
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -146,12 +164,12 @@ private fun QuestionContent(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     KanjiText(
-                        text = question.kanji.literal,
+                        text = question.displayCharacter,
                         fontSize = 96.sp,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = "What does this kanji mean?",
+                        text = question.questionPrompt,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -225,7 +243,7 @@ private fun QuestionContent(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = if (uiState.questionIndex == 4) "Finish Grade" else "Next",
+                    text = if (uiState.questionIndex == 4) "Finish Stage" else "Next",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -236,10 +254,96 @@ private fun QuestionContent(
         if (uiState.selectedAnswer != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Grade ${uiState.currentGrade}: ${uiState.gradeCorrectCount} / ${uiState.questionIndex + 1} correct",
+                text = "${uiState.currentStage.displayName}: ${uiState.stageCorrectCount} / ${uiState.questionIndex + 1} correct",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+private fun IntroContent(
+    isLoading: Boolean,
+    onStart: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "\u5b66",
+            fontSize = 80.sp,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "Japanese Placement Test",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "This quick test finds your level so we can personalize your learning. You'll start with hiragana, then katakana, radicals, and kanji \u2014 each stage getting progressively harder.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Each stage has 5 questions. Score 4 or more to advance. The test ends automatically after 3 minutes or when you don't pass a stage.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Don't worry about getting every answer right \u2014 the goal is to find where you are so we can start you at the right level.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onStart,
+            enabled = !isLoading,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = "Start Test (3 min max)",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -258,10 +362,20 @@ private fun ResultContent(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Assessment Complete!",
+            text = if (uiState.timedOut) "Time's Up!" else "Assessment Complete!",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
+
+        if (uiState.timedOut) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "We used your answers so far to find your level.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -302,26 +416,33 @@ private fun ResultContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
+                } else if (uiState.highestPassedStage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "You passed: ${uiState.highestPassedStage.displayName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Grade breakdown
+        // Stage breakdown
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Results by Grade",
+                    text = "Results",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                uiState.gradeResults.entries.sortedBy { it.key }.forEach { (grade, result) ->
+                uiState.stageResults.entries.forEach { (stageName, result) ->
                     val (correct, total) = result
                     val passed = correct >= 4
                     Row(
@@ -332,7 +453,7 @@ private fun ResultContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Grade $grade",
+                            text = stageName,
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {

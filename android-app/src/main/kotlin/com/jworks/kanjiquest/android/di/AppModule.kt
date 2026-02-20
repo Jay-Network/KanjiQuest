@@ -13,8 +13,12 @@ import com.jworks.kanjiquest.core.data.FeedbackRepositoryImpl
 import com.jworks.kanjiquest.core.data.FlashcardRepositoryImpl
 import com.jworks.kanjiquest.core.data.DatabaseDriverFactory
 import com.jworks.kanjiquest.core.data.JCoinRepositoryImpl
+import com.jworks.kanjiquest.core.data.KanaRepositoryImpl
+import com.jworks.kanjiquest.core.data.KanaSrsRepositoryImpl
 import com.jworks.kanjiquest.core.data.KanjiRepositoryImpl
 import com.jworks.kanjiquest.core.data.LearningSyncRepositoryImpl
+import com.jworks.kanjiquest.core.data.RadicalRepositoryImpl
+import com.jworks.kanjiquest.core.data.RadicalSrsRepositoryImpl
 import com.jworks.kanjiquest.core.data.SessionRepositoryImpl
 import com.jworks.kanjiquest.core.data.SrsRepositoryImpl
 import com.jworks.kanjiquest.core.data.UserRepositoryImpl
@@ -27,8 +31,12 @@ import com.jworks.kanjiquest.core.domain.repository.DevChatRepository
 import com.jworks.kanjiquest.core.domain.repository.FeedbackRepository
 import com.jworks.kanjiquest.core.domain.repository.FlashcardRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
+import com.jworks.kanjiquest.core.domain.repository.KanaRepository
+import com.jworks.kanjiquest.core.domain.repository.KanaSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
 import com.jworks.kanjiquest.core.domain.repository.LearningSyncRepository
+import com.jworks.kanjiquest.core.domain.repository.RadicalRepository
+import com.jworks.kanjiquest.core.domain.repository.RadicalSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.SessionRepository
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
@@ -39,7 +47,9 @@ import com.jworks.kanjiquest.core.domain.usecase.MigrateLocalDataUseCase
 import com.jworks.kanjiquest.core.domain.usecase.WordOfTheDayUseCase
 import com.jworks.kanjiquest.core.engine.GameEngine
 import com.jworks.kanjiquest.core.engine.GradeMasteryProvider
+import com.jworks.kanjiquest.core.engine.KanaQuestionGenerator
 import com.jworks.kanjiquest.core.engine.QuestionGenerator
+import com.jworks.kanjiquest.core.engine.RadicalQuestionGenerator
 import com.jworks.kanjiquest.core.scoring.ScoringEngine
 import com.jworks.kanjiquest.core.srs.Sm2Algorithm
 import com.jworks.kanjiquest.core.srs.SrsAlgorithm
@@ -148,6 +158,30 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideKanaRepository(db: KanjiQuestDatabase): KanaRepository {
+        return KanaRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideKanaSrsRepository(db: KanjiQuestDatabase): KanaSrsRepository {
+        return KanaSrsRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRadicalRepository(db: KanjiQuestDatabase): RadicalRepository {
+        return RadicalRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRadicalSrsRepository(db: KanjiQuestDatabase): RadicalSrsRepository {
+        return RadicalSrsRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
     fun provideUserSessionProvider(authRepository: AuthRepository): UserSessionProvider {
         return UserSessionProviderImpl(authRepository)
     }
@@ -172,6 +206,23 @@ object AppModule {
     }
 
     @Provides
+    fun provideKanaQuestionGenerator(
+        kanaRepository: KanaRepository,
+        kanaSrsRepository: KanaSrsRepository
+    ): KanaQuestionGenerator {
+        return KanaQuestionGenerator(kanaRepository, kanaSrsRepository)
+    }
+
+    @Provides
+    fun provideRadicalQuestionGenerator(
+        radicalRepository: RadicalRepository,
+        radicalSrsRepository: RadicalSrsRepository,
+        kanjiRepository: KanjiRepository
+    ): RadicalQuestionGenerator {
+        return RadicalQuestionGenerator(radicalRepository, radicalSrsRepository, kanjiRepository)
+    }
+
+    @Provides
     fun provideGameEngine(
         questionGenerator: QuestionGenerator,
         srsAlgorithm: SrsAlgorithm,
@@ -179,12 +230,20 @@ object AppModule {
         scoringEngine: ScoringEngine,
         vocabSrsRepository: VocabSrsRepository,
         userRepository: UserRepository,
-        userSessionProvider: UserSessionProvider
+        userSessionProvider: UserSessionProvider,
+        kanaQuestionGenerator: KanaQuestionGenerator,
+        kanaSrsRepository: KanaSrsRepository,
+        radicalQuestionGenerator: RadicalQuestionGenerator,
+        radicalSrsRepository: RadicalSrsRepository
     ): GameEngine {
         return GameEngine(
             questionGenerator, srsAlgorithm, srsRepository, scoringEngine,
             vocabSrsRepository, userRepository,
-            userSessionProvider = userSessionProvider
+            userSessionProvider = userSessionProvider,
+            kanaQuestionGenerator = kanaQuestionGenerator,
+            kanaSrsRepository = kanaSrsRepository,
+            radicalQuestionGenerator = radicalQuestionGenerator,
+            radicalSrsRepository = radicalSrsRepository
         )
     }
 

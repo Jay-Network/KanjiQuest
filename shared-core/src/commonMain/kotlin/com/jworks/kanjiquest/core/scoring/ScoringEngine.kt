@@ -17,15 +17,30 @@ class ScoringEngine {
         isNewCard: Boolean,
         gameMode: GameMode = GameMode.RECOGNITION
     ): ScoreResult {
-        val baseXp = if (gameMode == GameMode.WRITING) {
-            when {
+        val baseXp = when {
+            // Writing modes (kanji or kana) — full XP
+            gameMode == GameMode.WRITING || gameMode == GameMode.KANA_WRITING -> when {
                 quality >= 5 -> 20
                 quality >= 4 -> 15
                 quality >= 3 -> 10
                 else -> 0
             }
-        } else {
-            when {
+            // Radical builder — higher XP (composition is harder)
+            gameMode == GameMode.RADICAL_BUILDER -> when {
+                quality >= 5 -> 18
+                quality >= 4 -> 14
+                quality >= 3 -> 10
+                else -> 0
+            }
+            // Kana/radical recognition — slightly lower XP
+            gameMode == GameMode.KANA_RECOGNITION || gameMode == GameMode.RADICAL_RECOGNITION -> when {
+                quality >= 5 -> 10
+                quality >= 4 -> 8
+                quality >= 3 -> 5
+                else -> 0
+            }
+            // Standard recognition, vocabulary, camera
+            else -> when {
                 quality >= 5 -> 15
                 quality >= 4 -> 12
                 quality >= 3 -> 8

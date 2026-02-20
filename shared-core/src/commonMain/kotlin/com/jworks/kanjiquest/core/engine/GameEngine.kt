@@ -2,8 +2,11 @@ package com.jworks.kanjiquest.core.engine
 
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
 import com.jworks.kanjiquest.core.domain.model.GameMode
+import com.jworks.kanjiquest.core.domain.model.KanaType
 import com.jworks.kanjiquest.core.domain.model.SrsState
 import com.jworks.kanjiquest.core.domain.model.VocabSrsCard
+import com.jworks.kanjiquest.core.domain.repository.KanaSrsRepository
+import com.jworks.kanjiquest.core.domain.repository.RadicalSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import com.jworks.kanjiquest.core.domain.repository.VocabSrsRepository
@@ -25,6 +28,10 @@ class GameEngine(
     private val userRepository: UserRepository? = null,
     private val wordOfTheDayVocabId: Long? = null,
     private val userSessionProvider: UserSessionProvider? = null,
+    private val kanaQuestionGenerator: KanaQuestionGenerator? = null,
+    private val kanaSrsRepository: KanaSrsRepository? = null,
+    private val radicalQuestionGenerator: RadicalQuestionGenerator? = null,
+    private val radicalSrsRepository: RadicalSrsRepository? = null,
     private val timeProvider: () -> Long = { kotlinx.datetime.Clock.System.now().epochSeconds }
 ) {
     private val _state = MutableStateFlow<GameState>(GameState.Idle)
@@ -75,29 +82,42 @@ class GameEngine(
             playerLevel = userSessionProvider?.getAdminPlayerLevelOverride()
                 ?: userRepository?.getProfile()?.level ?: 1
 
-            if (event.targetKanjiId != null) {
-                questionGenerator.prepareTargetedSession(event.targetKanjiId, totalQuestions)
-            } else if (gameMode == GameMode.VOCABULARY) {
-                questionGenerator.prepareVocabSession(totalQuestions, timeProvider(), playerLevel)
-            } else {
-                questionGenerator.prepareSession(totalQuestions, timeProvider(), playerLevel)
+            when {
+                gameMode.isKanaMode -> {
+                    val kanaType = event.kanaType ?: KanaType.HIRAGANA
+                    kanaQuestionGenerator?.prepareSession(totalQuestions, timeProvider(), kanaType) ?: false
+                }
+                gameMode.isRadicalMode -> {
+                    radicalQuestionGenerator?.prepareSession(totalQuestions, timeProvider()) ?: false
+                }
+                event.targetKanjiId != null -> {
+                    questionGenerator.prepareTargetedSession(event.targetKanjiId, totalQuestions)
+                }
+                gameMode == GameMode.VOCABULARY -> {
+                    questionGenerator.prepareVocabSession(totalQuestions, timeProvider(), playerLevel)
+                }
+                else -> {
+                    questionGenerator.prepareSession(totalQuestions, timeProvider(), playerLevel)
+                }
             }
         }
 
         if (!ready) {
-            val errorMsg = if (gameMode == GameMode.VOCABULARY) {
-                "No vocabulary available. Study more kanji first!"
-            } else {
-                "No kanji available for study. Add kanji data first."
+            val errorMsg = when {
+                gameMode.isKanaMode -> "No kana available for study."
+                gameMode.isRadicalMode -> "No radicals available for study."
+                gameMode == GameMode.VOCABULARY -> "No vocabulary available. Study more kanji first!"
+                else -> "No kanji available for study. Add kanji data first."
             }
             _state.value = GameState.Error(errorMsg)
             return
         }
 
-        totalQuestions = if (gameMode == GameMode.VOCABULARY) {
-            questionGenerator.vocabRemainingCount()
-        } else {
-            questionGenerator.remainingCount()
+        totalQuestions = when {
+            gameMode.isKanaMode -> kanaQuestionGenerator?.remainingCount() ?: 0
+            gameMode.isRadicalMode -> radicalQuestionGenerator?.remainingCount() ?: 0
+            gameMode == GameMode.VOCABULARY -> questionGenerator.vocabRemainingCount()
+            else -> questionGenerator.remainingCount()
         }
         showNextQuestion()
     }
@@ -149,26 +169,53 @@ class GameEngine(
 
         // Update SRS card (off main thread) and track touched IDs
         withContext(Dispatchers.IO) {
-            if (gameMode == GameMode.VOCABULARY && question.vocabId != null) {
-                val vocabRepo = vocabSrsRepository
-                if (vocabRepo != null) {
-                    val vocabCard = vocabRepo.getCard(question.vocabId)
-                    if (vocabCard != null) {
-                        val updated = reviewVocabCard(vocabCard, quality, timeProvider())
-                        vocabRepo.saveCard(updated)
+            when {
+                gameMode.isKanaMode -> {
+                    val kanaRepo = kanaSrsRepository
+                    if (kanaRepo != null) {
+                        val card = kanaRepo.getCard(question.kanjiId)
+                        if (card != null) {
+                            val updated = srsAlgorithm.review(card, quality, timeProvider())
+                            kanaRepo.saveCard(updated)
+                        }
                     }
+                    touchedKanjiIds.add(question.kanjiId)
                 }
-                touchedVocabIds.add(question.vocabId)
-            } else {
-                val card = srsRepository.getCard(question.kanjiId)
-                if (card != null) {
-                    val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
-                    srsRepository.saveCard(updatedCard)
+                gameMode.isRadicalMode -> {
+                    val radRepo = radicalSrsRepository
+                    if (radRepo != null) {
+                        val card = radRepo.getCard(question.kanjiId)
+                        if (card != null) {
+                            val updated = srsAlgorithm.review(card, quality, timeProvider())
+                            radRepo.saveCard(updated)
+                        }
+                    }
+                    touchedKanjiIds.add(question.kanjiId)
                 }
-                touchedKanjiIds.add(question.kanjiId)
+                gameMode == GameMode.VOCABULARY && question.vocabId != null -> {
+                    val vocabRepo = vocabSrsRepository
+                    if (vocabRepo != null) {
+                        val vocabCard = vocabRepo.getCard(question.vocabId)
+                        if (vocabCard != null) {
+                            val updated = reviewVocabCard(vocabCard, quality, timeProvider())
+                            vocabRepo.saveCard(updated)
+                        }
+                    }
+                    touchedVocabIds.add(question.vocabId)
+                }
+                else -> {
+                    val card = srsRepository.getCard(question.kanjiId)
+                    if (card != null) {
+                        val updatedCard = srsAlgorithm.review(card, quality, timeProvider())
+                        srsRepository.saveCard(updatedCard)
+                    }
+                    touchedKanjiIds.add(question.kanjiId)
+                }
             }
-            // Track per-mode stats
-            srsRepository.incrementModeStats(question.kanjiId, gameMode.name.lowercase(), isCorrect)
+            // Track per-mode stats (only for kanji modes)
+            if (!gameMode.isKanaMode && !gameMode.isRadicalMode) {
+                srsRepository.incrementModeStats(question.kanjiId, gameMode.name.lowercase(), isCorrect)
+            }
         }
 
         _state.value = GameState.ShowingResult(
@@ -185,10 +232,11 @@ class GameEngine(
     }
 
     private suspend fun handleNextQuestion() {
-        val hasNext = if (gameMode == GameMode.VOCABULARY) {
-            questionGenerator.vocabRemainingCount() > 0
-        } else {
-            questionGenerator.hasNextQuestion()
+        val hasNext = when {
+            gameMode.isKanaMode -> kanaQuestionGenerator?.hasNextQuestion() ?: false
+            gameMode.isRadicalMode -> radicalQuestionGenerator?.hasNextQuestion() ?: false
+            gameMode == GameMode.VOCABULARY -> questionGenerator.vocabRemainingCount() > 0
+            else -> questionGenerator.hasNextQuestion()
         }
         if (hasNext) {
             showNextQuestion()
@@ -204,6 +252,10 @@ class GameEngine(
     private suspend fun showNextQuestion() {
         val question = withContext(Dispatchers.IO) {
             when (gameMode) {
+                GameMode.KANA_RECOGNITION -> kanaQuestionGenerator?.generateRecognitionQuestion()
+                GameMode.KANA_WRITING -> kanaQuestionGenerator?.generateWritingQuestion()
+                GameMode.RADICAL_RECOGNITION -> radicalQuestionGenerator?.generateRecognitionQuestion()
+                GameMode.RADICAL_BUILDER -> radicalQuestionGenerator?.generateBuilderQuestion()
                 GameMode.RECOGNITION -> questionGenerator.generateRecognitionQuestion()
                 GameMode.WRITING -> questionGenerator.generateWritingQuestion()
                 GameMode.VOCABULARY -> questionGenerator.generateVocabularyQuestion(playerLevel)

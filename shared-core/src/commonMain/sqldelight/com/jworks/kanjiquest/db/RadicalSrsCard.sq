@@ -1,0 +1,60 @@
+CREATE TABLE radical_srs_card (
+    radical_id INTEGER PRIMARY KEY NOT NULL,
+    ease_factor REAL NOT NULL DEFAULT 2.5,
+    interval INTEGER NOT NULL DEFAULT 0,
+    repetitions INTEGER NOT NULL DEFAULT 0,
+    next_review INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'new',
+    total_reviews INTEGER NOT NULL DEFAULT 0,
+    correct_count INTEGER NOT NULL DEFAULT 0
+);
+
+getByRadicalId:
+SELECT * FROM radical_srs_card WHERE radical_id = ?;
+
+getDueCards:
+SELECT * FROM radical_srs_card WHERE next_review <= ? AND state != 'graduated' ORDER BY next_review ASC;
+
+getNewCards:
+SELECT * FROM radical_srs_card WHERE state = 'new' ORDER BY RANDOM() LIMIT ?;
+
+getDueCount:
+SELECT COUNT(*) FROM radical_srs_card WHERE next_review <= ? AND state != 'graduated';
+
+getNewCount:
+SELECT COUNT(*) FROM radical_srs_card WHERE state = 'new';
+
+getLearningCards:
+SELECT * FROM radical_srs_card WHERE state = 'learning' ORDER BY RANDOM() LIMIT ?;
+
+getMasteredCount:
+SELECT COUNT(*) FROM radical_srs_card WHERE state = 'graduated';
+
+getTotalCount:
+SELECT COUNT(*) FROM radical_srs_card;
+
+getNonNewCount:
+SELECT COUNT(*) FROM radical_srs_card WHERE state != 'new';
+
+upsert:
+INSERT OR REPLACE INTO radical_srs_card(radical_id, ease_factor, interval, repetitions, next_review, state, total_reviews, correct_count)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+insertNew:
+INSERT OR IGNORE INTO radical_srs_card(radical_id) VALUES (?);
+
+getCardsByIds:
+SELECT * FROM radical_srs_card WHERE radical_id IN ?;
+
+getOverallStats:
+SELECT
+    COUNT(rs.radical_id) AS studied_count,
+    SUM(CASE WHEN rs.state = 'graduated' THEN 1 ELSE 0 END) AS mastered_count,
+    CASE
+        WHEN SUM(CASE WHEN rs.total_reviews > 0 THEN 1 ELSE 0 END) > 0
+        THEN CAST(SUM(CASE WHEN rs.total_reviews > 0 THEN CAST(rs.correct_count AS REAL) / rs.total_reviews ELSE 0 END) AS REAL)
+             / SUM(CASE WHEN rs.total_reviews > 0 THEN 1 ELSE 0 END)
+        ELSE 0.0
+    END AS avg_accuracy
+FROM radical_srs_card rs
+WHERE rs.state != 'new';

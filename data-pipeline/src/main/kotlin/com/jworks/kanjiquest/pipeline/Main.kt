@@ -3,6 +3,8 @@ package com.jworks.kanjiquest.pipeline
 import com.jworks.kanjiquest.pipeline.parser.Kanjidic2Parser
 import com.jworks.kanjiquest.pipeline.parser.KanjiVgParser
 import com.jworks.kanjiquest.pipeline.parser.JMDictParser
+import com.jworks.kanjiquest.pipeline.parser.KanaDataGenerator
+import com.jworks.kanjiquest.pipeline.parser.RadicalParser
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
@@ -62,6 +64,16 @@ fun main(args: Array<String>) {
         } else {
             println("WARNING: JMdict_e.xml not found in $rawDataDir")
         }
+
+        // 4. Generate Kana data
+        println("\nGenerating Kana data...")
+        val kanaCount = KanaDataGenerator.generate(connection)
+        println("  Inserted $kanaCount kana entries")
+
+        // 5. Parse Radicals
+        println("\nGenerating Radical data...")
+        val radicalCount = RadicalParser.parse(connection)
+        println("  Inserted $radicalCount radical entries")
 
         connection.commit()
 
@@ -182,6 +194,72 @@ private fun createSchema(conn: Connection) {
             )
         """)
 
+        // Kana table
+        stmt.executeUpdate("""
+            CREATE TABLE IF NOT EXISTS kana (
+                id INTEGER PRIMARY KEY NOT NULL,
+                literal TEXT NOT NULL UNIQUE,
+                type TEXT NOT NULL,
+                romanization TEXT NOT NULL,
+                kana_group TEXT NOT NULL,
+                stroke_count INTEGER NOT NULL,
+                stroke_svg TEXT,
+                variant TEXT NOT NULL DEFAULT 'basic',
+                base_kana_id INTEGER
+            )
+        """)
+
+        // Radical tables
+        stmt.executeUpdate("""
+            CREATE TABLE IF NOT EXISTS radical (
+                id INTEGER PRIMARY KEY NOT NULL,
+                literal TEXT NOT NULL,
+                meaning_en TEXT NOT NULL,
+                meaning_jp TEXT,
+                stroke_count INTEGER NOT NULL,
+                stroke_svg TEXT,
+                frequency INTEGER NOT NULL DEFAULT 0,
+                example_kanji TEXT NOT NULL DEFAULT '[]',
+                position TEXT
+            )
+        """)
+
+        stmt.executeUpdate("""
+            CREATE TABLE IF NOT EXISTS kanji_radical (
+                kanji_id INTEGER NOT NULL,
+                radical_id INTEGER NOT NULL,
+                PRIMARY KEY (kanji_id, radical_id)
+            )
+        """)
+
+        // Kana SRS card
+        stmt.executeUpdate("""
+            CREATE TABLE IF NOT EXISTS kana_srs_card (
+                kana_id INTEGER PRIMARY KEY NOT NULL,
+                ease_factor REAL NOT NULL DEFAULT 2.5,
+                interval INTEGER NOT NULL DEFAULT 0,
+                repetitions INTEGER NOT NULL DEFAULT 0,
+                next_review INTEGER NOT NULL DEFAULT 0,
+                state TEXT NOT NULL DEFAULT 'new',
+                total_reviews INTEGER NOT NULL DEFAULT 0,
+                correct_count INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
+        // Radical SRS card
+        stmt.executeUpdate("""
+            CREATE TABLE IF NOT EXISTS radical_srs_card (
+                radical_id INTEGER PRIMARY KEY NOT NULL,
+                ease_factor REAL NOT NULL DEFAULT 2.5,
+                interval INTEGER NOT NULL DEFAULT 0,
+                repetitions INTEGER NOT NULL DEFAULT 0,
+                next_review INTEGER NOT NULL DEFAULT 0,
+                state TEXT NOT NULL DEFAULT 'new',
+                total_reviews INTEGER NOT NULL DEFAULT 0,
+                correct_count INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
         // Indexes
         stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kanji_grade ON kanji(grade)")
         stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kanji_jlpt ON kanji(jlpt_level)")
@@ -190,6 +268,11 @@ private fun createSchema(conn: Connection) {
         stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_vocab_kanji_form ON vocabulary(kanji_form)")
         stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_srs_next_review ON srs_card(next_review)")
         stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_srs_state ON srs_card(state)")
+        stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kana_type ON kana(type)")
+        stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kana_group ON kana(type, kana_group)")
+        stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_radical_strokes ON radical(stroke_count)")
+        stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kanji_radical_kid ON kanji_radical(kanji_id)")
+        stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kanji_radical_rid ON kanji_radical(radical_id)")
     }
     conn.commit()
 }
@@ -220,6 +303,21 @@ private fun printStats(conn: Connection) {
         }
         stmt.executeQuery("SELECT COUNT(*) FROM example_sentence").use { rs ->
             rs.next(); println("  Example sentences: ${rs.getInt(1)}")
+        }
+        stmt.executeQuery("SELECT COUNT(*) FROM kana").use { rs ->
+            rs.next(); println("  Kana: ${rs.getInt(1)}")
+        }
+        stmt.executeQuery("SELECT type, COUNT(*) FROM kana GROUP BY type").use { rs ->
+            println("  Kana by type:")
+            while (rs.next()) {
+                println("    ${rs.getString(1)}: ${rs.getInt(2)}")
+            }
+        }
+        stmt.executeQuery("SELECT COUNT(*) FROM radical").use { rs ->
+            rs.next(); println("  Radicals: ${rs.getInt(1)}")
+        }
+        stmt.executeQuery("SELECT COUNT(*) FROM kanji_radical").use { rs ->
+            rs.next(); println("  Kanji-Radical links: ${rs.getInt(1)}")
         }
     }
 }
