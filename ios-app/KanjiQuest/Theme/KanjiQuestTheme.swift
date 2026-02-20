@@ -11,6 +11,10 @@ enum KanjiQuestTheme {
     static let secondary = Color(hex: 0x424242)
     static let onSecondary = Color.white
 
+    // Tertiary (for combos, accents)
+    static let tertiary = Color(hex: 0xFF8C42)        // Orange accent
+    static let onTertiary = Color.white
+
     // Background
     static let background = Color(hex: 0xFFFBFE)
     static let surface = Color.white
@@ -19,6 +23,7 @@ enum KanjiQuestTheme {
     // Text
     static let onBackground = Color(hex: 0x1C1B1F)
     static let onSurface = Color(hex: 0x1C1B1F)
+    static let onSurfaceVariant = Color(hex: 0x49454F)
 
     // Status
     static let success = Color(hex: 0x2E7D32)
@@ -29,6 +34,7 @@ enum KanjiQuestTheme {
     static let coinGold = Color(hex: 0xFFC107)
 
     // Typography
+    static let headlineMedium = Font.system(size: 32, weight: .bold, design: .rounded)
     static let titleLarge = Font.system(size: 28, weight: .bold, design: .rounded)
     static let titleMedium = Font.system(size: 22, weight: .semibold, design: .rounded)
     static let bodyLarge = Font.system(size: 17, weight: .regular)

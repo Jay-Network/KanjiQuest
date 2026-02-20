@@ -2,6 +2,7 @@ import SwiftUI
 
 enum Route: Hashable {
     case home
+    case recognition(targetKanjiId: Int32? = nil)
     case calligraphySession(kanjiLiteral: String, strokePaths: [String])
     case login
     case progress
@@ -29,6 +30,8 @@ struct AppNavigation: View {
                 switch route {
                 case .home:
                     HomeView(navigateTo: navigate)
+                case .recognition(let targetKanjiId):
+                    RecognitionView(targetKanjiId: targetKanjiId)
                 case .calligraphySession(let kanji, let paths):
                     CalligraphySessionView(
                         kanjiLiteral: kanji,

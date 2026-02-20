@@ -26,32 +26,58 @@ struct HomeView: View {
                     LevelCard(profile: profile)
                 }
 
-                // Calligraphy Practice button
-                Button {
-                    if let kanji = viewModel.nextKanji {
-                        navigateTo(.calligraphySession(
-                            kanjiLiteral: kanji.literal,
-                            strokePaths: kanji.strokePaths
-                        ))
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "pencil.tip")
-                            .font(.title2)
-                        VStack(alignment: .leading) {
-                            Text("Calligraphy Practice")
-                                .font(KanjiQuestTheme.labelLarge)
-                            Text("書道モード")
-                                .font(KanjiQuestTheme.labelSmall)
-                                .foregroundColor(.secondary)
+                // Game Mode Buttons
+                VStack(spacing: KanjiQuestTheme.spacingM) {
+                    // Recognition Mode (TestFlight MVP)
+                    Button {
+                        navigateTo(.recognition())
+                    } label: {
+                        HStack {
+                            Image(systemName: "eye.fill")
+                                .font(.title2)
+                            VStack(alignment: .leading) {
+                                Text("Recognition Mode")
+                                    .font(KanjiQuestTheme.labelLarge)
+                                Text("認識モード")
+                                    .font(KanjiQuestTheme.labelSmall)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
+                        .padding()
+                        .background(KanjiQuestTheme.secondary)
+                        .foregroundColor(.white)
+                        .cornerRadius(KanjiQuestTheme.radiusM)
                     }
-                    .padding()
-                    .background(KanjiQuestTheme.primary)
-                    .foregroundColor(.white)
-                    .cornerRadius(KanjiQuestTheme.radiusM)
+
+                    // Calligraphy Practice (iPad differentiator)
+                    Button {
+                        if let kanji = viewModel.nextKanji {
+                            navigateTo(.calligraphySession(
+                                kanjiLiteral: kanji.literal,
+                                strokePaths: kanji.strokePaths
+                            ))
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "pencil.tip")
+                                .font(.title2)
+                            VStack(alignment: .leading) {
+                                Text("Calligraphy Practice")
+                                    .font(KanjiQuestTheme.labelLarge)
+                                Text("書道モード")
+                                    .font(KanjiQuestTheme.labelSmall)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                        .padding()
+                        .background(KanjiQuestTheme.primary)
+                        .foregroundColor(.white)
+                        .cornerRadius(KanjiQuestTheme.radiusM)
+                    }
                 }
 
                 // Navigation links
