@@ -39,6 +39,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: false
+        FRAMEWORK_SEARCH_PATHS: $(inherited) $(PROJECT_DIR)/Frameworks
         # Inject xcconfig values into Info.plist
         SUPABASE_URL: $(SUPABASE_URL)
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
