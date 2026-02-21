@@ -16,6 +16,7 @@ final class CalligraphySessionViewModel: ObservableObject {
     @Published var sessionStats: SessionStats?
     @Published var currentKanji: String = ""
     @Published var currentStrokePaths: [String] = []
+    @Published var currentGradeMastery: GradeMastery?
 
     // MARK: - Dependencies
 
@@ -132,11 +133,19 @@ final class CalligraphySessionViewModel: ObservableObject {
         case let complete as GameState.SessionComplete:
             sessionComplete = true
             sessionStats = complete.stats
+            await loadGradeMastery()
         case is GameState.Error:
             break
         default:
             break
         }
+    }
+
+    /// Load current grade mastery for the kanji being practiced
+    private func loadGradeMastery() async {
+        guard let container else { return }
+        let mastery = container.kanjiRepository.getGradeMastery(grade: 1)
+        currentGradeMastery = mastery
     }
 
     func reset() {

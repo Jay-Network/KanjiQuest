@@ -7,6 +7,7 @@ struct ProgressView: View {
     @State private var masteredKanji = 0
     @State private var sessionsCompleted = 0
     @State private var totalXP = 0
+    @State private var gradeMasteries: [GradeMastery] = []
 
     var body: some View {
         ScrollView {
@@ -24,6 +25,37 @@ struct ProgressView: View {
                     StatCard(title: "Kanji Seen", value: "\(totalKanji)", icon: "character.ja", color: KanjiQuestTheme.primary)
                     StatCard(title: "Mastered", value: "\(masteredKanji)", icon: "trophy.fill", color: KanjiQuestTheme.coinGold)
                 }
+
+                // Grade Mastery Badges
+                if !gradeMasteries.isEmpty {
+                    VStack(alignment: .leading, spacing: KanjiQuestTheme.spacingS) {
+                        Text("Grade Mastery")
+                            .font(KanjiQuestTheme.titleMedium)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: KanjiQuestTheme.spacingM) {
+                            ForEach(gradeMasteries, id: \.grade) { mastery in
+                                VStack(spacing: 6) {
+                                    MasteryBadgeView(level: mastery.masteryLevel, size: 56)
+                                    Text("Grade \(mastery.grade)")
+                                        .font(KanjiQuestTheme.labelSmall)
+                                    Text("\(Int(mastery.masteryScore * 100))%")
+                                        .font(KanjiQuestTheme.labelSmall)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity)
+                                .background(KanjiQuestTheme.surface)
+                                .cornerRadius(KanjiQuestTheme.radiusM)
+                                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+                            }
+                        }
+                    }
+                }
             }
             .padding()
         }
@@ -31,6 +63,7 @@ struct ProgressView: View {
         .navigationTitle("Progress")
         .task {
             await loadStats()
+            await loadGradeMasteries()
         }
     }
 
@@ -41,6 +74,18 @@ struct ProgressView: View {
             totalXP = Int(profile?.totalXp ?? 0)
             sessionsCompleted = Int(profile?.sessionsCompleted ?? 0)
         } catch {}
+    }
+
+    private func loadGradeMasteries() async {
+        var masteries: [GradeMastery] = []
+        // Load mastery for grades 1-6 (elementary school kanji grades)
+        for grade in 1...6 {
+            let mastery = container.kanjiRepository.getGradeMastery(grade: Int32(grade))
+            if mastery.studiedCount > 0 {
+                masteries.append(mastery)
+            }
+        }
+        gradeMasteries = masteries
     }
 }
 

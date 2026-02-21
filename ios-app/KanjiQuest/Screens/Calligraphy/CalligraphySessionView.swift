@@ -11,6 +11,9 @@ struct CalligraphySessionView: View {
     @State private var strokes: [[CalligraphyPointData]] = []
     @State private var activeStroke: [CalligraphyPointData] = []
 
+    /// Warm paper color matching the canvas
+    private let paperBackground = Color(red: 1.0, green: 0.973, blue: 0.941)
+
     var body: some View {
         VStack(spacing: 0) {
             // Header: kanji + stroke count
@@ -24,7 +27,9 @@ struct CalligraphySessionView: View {
 
             // Result / Feedback
             if viewModel.showResult {
-                resultSection
+                ScrollView {
+                    resultSection
+                }
             }
         }
         .overlay {
@@ -32,7 +37,7 @@ struct CalligraphySessionView: View {
                 sessionCompleteOverlay(stats: stats)
             }
         }
-        .background(KanjiQuestTheme.background)
+        .background(paperBackground)
         .navigationTitle("書道")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -82,7 +87,11 @@ struct CalligraphySessionView: View {
             }
         )
         .aspectRatio(1.0, contentMode: .fit)
-        .border(Color.gray.opacity(0.3), width: 1)
+        .clipShape(RoundedRectangle(cornerRadius: KanjiQuestTheme.radiusM))
+        .overlay(
+            RoundedRectangle(cornerRadius: KanjiQuestTheme.radiusM)
+                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+        )
         .padding(.horizontal)
     }
 
@@ -120,7 +129,7 @@ struct CalligraphySessionView: View {
 
     private var resultSection: some View {
         VStack(alignment: .leading, spacing: KanjiQuestTheme.spacingS) {
-            // Score
+            // Score header
             HStack {
                 Text("Score")
                     .font(KanjiQuestTheme.labelLarge)
@@ -152,6 +161,10 @@ struct CalligraphySessionView: View {
                         .font(KanjiQuestTheme.bodyMedium)
                 }
 
+                // Stroke ending scores
+                strokeEndingScoresView(feedback: feedback)
+
+                // Pressure feedback
                 if !feedback.pressureFeedback.isEmpty {
                     HStack(alignment: .top) {
                         Text("筆圧:")
@@ -162,6 +175,7 @@ struct CalligraphySessionView: View {
                     }
                 }
 
+                // Movement feedback
                 if !feedback.movementFeedback.isEmpty {
                     HStack(alignment: .top) {
                         Text("運筆:")
@@ -172,6 +186,7 @@ struct CalligraphySessionView: View {
                     }
                 }
 
+                // Per-stroke feedback
                 ForEach(Array(feedback.strokeFeedback.enumerated()), id: \.offset) { _, tip in
                     Text("• \(tip)")
                         .font(KanjiQuestTheme.bodyMedium)
@@ -198,6 +213,82 @@ struct CalligraphySessionView: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Stroke Ending Scores
+
+    /// Maps technique labels to their badge image asset names
+    private static let techniqueBadgeMap: [String: String] = [
+        "Tome": "Calligraphy/BadgeTome",
+        "Hane": "Calligraphy/BadgeHane",
+        "Harai": "Calligraphy/BadgeHarai",
+    ]
+
+    @ViewBuilder
+    private func strokeEndingScoresView(feedback: CalligraphyFeedbackService.CalligraphyFeedback) -> some View {
+        let hasAnyScore = feedback.tomeScore != nil || feedback.haneScore != nil
+            || feedback.haraiScore != nil || feedback.balanceScore != nil
+
+        if hasAnyScore {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    if let balance = feedback.balanceScore {
+                        scoreChip(label: "Balance", kanji: "均", score: balance)
+                    }
+                    if let tome = feedback.tomeScore {
+                        scoreChip(label: "Tome", kanji: "止", score: tome)
+                    }
+                    if let hane = feedback.haneScore {
+                        scoreChip(label: "Hane", kanji: "撥", score: hane)
+                    }
+                    if let harai = feedback.haraiScore {
+                        scoreChip(label: "Harai", kanji: "払", score: harai)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func scoreChip(label: String, kanji: String, score: Int) -> some View {
+        VStack(spacing: 2) {
+            // Show badge image for technique chips (tome/hane/harai)
+            if let badgeName = Self.techniqueBadgeMap[label] {
+                Image(badgeName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 32, height: 32)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            Text(kanji)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(scoreColor(score))
+            HStack(spacing: 1) {
+                ForEach(1...5, id: \.self) { i in
+                    Circle()
+                        .fill(i <= score ? scoreColor(score) : Color.gray.opacity(0.2))
+                        .frame(width: 6, height: 6)
+                }
+            }
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(minWidth: 50)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(scoreColor(score).opacity(0.08))
+        .cornerRadius(8)
+    }
+
+    private func scoreColor(_ score: Int) -> Color {
+        switch score {
+        case 5: return .green
+        case 4: return Color(red: 0.2, green: 0.7, blue: 0.3)
+        case 3: return .orange
+        case 2: return Color(red: 0.9, green: 0.5, blue: 0.2)
+        default: return .red
+        }
+    }
+
     // MARK: - Session Complete Overlay
 
     private func sessionCompleteOverlay(stats: SessionStats) -> some View {
@@ -209,6 +300,11 @@ struct CalligraphySessionView: View {
                 Text("Session Complete!")
                     .font(KanjiQuestTheme.titleLarge)
                     .foregroundColor(.white)
+
+                // Mastery grade badge (if available)
+                if let mastery = viewModel.currentGradeMastery {
+                    MasteryBadgeView(level: mastery.masteryLevel, size: 80)
+                }
 
                 VStack(spacing: KanjiQuestTheme.spacingS) {
                     statRow(label: "Kanji Studied", value: "\(stats.cardsStudied)")

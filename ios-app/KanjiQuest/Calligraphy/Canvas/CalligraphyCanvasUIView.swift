@@ -19,6 +19,11 @@ protocol CalligraphyCanvasDelegate: AnyObject {
 
 /// Custom UIView that captures Apple Pencil touches with full pressure/tilt data
 /// and renders ink using the FudeBrushEngine via Core Graphics.
+///
+/// Enhanced with:
+/// - Warm 半紙 (hanshi) paper texture with subtle grain
+/// - Ink pooling at stroke start/stop points
+/// - Soft-edge rendering via the gradient-based FudeBrushEngine
 final class CalligraphyCanvasUIView: UIView {
 
     weak var delegate: CalligraphyCanvasDelegate?
@@ -37,6 +42,21 @@ final class CalligraphyCanvasUIView: UIView {
     // Offscreen buffer for completed strokes (avoids re-rendering)
     private var completedImage: UIImage?
 
+    // Paper texture (generated once, cached)
+    private var paperTextureImage: UIImage?
+
+    /// Warm paper background color (half-white 半紙 tone)
+    private let paperColor = UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1.0) // #FFF8F0
+
+    /// Velocity threshold below which ink pooling occurs (px/sec)
+    private let poolingVelocityThreshold: CGFloat = 50.0
+
+    /// Extra radius multiplier for ink pooling stamps
+    private let poolingRadiusMultiplier: CGFloat = 1.35
+
+    /// Extra alpha for ink pooling (darker puddle)
+    private let poolingAlphaBoost: CGFloat = 0.15
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         commonInit()
@@ -48,9 +68,18 @@ final class CalligraphyCanvasUIView: UIView {
     }
 
     private func commonInit() {
-        backgroundColor = .white
+        backgroundColor = paperColor
         isMultipleTouchEnabled = false
         contentMode = .redrawOnClear
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Load paper texture when bounds change
+        if paperTextureImage?.size != bounds.size, bounds.size.width > 0, bounds.size.height > 0 {
+            paperTextureImage = loadPaperTexture(size: bounds.size)
+            setNeedsDisplay()
+        }
     }
 
     // MARK: - Touch Handling
@@ -76,12 +105,6 @@ final class CalligraphyCanvasUIView: UIView {
         let coalesced = event?.coalescedTouches(for: touch) ?? [touch]
         for t in coalesced {
             activePoints.append(pointData(from: t))
-        }
-
-        // Also use predicted touches for low-latency rendering
-        if let predicted = event?.predictedTouches(for: touch) {
-            // Predicted touches are used for rendering only, not stored
-            // They'll be replaced by actual coalesced touches next frame
         }
 
         setNeedsDisplay()
@@ -113,20 +136,168 @@ final class CalligraphyCanvasUIView: UIView {
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
 
-        // 1. Draw background
-        context.setFillColor(UIColor.white.cgColor)
+        // 1. Draw warm paper background
+        context.setFillColor(paperColor.cgColor)
         context.fill(rect)
 
-        // 2. Draw ghost reference strokes
+        // 2. Overlay paper texture (subtle grain)
+        if let texture = paperTextureImage {
+            context.saveGState()
+            context.setBlendMode(.multiply)
+            context.setAlpha(0.08) // Very subtle
+            texture.draw(in: bounds)
+            context.restoreGState()
+        }
+
+        // 3. Draw ghost reference strokes
         drawReferenceStrokes(in: context)
 
-        // 3. Draw completed strokes (from cached image)
+        // 4. Draw completed strokes (from cached image)
         completedImage?.draw(in: bounds)
 
-        // 4. Draw active stroke
+        // 5. Draw active stroke
         if !activePoints.isEmpty {
             brushEngine.render(points: activePoints, in: context, bounds: bounds)
+            // Render ink pooling at start of active stroke
+            renderInkPooling(points: activePoints, in: context)
         }
+    }
+
+    // MARK: - Paper Texture
+
+    /// Load the 半紙 (hanshi) rice paper texture from assets, scaled to the canvas size.
+    /// Falls back to procedural generation if the asset is missing.
+    private func loadPaperTexture(size: CGSize) -> UIImage {
+        if let asset = UIImage(named: "Calligraphy/HanshiTexture") {
+            let renderer = UIGraphicsImageRenderer(size: size)
+            return renderer.image { ctx in
+                asset.draw(in: CGRect(origin: .zero, size: size))
+            }
+        }
+        // Fallback: procedural generation
+        return generatePaperTextureFallback(size: size)
+    }
+
+    /// Procedural fallback if the hanshi texture asset is unavailable.
+    private func generatePaperTextureFallback(size: CGSize) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let context = ctx.cgContext
+            let width = Int(size.width)
+            let height = Int(size.height)
+
+            context.setFillColor(UIColor(white: 0.0, alpha: 1.0).cgColor)
+
+            let grainSize: Int = 3
+            let stepX = max(1, width / 200)
+            let stepY = max(1, height / 200)
+
+            for y in stride(from: 0, to: height, by: stepY) {
+                for x in stride(from: 0, to: width, by: stepX) {
+                    let hash = (x * 73856093) ^ (y * 19349663)
+                    let normalizedHash = Float(hash & 0xFF) / 255.0
+
+                    if normalizedHash > 0.4 {
+                        let alpha = CGFloat((normalizedHash - 0.4) * 0.5)
+                        context.setFillColor(UIColor(white: 0.0, alpha: alpha).cgColor)
+                        context.fill(CGRect(x: x, y: y, width: grainSize, height: grainSize))
+                    }
+                }
+            }
+
+            context.setStrokeColor(UIColor(white: 0.0, alpha: 0.03).cgColor)
+            context.setLineWidth(0.5)
+            for i in 0..<15 {
+                let hash1 = (i * 48271) & 0xFFFF
+                let hash2 = (i * 65521) & 0xFFFF
+                let x1 = CGFloat(hash1 % width)
+                let y1 = CGFloat(hash2 % height)
+                let len = CGFloat(10 + (hash1 % 30))
+                let angle = CGFloat(hash2 % 314) / 100.0
+
+                context.beginPath()
+                context.move(to: CGPoint(x: x1, y: y1))
+                context.addLine(to: CGPoint(x: x1 + cos(angle) * len, y: y1 + sin(angle) * len))
+                context.strokePath()
+            }
+        }
+    }
+
+    // MARK: - Ink Pooling
+
+    /// Render darker ink puddles where velocity is near zero (start/end of stroke).
+    private func renderInkPooling(points: [CalligraphyPointData], in context: CGContext) {
+        guard points.count >= 3 else { return }
+
+        // Check start of stroke (first few points)
+        let startPoolPoints = min(5, points.count)
+        for i in 0..<startPoolPoints {
+            if i == 0 {
+                // First point: always pool (brush resting on paper)
+                renderPoolStamp(point: points[i], in: context, intensity: 0.8)
+            } else {
+                let velocity = computePointVelocity(points: points, index: i)
+                if velocity < poolingVelocityThreshold {
+                    let factor = 1.0 - velocity / poolingVelocityThreshold
+                    renderPoolStamp(point: points[i], in: context, intensity: CGFloat(factor) * 0.6)
+                }
+            }
+        }
+
+        // Check end of stroke (last few points)
+        let endStart = max(startPoolPoints, points.count - 5)
+        for i in endStart..<points.count {
+            let velocity = computePointVelocity(points: points, index: i)
+            if velocity < poolingVelocityThreshold {
+                let factor = 1.0 - velocity / poolingVelocityThreshold
+                renderPoolStamp(point: points[i], in: context, intensity: CGFloat(factor) * 0.5)
+            }
+        }
+    }
+
+    /// Render a single ink pool stamp — slightly larger and darker than normal.
+    private func renderPoolStamp(point: CalligraphyPointData, in context: CGContext, intensity: CGFloat) {
+        let baseWidth = 1.5 + (32.0 - 1.5) * pow(max(0, min(1, point.force)), 1.0 / 1.8)
+        let poolRadius = baseWidth * poolingRadiusMultiplier / 2
+
+        context.saveGState()
+        context.translateBy(x: point.x, y: point.y)
+
+        let poolAlpha = min(1.0, point.force * 0.5 + poolingAlphaBoost) * intensity
+
+        // Draw a soft radial pool
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let poolColor = UIColor.black
+        let colors = [
+            poolColor.withAlphaComponent(poolAlpha).cgColor,
+            poolColor.withAlphaComponent(poolAlpha * 0.3).cgColor,
+            poolColor.withAlphaComponent(0).cgColor,
+        ] as CFArray
+        let locations: [CGFloat] = [0.0, 0.5, 1.0]
+
+        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locations) {
+            context.drawRadialGradient(
+                gradient,
+                startCenter: .zero,
+                startRadius: 0,
+                endCenter: .zero,
+                endRadius: poolRadius,
+                options: [.drawsAfterEndLocation]
+            )
+        }
+
+        context.restoreGState()
+    }
+
+    private func computePointVelocity(points: [CalligraphyPointData], index: Int) -> CGFloat {
+        guard index > 0 else { return 0 }
+        let prev = points[index - 1]
+        let curr = points[index]
+        let dx = curr.x - prev.x
+        let dy = curr.y - prev.y
+        let dist = sqrt(dx * dx + dy * dy)
+        let dt = curr.timestamp - prev.timestamp
+        return dt > 0.0001 ? dist / CGFloat(dt) : 0
     }
 
     // MARK: - Reference Strokes
@@ -217,6 +388,7 @@ final class CalligraphyCanvasUIView: UIView {
         completedImage = renderer.image { ctx in
             completedImage?.draw(in: bounds)
             brushEngine.render(points: activePoints, in: ctx.cgContext, bounds: bounds)
+            renderInkPooling(points: activePoints, in: ctx.cgContext)
         }
 
         completedStrokes.append(CompletedStrokeLayer(points: activePoints))
@@ -247,6 +419,7 @@ final class CalligraphyCanvasUIView: UIView {
         completedImage = renderer.image { ctx in
             for stroke in completedStrokes {
                 brushEngine.render(points: stroke.points, in: ctx.cgContext, bounds: bounds)
+                renderInkPooling(points: stroke.points, in: ctx.cgContext)
             }
         }
     }
