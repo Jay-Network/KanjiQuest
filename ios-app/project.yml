@@ -58,6 +58,7 @@ targets:
         embed: true
       - framework: $(PROJECT_DIR)/Frameworks/SharedJapanese.xcframework
         embed: true
+      - sdk: libsqlite3.tbd
 
     preBuildScripts:
       - name: "Link SharedCore XCFramework"

@@ -192,7 +192,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="$PP_UUID" \
             FRAMEWORK_SEARCH_PATHS="$(pwd)/Frameworks" \
-            OTHER_LDFLAGS='$(inherited) -ObjC -Wl,-weak-lswiftXPC' \
+            OTHER_LDFLAGS='$(inherited) -ObjC -lsqlite3 -Wl,-weak-lswiftXPC' \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             2>&1 | tee /tmp/xcodebuild.log | xcpretty || {
               echo "=== Raw xcodebuild error output ==="
