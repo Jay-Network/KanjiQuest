@@ -11,5 +11,8 @@ Pods/
 # SPM
 .build/
 
+# XCFrameworks (copied at build time)
+Frameworks/
+
 # OS
 .DS_Store

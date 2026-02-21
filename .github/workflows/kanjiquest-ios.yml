@@ -64,13 +64,17 @@ jobs:
         with:
           name: xcframeworks
 
-      - name: Verify XCFrameworks
+      - name: Verify and stage XCFrameworks
         run: |
           echo "=== Workspace contents ==="
           find . -name "*.xcframework" -type d
           echo "=== Checking expected paths ==="
           ls -d shared-core/build/XCFrameworks/release/SharedCore.xcframework || { echo "SharedCore.xcframework NOT FOUND"; exit 1; }
           echo "SharedCore.xcframework found"
+          echo "=== Copying to ios-app/Frameworks/ ==="
+          mkdir -p ios-app/Frameworks
+          cp -R shared-core/build/XCFrameworks/release/SharedCore.xcframework ios-app/Frameworks/
+          ls -la ios-app/Frameworks/
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.0.app || sudo xcode-select -s /Applications/Xcode.app
