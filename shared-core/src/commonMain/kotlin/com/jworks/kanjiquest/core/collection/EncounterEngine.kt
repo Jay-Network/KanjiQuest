@@ -197,6 +197,6 @@ class EncounterEngine(
     }
 
     fun resetPity() {
-        pityCounts.replaceAll { _, _ -> 0 }
+        pityCounts.keys.forEach { key -> pityCounts[key] = 0 }
     }
 }
