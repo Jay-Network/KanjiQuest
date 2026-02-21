@@ -70,7 +70,7 @@ final class CalligraphyCanvasUIView: UIView {
     private func commonInit() {
         backgroundColor = paperColor
         isMultipleTouchEnabled = false
-        contentMode = .redrawOnClear
+        contentMode = .redraw
     }
 
     override func layoutSubviews() {

@@ -34,7 +34,7 @@ final class AppContainer: ObservableObject {
         // Database
         databaseDriverFactory = DatabaseDriverFactory()
         let driver = databaseDriverFactory.createDriver()
-        database = KanjiQuestDatabase(driver: driver)
+        database = databaseDriverFactory.createDatabase(driver: driver)
 
         // Repositories (param is `db:` except AchievementRepositoryImpl which uses `database:`)
         kanjiRepository = KanjiRepositoryImpl(db: database)
@@ -70,7 +70,12 @@ final class AppContainer: ObservableObject {
             scoringEngine: scoringEngine,
             vocabSrsRepository: vocabSrsRepository,
             userRepository: userRepository,
-            userSessionProvider: sessionProvider
+            wordOfTheDayVocabId: nil,
+            userSessionProvider: sessionProvider,
+            kanaQuestionGenerator: nil,
+            kanaSrsRepository: nil,
+            radicalQuestionGenerator: nil,
+            radicalSrsRepository: nil
         )
     }
 

@@ -19,6 +19,10 @@ actual class DatabaseDriverFactory {
         )
     }
 
+    fun createDatabase(driver: SqlDriver): KanjiQuestDatabase {
+        return KanjiQuestDatabase(driver)
+    }
+
     private fun copyDatabaseIfNeeded() {
         val fileManager = NSFileManager.defaultManager
         val documentsPath = NSSearchPathForDirectoriesInDomains(

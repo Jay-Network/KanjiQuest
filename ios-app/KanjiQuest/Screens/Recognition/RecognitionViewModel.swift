@@ -48,11 +48,12 @@ final class RecognitionViewModel: ObservableObject {
     func startGame(questionCount: Int = 10, targetKanjiId: Int32? = nil) async {
         guard let gameEngine else { return }
         isLoading = true
-        await gameEngine.onEvent(
+        try? await gameEngine.onEvent(
             event: GameEvent.StartSession(
                 gameMode: GameMode.recognition,
                 questionCount: Int32(questionCount),
-                targetKanjiId: targetKanjiId.map { KotlinInt(value: $0) }
+                targetKanjiId: targetKanjiId.map { KotlinInt(value: $0) },
+                kanaType: nil
             )
         )
         isLoading = false
@@ -60,17 +61,17 @@ final class RecognitionViewModel: ObservableObject {
 
     func submitAnswer(_ answer: String) async {
         guard let gameEngine else { return }
-        await gameEngine.onEvent(event: GameEvent.SubmitAnswer(answer: answer))
+        try? await gameEngine.onEvent(event: GameEvent.SubmitAnswer(answer: answer))
     }
 
     func nextQuestion() async {
         guard let gameEngine else { return }
-        await gameEngine.onEvent(event: GameEvent.NextQuestion())
+        try? await gameEngine.onEvent(event: GameEvent.NextQuestion())
     }
 
     func endSession() async {
         guard let gameEngine else { return }
-        await gameEngine.onEvent(event: GameEvent.EndSession())
+        try? await gameEngine.onEvent(event: GameEvent.EndSession())
     }
 
     func reset() {

@@ -40,10 +40,12 @@ final class CalligraphySessionViewModel: ObservableObject {
 
     func startSession(questionCount: Int = 10) async {
         guard let gameEngine else { return }
-        await gameEngine.onEvent(
+        try? await gameEngine.onEvent(
             event: GameEvent.StartSession(
                 gameMode: GameMode.writing,
-                questionCount: Int32(questionCount)
+                questionCount: Int32(questionCount),
+                targetKanjiId: nil,
+                kanaType: nil
             )
         )
     }
@@ -78,7 +80,7 @@ final class CalligraphySessionViewModel: ObservableObject {
 
         // Submit to GameEngine for SRS update + XP calculation
         let answer = "\(result.isCorrect)|\(result.quality)"
-        await gameEngine.onEvent(event: GameEvent.SubmitAnswer(answer: answer))
+        try? await gameEngine.onEvent(event: GameEvent.SubmitAnswer(answer: answer))
 
         // Path B: AI Calligraphy Feedback (async, non-blocking)
         isAILoading = true
@@ -100,14 +102,14 @@ final class CalligraphySessionViewModel: ObservableObject {
     func nextKanji() async {
         reset()
         guard let gameEngine else { return }
-        await gameEngine.onEvent(event: GameEvent.NextQuestion())
+        try? await gameEngine.onEvent(event: GameEvent.NextQuestion())
     }
 
     // MARK: - End Session
 
     func endSession() async {
         guard let gameEngine else { return }
-        await gameEngine.onEvent(event: GameEvent.EndSession())
+        try? await gameEngine.onEvent(event: GameEvent.EndSession())
     }
 
     // MARK: - State Observation (SKIE: StateFlow → AsyncSequence)

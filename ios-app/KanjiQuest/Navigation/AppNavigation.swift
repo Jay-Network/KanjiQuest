@@ -53,7 +53,7 @@ struct AppNavigation: View {
         }
         .task {
             // Check for existing session
-            isAuthenticated = await container.authRepository.hasActiveSession()
+            isAuthenticated = (try? await container.authRepository.getCurrentUserId()) != nil
         }
     }
 
