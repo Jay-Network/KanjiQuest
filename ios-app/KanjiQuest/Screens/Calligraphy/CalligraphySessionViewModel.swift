@@ -144,8 +144,11 @@ final class CalligraphySessionViewModel: ObservableObject {
     /// Load current grade mastery for the kanji being practiced
     private func loadGradeMastery() async {
         guard let container else { return }
-        let mastery = container.kanjiRepository.getGradeMastery(grade: 1)
-        currentGradeMastery = mastery
+        do {
+            let total = try await container.kanjiRepository.getKanjiCountByGrade(grade: 1)
+            let mastery = try await container.srsRepository.getGradeMastery(grade: 1, totalKanjiInGrade: total)
+            currentGradeMastery = mastery
+        } catch {}
     }
 
     func reset() {

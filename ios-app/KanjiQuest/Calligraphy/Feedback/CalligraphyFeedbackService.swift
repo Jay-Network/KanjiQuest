@@ -1,8 +1,8 @@
 import Foundation
 
 /// AI calligraphy feedback using Gemini 2.5 Flash.
-/// Extends the Android HandwritingChecker with 2 additional evaluation aspects:
-/// 筆圧 (brush pressure) and 運筆 (brush movement/rhythm).
+/// Evaluates 書道 technique including stroke endings (止め/はね/はらい),
+/// brush pressure, tilt usage, and movement rhythm.
 final class CalligraphyFeedbackService {
 
     private let apiKey: String
@@ -14,6 +14,10 @@ final class CalligraphyFeedbackService {
         let qualityRating: Int           // 1-5
         let pressureFeedback: String     // 筆圧 evaluation
         let movementFeedback: String     // 運筆 evaluation
+        let tomeScore: Int?              // 1-5 for 止め technique
+        let haneScore: Int?              // 1-5 for はね technique
+        let haraiScore: Int?             // 1-5 for はらい technique
+        let balanceScore: Int?           // 1-5 for overall balance
         let isAvailable: Bool
     }
 
@@ -38,7 +42,7 @@ final class CalligraphyFeedbackService {
             return unavailable()
         }
 
-        // Generate pressure metadata
+        // Generate enhanced metadata with tilt, velocity, and stroke endings
         let analysis = PressureAnalyzer.analyze(strokes: strokes)
         let metadata = PressureAnalyzer.generateTextMetadata(from: analysis)
 
@@ -64,42 +68,75 @@ final class CalligraphyFeedbackService {
         pressureMetadata: String
     ) -> String {
         """
-        You are a Japanese 書道 (calligraphy) master evaluating a student's work written with Apple Pencil on iPad. The kanji is「\(kanji)」with \(strokeCount) stroke(s). The image shows pressure-aware rendering where thicker lines = more pressure.
+        You are a Japanese 書道 (calligraphy) master evaluating a student's work written with Apple Pencil on iPad. The kanji is「\(kanji)」with \(strokeCount) stroke(s). The image shows pressure-and-tilt-aware rendering where thicker lines = more pressure, and elliptical brush shapes show pencil tilt angle.
 
-        PRESSURE & MOVEMENT DATA (from Apple Pencil sensors):
+        SENSOR DATA (from Apple Pencil — pressure, tilt altitude/azimuth, velocity, stroke endings):
         \(pressureMetadata)
 
-        Evaluate these 5 aspects IN ORDER OF IMPORTANCE:
+        IMPORTANT: The stroke ending detector has already analyzed each stroke's ending pattern from raw sensor data. The detected types (tome/hane/harai) and confidence scores are included above. Use these as INPUT data alongside the visual image.
 
-        1. OVERALL BALANCE (バランス): Proportions, centering, spacing of components.
+        Evaluate these aspects with STRICT 書道 criteria:
 
-        2. STROKE ORDER (筆順): Standard Japanese conventions (top→bottom, left→right, horizontal before vertical).
+        1. OVERALL BALANCE (バランス) [score 1-5]:
+           Proportions, centering, spacing of components, stroke length ratios.
+           5: Master — perfect proportions, centered, harmonious spacing
+           4: Good — mostly balanced, minor proportion issues
+           3: Acceptable — recognizable but noticeably off-balance
+           2: Needs work — significant proportion/spacing errors
+           1: Beginner — major balance issues
 
-        3. STROKE ENDINGS (止め・はね・はらい):
-           - 止め (tome): Firm stop — pressure should remain steady at end
-           - はね (hane): Upward flick — pressure should decrease then spike briefly
-           - はらい (harai): Gradual taper — pressure should decrease smoothly to near-zero
+        2. STROKE ORDER (筆順):
+           Standard Japanese conventions (top→bottom, left→right, horizontal before vertical).
 
-        4. BRUSH PRESSURE (筆圧): Is pressure variation natural? Does it follow 書道 conventions?
-           - Strokes should generally start with moderate pressure
-           - Horizontal strokes often have slight pressure increase in middle
-           - Ending pressure pattern should match the stroke ending type
-           - Look for unnatural constant pressure (robotic) vs natural variation
+        3. STROKE ENDINGS — evaluate EACH applicable type:
 
-        5. BRUSH MOVEMENT (運筆): Flow, rhythm, and speed variation.
-           - Even spacing between points = steady movement (good for 横画)
-           - Acceleration at ends = confident はらい
-           - Duration proportional to stroke length = good rhythm
-           - Very fast strokes may indicate carelessness
+           止め (tome) [score 1-5]: Firm stop technique
+           5: Clean stop with steady pressure, no wobble, confident halt
+           4: Good stop, minor pressure instability
+           3: Recognizable stop but pressure fades or wobbles
+           2: Weak stop, inconsistent pressure at end
+           1: No discernible stop technique
 
-        IMPORTANT: This is iPad + Apple Pencil, so pressure data is REAL and meaningful. Unlike smartphone evaluation, you CAN and SHOULD evaluate brush pressure and movement.
+           はね (hane) [score 1-5]: Upward flick technique
+           5: Crisp flick with clear pressure dip→spike, correct direction
+           4: Good flick, slightly weak or off-angle
+           3: Attempt visible but pressure pattern unclear
+           2: Weak or absent flick
+           1: No discernible flick
 
-        Be encouraging. Praise what is done well before noting issues. Only discuss visible strokes.
+           はらい (harai) [score 1-5]: Gradual taper technique
+           5: Smooth monotonic pressure decrease, natural taper to nothing
+           4: Good taper with minor pressure bumps
+           3: Taper present but irregular or too abrupt
+           2: Pressure drops suddenly instead of tapering
+           1: No discernible taper
 
-        Respond with ONLY this JSON (no other text):
-        {"rating":3,"overall":"summary","strokes":["stroke-specific feedback"],"pressure":"筆圧 evaluation","movement":"運筆 evaluation"}
+           Only score ending types that appear in this kanji. Set others to null.
 
-        rating: 1=major errors, 2=significant issues, 3=acceptable, 4=good technique, 5=excellent 書道 form.
+        4. BRUSH PRESSURE (筆圧):
+           - Natural pressure variation (not robotic constant pressure)
+           - Appropriate pressure curves for each stroke type
+           - Starting pressure: moderate entry
+           - Horizontal strokes: slight pressure swell in middle
+           - Ending matches the stroke ending type
+
+        5. BRUSH MOVEMENT (運筆):
+           - Flow and rhythm between strokes
+           - Velocity consistency within strokes
+           - Appropriate speed: not rushed, not labored
+           - Duration proportional to stroke complexity
+
+        6. TILT USAGE (筆角):
+           - Consistent tilt angle (altitude variance should be low)
+           - Appropriate tilt for stroke types
+           - Higher altitude (perpendicular) for thin strokes, lower for broad strokes
+
+        Be encouraging but honest. Praise what is done well. Give specific, actionable feedback.
+
+        Respond with ONLY this JSON (no markdown, no other text):
+        {"rating":3,"overall":"summary","strokes":["per-stroke feedback"],"pressure":"筆圧 eval","movement":"運筆 eval","tome_score":null,"hane_score":null,"harai_score":null,"balance_score":3}
+
+        rating: 1-5 overall. tome_score/hane_score/harai_score: 1-5 or null if not applicable. balance_score: 1-5.
         """
     }
 
@@ -162,6 +199,11 @@ final class CalligraphyFeedbackService {
         let pressure = json["pressure"] as? String ?? ""
         let movement = json["movement"] as? String ?? ""
 
+        let tomeScore = (json["tome_score"] as? Int)?.clamped(to: 1...5)
+        let haneScore = (json["hane_score"] as? Int)?.clamped(to: 1...5)
+        let haraiScore = (json["harai_score"] as? Int)?.clamped(to: 1...5)
+        let balanceScore = (json["balance_score"] as? Int)?.clamped(to: 1...5)
+
         var strokeFeedback: [String] = []
         if let strokes = json["strokes"] as? [String] {
             strokeFeedback = strokes.filter { !$0.isEmpty }
@@ -173,6 +215,10 @@ final class CalligraphyFeedbackService {
             qualityRating: rating,
             pressureFeedback: pressure,
             movementFeedback: movement,
+            tomeScore: tomeScore,
+            haneScore: haneScore,
+            haraiScore: haraiScore,
+            balanceScore: balanceScore,
             isAvailable: true
         )
     }
@@ -193,6 +239,10 @@ final class CalligraphyFeedbackService {
             qualityRating: 3,
             pressureFeedback: "",
             movementFeedback: "",
+            tomeScore: nil,
+            haneScore: nil,
+            haraiScore: nil,
+            balanceScore: nil,
             isAvailable: true
         )
     }
@@ -204,6 +254,10 @@ final class CalligraphyFeedbackService {
             qualityRating: 0,
             pressureFeedback: "",
             movementFeedback: "",
+            tomeScore: nil,
+            haneScore: nil,
+            haraiScore: nil,
+            balanceScore: nil,
             isAvailable: false
         )
     }
@@ -218,5 +272,12 @@ enum CalligraphyError: Error {
 private extension Comparable {
     func clamped(to range: ClosedRange<Self>) -> Self {
         min(max(self, range.lowerBound), range.upperBound)
+    }
+}
+
+private extension Optional where Wrapped: Comparable {
+    func clamped(to range: ClosedRange<Wrapped>) -> Wrapped? {
+        guard let value = self else { return nil }
+        return value.clamped(to: range)
     }
 }

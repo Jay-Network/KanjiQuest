@@ -22,9 +22,9 @@ final class HomeViewModel: ObservableObject {
     func load(container: AppContainer) async {
         // Load user profile from shared-core
         do {
-            let profile = try await container.userRepository.getUserProfile()
-            let level = Int(profile?.level ?? 1)
-            let xp = Int(profile?.totalXp ?? 0)
+            let profile = try await container.userRepository.getProfile()
+            let level = Int(profile.level)
+            let xp = Int(profile.totalXp)
             let threshold = level * level * 50  // level²×50
             let prevThreshold = max(0, (level - 1) * (level - 1) * 50)
             let xpInLevel = xp - prevThreshold

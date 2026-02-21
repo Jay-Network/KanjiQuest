@@ -26,7 +26,7 @@ final class AppContainer: ObservableObject {
     let strokeMatcher: StrokeMatcher
 
     // MARK: - Auth
-    let authRepository: AuthRepository
+    let authRepository: AuthRepositoryImpl
 
     init() {
         configuration = Configuration()
@@ -36,19 +36,16 @@ final class AppContainer: ObservableObject {
         let driver = databaseDriverFactory.createDriver()
         database = KanjiQuestDatabase(driver: driver)
 
-        // Repositories
-        kanjiRepository = KanjiRepositoryImpl(database: database)
-        srsRepository = SrsRepositoryImpl(database: database)
-        userRepository = UserRepositoryImpl(database: database)
-        sessionRepository = SessionRepositoryImpl(database: database)
+        // Repositories (param is `db:` except AchievementRepositoryImpl which uses `database:`)
+        kanjiRepository = KanjiRepositoryImpl(db: database)
+        srsRepository = SrsRepositoryImpl(db: database)
+        userRepository = UserRepositoryImpl(db: database)
+        sessionRepository = SessionRepositoryImpl(db: database)
         achievementRepository = AchievementRepositoryImpl(database: database)
-        vocabSrsRepository = VocabSrsRepositoryImpl(database: database)
+        vocabSrsRepository = VocabSrsRepositoryImpl(db: database)
 
-        // Auth
-        authRepository = AuthRepository(
-            supabaseUrl: configuration.supabaseUrl,
-            supabaseAnonKey: configuration.supabaseAnonKey
-        )
+        // Auth (no constructor params — uses internal AuthSupabaseClientFactory)
+        authRepository = AuthRepositoryImpl()
 
         // Algorithms
         srsAlgorithm = Sm2Algorithm()
@@ -63,11 +60,9 @@ final class AppContainer: ObservableObject {
             kanjiRepository: kanjiRepository,
             srsRepository: srsRepository,
             vocabSrsRepository: vocabSrsRepository,
-            gradeMasteryProvider: { [weak self] grade in
-                guard let self else { return GradeMastery.companion.empty() }
-                return self.kanjiRepository.getGradeMastery(grade: grade)
-            }
+            gradeMasteryProvider: nil
         )
+        let sessionProvider = UserSessionProviderImpl(authRepository: authRepository)
         return GameEngine(
             questionGenerator: questionGenerator,
             srsAlgorithm: srsAlgorithm,
@@ -75,7 +70,7 @@ final class AppContainer: ObservableObject {
             scoringEngine: scoringEngine,
             vocabSrsRepository: vocabSrsRepository,
             userRepository: userRepository,
-            userSessionProvider: authRepository
+            userSessionProvider: sessionProvider
         )
     }
 

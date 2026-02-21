@@ -5,7 +5,7 @@ struct ProgressView: View {
     @EnvironmentObject var container: AppContainer
     @State private var totalKanji = 0
     @State private var masteredKanji = 0
-    @State private var sessionsCompleted = 0
+    @State private var currentStreak = 0
     @State private var totalXP = 0
     @State private var gradeMasteries: [GradeMastery] = []
 
@@ -21,7 +21,7 @@ struct ProgressView: View {
                     GridItem(.flexible())
                 ], spacing: KanjiQuestTheme.spacingM) {
                     StatCard(title: "Total XP", value: "\(totalXP)", icon: "star.fill", color: KanjiQuestTheme.xpGold)
-                    StatCard(title: "Sessions", value: "\(sessionsCompleted)", icon: "checkmark.circle.fill", color: KanjiQuestTheme.success)
+                    StatCard(title: "Streak", value: "\(currentStreak)", icon: "flame.fill", color: KanjiQuestTheme.success)
                     StatCard(title: "Kanji Seen", value: "\(totalKanji)", icon: "character.ja", color: KanjiQuestTheme.primary)
                     StatCard(title: "Mastered", value: "\(masteredKanji)", icon: "trophy.fill", color: KanjiQuestTheme.coinGold)
                 }
@@ -68,22 +68,23 @@ struct ProgressView: View {
     }
 
     private func loadStats() async {
-        // Load from shared-core repositories
         do {
-            let profile = try await container.userRepository.getUserProfile()
-            totalXP = Int(profile?.totalXp ?? 0)
-            sessionsCompleted = Int(profile?.sessionsCompleted ?? 0)
+            let profile = try await container.userRepository.getProfile()
+            totalXP = Int(profile.totalXp)
+            currentStreak = Int(profile.currentStreak)
         } catch {}
     }
 
     private func loadGradeMasteries() async {
         var masteries: [GradeMastery] = []
-        // Load mastery for grades 1-6 (elementary school kanji grades)
-        for grade in 1...6 {
-            let mastery = container.kanjiRepository.getGradeMastery(grade: Int32(grade))
-            if mastery.studiedCount > 0 {
-                masteries.append(mastery)
-            }
+        for grade: Int32 in 1...6 {
+            do {
+                let total = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
+                let mastery = try await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total)
+                if mastery.studiedCount > 0 {
+                    masteries.append(mastery)
+                }
+            } catch {}
         }
         gradeMasteries = masteries
     }
