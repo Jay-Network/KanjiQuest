@@ -76,7 +76,7 @@ final class AppContainer: ObservableObject {
             kanaSrsRepository: nil,
             radicalQuestionGenerator: nil,
             radicalSrsRepository: nil,
-            timeProvider: { Int64(Date().timeIntervalSince1970) }
+            timeProvider: { KotlinLong(value: Int64(Date().timeIntervalSince1970)) }
         )
     }
 
