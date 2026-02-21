@@ -40,8 +40,6 @@ targets:
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: false
         FRAMEWORK_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks
-        OTHER_LDFLAGS: $(inherited) -ObjC -Wl,-weak-lswiftXPC
-        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
         # Inject xcconfig values into Info.plist
         SUPABASE_URL: $(SUPABASE_URL)
         SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
