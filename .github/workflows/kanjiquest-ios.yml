@@ -82,7 +82,9 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # Use the default Xcode — must match the version used to build XCFrameworks
+          # xcodegen 2.44+ generates project format 77, which requires Xcode 16+
+          # Also needed for swiftXPC library required by KMP xcframeworks
+          sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.1.app || sudo xcode-select -s /Applications/Xcode_16.0.app || sudo xcode-select -s /Applications/Xcode.app
           xcodebuild -version
 
       - name: Install xcodegen
