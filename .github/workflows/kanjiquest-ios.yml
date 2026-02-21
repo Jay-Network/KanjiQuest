@@ -81,7 +81,9 @@ jobs:
           ls -la ios-app/Frameworks/
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.0.app || sudo xcode-select -s /Applications/Xcode.app
+        run: |
+          # Use the default Xcode — must match the version used to build XCFrameworks
+          xcodebuild -version
 
       - name: Install xcodegen
         run: brew install xcodegen
@@ -188,7 +190,13 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="$PP_UUID" \
             FRAMEWORK_SEARCH_PATHS="$(pwd)/Frameworks" \
-            | xcpretty
+            OTHER_LDFLAGS='$(inherited) -ObjC -Wl,-weak-lswiftXPC' \
+            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
+            2>&1 | tee /tmp/xcodebuild.log | xcpretty || {
+              echo "=== Raw xcodebuild error output ==="
+              grep -A 5 "error:\|Undefined symbols\|ld:" /tmp/xcodebuild.log | tail -40
+              exit 1
+            }
 
       - name: Verify archive
         working-directory: ios-app
