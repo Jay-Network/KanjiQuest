@@ -148,7 +148,7 @@ final class CalligraphySessionViewModel: ObservableObject {
         guard let container else { return }
         do {
             let total = try await container.kanjiRepository.getKanjiCountByGrade(grade: 1)
-            let mastery = try await container.srsRepository.getGradeMastery(grade: 1, totalKanjiInGrade: total)
+            let mastery = try await container.srsRepository.getGradeMastery(grade: 1, totalKanjiInGrade: total.int64Value)
             currentGradeMastery = mastery
         } catch {}
     }

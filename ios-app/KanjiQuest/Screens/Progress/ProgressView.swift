@@ -80,7 +80,7 @@ struct ProgressView: View {
         for grade: Int32 in 1...6 {
             do {
                 let total = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
-                let mastery = try await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total)
+                let mastery = try await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total.int64Value)
                 if mastery.studiedCount > 0 {
                     masteries.append(mastery)
                 }
