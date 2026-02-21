@@ -187,6 +187,7 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="$PP_UUID" \
+            FRAMEWORK_SEARCH_PATHS='$(inherited) $(PROJECT_DIR)/Frameworks' \
             | xcpretty
 
       - name: Verify archive
