@@ -96,9 +96,12 @@ jobs:
           PP_PATH=$RUNNER_TEMP/profile.mobileprovision
           echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
 
-          # Extract UUID from provisioning profile
-          PP_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$(security cms -D -i "$PP_PATH")")
+          # Extract UUID and Name from provisioning profile
+          PP_PLIST=$(security cms -D -i "$PP_PATH")
+          PP_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$PP_PLIST")
+          PP_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< "$PP_PLIST")
           echo "PP_UUID=$PP_UUID" >> "$GITHUB_ENV"
+          echo "PP_NAME=$PP_NAME" >> "$GITHUB_ENV"
 
           # Install profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
@@ -106,6 +109,7 @@ jobs:
 
           echo "Certificate and provisioning profile installed successfully"
           echo "Profile UUID: $PP_UUID"
+          echo "Profile Name: $PP_NAME"
 
       # --- Build ---
       - name: Create xcconfig
@@ -129,7 +133,7 @@ jobs:
       - name: Create ExportOptions.plist
         working-directory: ios-app
         run: |
-          cat > ExportOptions.plist << 'PLIST'
+          cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -145,15 +149,17 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>com.jworks.kanjiquest.ipad</key>
-              <string>KanjiQuest iPad App Store</string>
+              <string>${PP_NAME}</string>
             </dict>
           </dict>
           </plist>
-          PLIST
+          EOF
+          echo "ExportOptions.plist profile name: $PP_NAME"
 
       - name: Archive
         working-directory: ios-app
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project KanjiQuest.xcodeproj \
             -scheme KanjiQuest \
@@ -165,16 +171,23 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="$PP_UUID" \
-            | xcpretty || true
+            | xcpretty
+
+      - name: Verify archive
+        working-directory: ios-app
+        run: |
+          ls -la build/KanjiQuest.xcarchive/Products/Applications/ || { echo "Archive failed - no .app found"; exit 1; }
 
       - name: Export IPA
         working-directory: ios-app
         run: |
+          set -o pipefail
           xcodebuild -exportArchive \
             -archivePath build/KanjiQuest.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath build/export \
-            | xcpretty || true
+            | xcpretty
+          ls -la build/export/*.ipa || { echo "Export failed - no IPA found"; exit 1; }
 
       # --- Upload to TestFlight ---
       - name: Install App Store Connect API key
