@@ -74,6 +74,10 @@ jobs:
           echo "=== Copying to ios-app/Frameworks/ ==="
           mkdir -p ios-app/Frameworks
           cp -R shared-core/build/XCFrameworks/release/SharedCore.xcframework ios-app/Frameworks/
+          if [ -d "shared-japanese/build/XCFrameworks/release/SharedJapanese.xcframework" ]; then
+            cp -R shared-japanese/build/XCFrameworks/release/SharedJapanese.xcframework ios-app/Frameworks/
+            echo "SharedJapanese.xcframework copied"
+          fi
           ls -la ios-app/Frameworks/
 
       - name: Select Xcode
