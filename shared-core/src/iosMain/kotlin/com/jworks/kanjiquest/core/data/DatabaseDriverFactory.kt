@@ -1,3 +1,4 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package com.jworks.kanjiquest.core.data
 
 import app.cash.sqldelight.db.SqlDriver

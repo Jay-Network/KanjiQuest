@@ -15,7 +15,7 @@ data class Kanji(
     val kunReadings: List<String>,
     val strokeSvg: String?
 ) {
-    val unicodeHex: String get() = "U+%04X".format(id)
+    val unicodeHex: String get() = "U+" + id.toString(16).uppercase().padStart(4, '0')
 
     val primaryMeaning: String get() = meaningsEn.firstOrNull() ?: ""
 
