@@ -53,7 +53,7 @@ targets:
           SWIFT_COMPILATION_MODE: wholemodule
 
     dependencies:
-      - framework: ../shared-core/build/XCFrameworks/release/SharedCore.framework
+      - framework: ../shared-core/build/XCFrameworks/release/SharedCore.xcframework
         embed: true
 
     preBuildScripts:
@@ -61,7 +61,7 @@ targets:
         script: |
           # Only build if XCFramework doesn't exist or source changed
           XCFRAMEWORK_DIR="${PROJECT_DIR}/../shared-core/build/XCFrameworks/release"
-          if [ ! -d "$XCFRAMEWORK_DIR/SharedCore.framework" ]; then
+          if [ ! -d "$XCFRAMEWORK_DIR/SharedCore.xcframework" ]; then
             cd "${PROJECT_DIR}/.."
             ./gradlew :shared-core:assembleSharedCoreReleaseXCFramework
           fi
