@@ -76,9 +76,14 @@ fun KanjiQuestNavHost(
     val context = LocalContext.current
 
     // Handle deep link: kanjiquest://collect?kanji_id=XXX&source=kanjilens
+    // Only process after login (not on Splash or Login screens)
     val deepLinkViewModel: DeepLinkCollectionViewModel = hiltViewModel()
-    LaunchedEffect(deepLinkUri) {
+    LaunchedEffect(deepLinkUri, currentRoute) {
         if (deepLinkUri == null) return@LaunchedEffect
+        // Defer until user is past login
+        if (currentRoute == NavRoute.Splash.route || currentRoute == NavRoute.Login.route || currentRoute == null) {
+            return@LaunchedEffect
+        }
         val host = deepLinkUri.host
         when (host) {
             "collect" -> {
@@ -98,7 +103,6 @@ fun KanjiQuestNavHost(
                 onDeepLinkConsumed()
             }
             "subscription" -> {
-                // Navigate to subscription screen
                 navController.navigate(NavRoute.Subscription.route)
                 onDeepLinkConsumed()
             }
