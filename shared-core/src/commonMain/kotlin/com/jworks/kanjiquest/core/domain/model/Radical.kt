@@ -9,5 +9,6 @@ data class Radical(
     val strokeSvg: String? = null,
     val frequency: Int = 0,
     val exampleKanji: String = "[]",
-    val position: String? = null
+    val position: String? = null,
+    val priority: Int = 2  // 1=essential, 2=common, 3=uncommon
 )

@@ -32,6 +32,10 @@ class RadicalRepositoryImpl(
         return db.radicalQueries.getUnseen(limit.toLong()).executeAsList().map { it.toRadical() }
     }
 
+    override suspend fun getUnseenByPriority(maxPriority: Int, limit: Int): List<Radical> {
+        return db.radicalQueries.getUnseenByPriority(maxPriority.toLong(), limit.toLong()).executeAsList().map { it.toRadical() }
+    }
+
     override suspend fun getRadicalsForKanji(kanjiId: Int): List<Radical> {
         return db.radicalQueries.getRadicalsForKanji(kanjiId.toLong()).executeAsList().map { it.toRadical() }
     }
@@ -67,5 +71,6 @@ internal fun com.jworks.kanjiquest.db.Radical.toRadical(): Radical = Radical(
     strokeSvg = stroke_svg,
     frequency = frequency.toInt(),
     exampleKanji = example_kanji,
-    position = position
+    position = position,
+    priority = priority.toInt()
 )

@@ -44,6 +44,8 @@ import androidx.compose.ui.geometry.Size as CanvasSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import com.jworks.kanjiquest.android.ui.components.AssetImage
 import com.jworks.kanjiquest.core.domain.model.GradeMastery
 import com.jworks.kanjiquest.core.domain.model.MasteryLevel
 import com.jworks.kanjiquest.core.domain.model.StudySession
@@ -494,39 +496,34 @@ private fun GradeMasteryRow(mastery: GradeMastery) {
         MasteryLevel.ADVANCED -> Color(0xFFFFD700)
     }
 
+    val badgeAsset = when (mastery.masteryLevel) {
+        MasteryLevel.BEGINNING -> "grade-beginning.png"
+        MasteryLevel.DEVELOPING -> "grade-developing.png"
+        MasteryLevel.PROFICIENT -> "grade-proficient.png"
+        MasteryLevel.ADVANCED -> "grade-advanced.png"
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Mastery ring
-        val progress = mastery.masteryScore.coerceIn(0f, 1f)
-        val bgColor = MaterialTheme.colorScheme.surfaceVariant
+        // Mastery badge
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(40.dp)
         ) {
-            Canvas(modifier = Modifier.size(40.dp)) {
-                val strokeWidth = 4.dp.toPx()
-                val arcSize = CanvasSize(size.width - strokeWidth, size.height - strokeWidth)
-                val topLeft = CanvasOffset(strokeWidth / 2, strokeWidth / 2)
-                drawArc(
-                    color = bgColor,
-                    startAngle = -90f, sweepAngle = 360f,
-                    useCenter = false, topLeft = topLeft, size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-                drawArc(
-                    color = levelColor,
-                    startAngle = -90f, sweepAngle = 360f * progress,
-                    useCenter = false, topLeft = topLeft, size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-            }
+            AssetImage(
+                filename = badgeAsset,
+                contentDescription = "${mastery.masteryLevel.label} badge",
+                modifier = Modifier.size(40.dp),
+                contentScale = ContentScale.Fit
+            )
             Text(
                 text = "G${mastery.grade}",
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
         }
 

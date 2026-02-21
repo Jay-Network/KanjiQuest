@@ -53,6 +53,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.layout.ContentScale
+import com.jworks.kanjiquest.android.ui.components.AssetImage
 import com.jworks.kanjiquest.core.domain.model.PurchaseResult
 import com.jworks.kanjiquest.core.domain.model.ShopCategory
 import com.jworks.kanjiquest.core.domain.model.ShopItem
@@ -221,10 +223,12 @@ private fun ShopItemCard(
         Column(
             modifier = Modifier.padding(12.dp)
         ) {
-            // Category icon placeholder
-            Text(
-                text = categoryIcon(item.category),
-                fontSize = 28.sp
+            // Category icon from asset
+            AssetImage(
+                filename = categoryImageAsset(item.category),
+                contentDescription = item.category.displayName,
+                modifier = Modifier.size(40.dp),
+                contentScale = ContentScale.Fit
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -524,10 +528,10 @@ private fun FeaturedBanner(
     }
 }
 
-private fun categoryIcon(category: ShopCategory): String = when (category) {
-    ShopCategory.THEME -> "\uD83C\uDFA8"       // art palette
-    ShopCategory.BOOSTER -> "\u26A1"            // lightning
-    ShopCategory.UTILITY -> "\uD83D\uDEE0\uFE0F" // wrench
-    ShopCategory.CONTENT -> "\uD83D\uDCDA"      // books
-    ShopCategory.CROSS_BUSINESS -> "\u2B50"      // star
+private fun categoryImageAsset(category: ShopCategory): String = when (category) {
+    ShopCategory.THEME -> "shop-themes.png"
+    ShopCategory.BOOSTER -> "shop-boosters.png"
+    ShopCategory.UTILITY -> "shop-cosmetics.png"
+    ShopCategory.CONTENT -> "shop-themes.png"
+    ShopCategory.CROSS_BUSINESS -> "shop-featured.png"
 }

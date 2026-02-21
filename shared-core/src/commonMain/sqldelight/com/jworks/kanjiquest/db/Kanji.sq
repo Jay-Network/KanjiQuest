@@ -41,6 +41,15 @@ SELECT * FROM kanji WHERE grade = ? AND id NOT IN (SELECT kanji_id FROM srs_card
 search:
 SELECT * FROM kanji WHERE literal LIKE ? OR meanings_en LIKE ? LIMIT ?;
 
+getByStrokeCount:
+SELECT * FROM kanji WHERE stroke_count = ? ORDER BY frequency ASC;
+
+countByStrokeCount:
+SELECT COUNT(*) FROM kanji WHERE stroke_count = ?;
+
+getDistinctStrokeCounts:
+SELECT DISTINCT stroke_count FROM kanji ORDER BY stroke_count ASC;
+
 insert:
 INSERT OR REPLACE INTO kanji(id, literal, grade, jlpt_level, frequency, stroke_count, meanings_en, on_readings, kun_readings, stroke_svg)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

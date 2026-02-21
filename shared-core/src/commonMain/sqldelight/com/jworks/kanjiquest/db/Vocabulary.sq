@@ -32,8 +32,9 @@ getForStudiedKanji:
 SELECT DISTINCT v.* FROM vocabulary v
 INNER JOIN kanji_vocabulary kv ON v.id = kv.vocab_id
 INNER JOIN srs_card sc ON sc.kanji_id = kv.kanji_id
-ORDER BY v.frequency ASC
-LIMIT 200;
+WHERE v.jlpt_level IS NOT NULL
+ORDER BY v.jlpt_level DESC, v.frequency ASC
+LIMIT 300;
 
 getRandomForStudiedKanji:
 SELECT DISTINCT v.* FROM vocabulary v
@@ -46,6 +47,12 @@ SELECT * FROM vocabulary LIMIT 1 OFFSET ?;
 
 countAll:
 SELECT COUNT(*) FROM vocabulary;
+
+getCommonAtOffset:
+SELECT * FROM vocabulary WHERE frequency IS NOT NULL AND frequency <= 6000 ORDER BY frequency ASC LIMIT 1 OFFSET ?;
+
+countCommon:
+SELECT COUNT(*) FROM vocabulary WHERE frequency IS NOT NULL AND frequency <= 6000;
 
 insert:
 INSERT OR REPLACE INTO vocabulary(id, kanji_form, reading, meanings_en, jlpt_level, frequency)

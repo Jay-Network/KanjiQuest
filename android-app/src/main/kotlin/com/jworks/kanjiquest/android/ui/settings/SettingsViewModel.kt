@@ -22,6 +22,7 @@ data class SettingsUiState(
     val vibrationsEnabled: Boolean = true,
     val notificationsEnabled: Boolean = true,
     val dailyGoal: Int = 20,
+    val sessionLength: Int = 10,
     val difficulty: DifficultyLevel = DifficultyLevel.MEDIUM,
     val autoPlayAudio: Boolean = true,
     val showHints: Boolean = true,
@@ -76,6 +77,7 @@ class SettingsViewModel @Inject constructor(
                 vibrationsEnabled = prefs.getBoolean("vibrations_enabled", true),
                 notificationsEnabled = prefs.getBoolean("notifications_enabled", true),
                 dailyGoal = prefs.getInt("daily_goal", 20),
+                sessionLength = prefs.getInt("session_length", 10),
                 difficulty = DifficultyLevel.valueOf(
                     prefs.getString("difficulty", DifficultyLevel.MEDIUM.name) ?: DifficultyLevel.MEDIUM.name
                 ),
@@ -154,6 +156,11 @@ class SettingsViewModel @Inject constructor(
                 // Handle error silently, SharedPreferences still saved
             }
         }
+    }
+
+    fun setSessionLength(length: Int) {
+        prefs.edit().putInt("session_length", length).apply()
+        _uiState.value = _uiState.value.copy(sessionLength = length)
     }
 
     fun setDifficulty(difficulty: DifficultyLevel) {

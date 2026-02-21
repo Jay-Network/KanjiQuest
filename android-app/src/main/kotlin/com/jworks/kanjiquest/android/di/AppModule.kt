@@ -8,8 +8,10 @@ import com.jworks.kanjiquest.android.ui.game.writing.AiFeedbackReporter
 import com.jworks.kanjiquest.android.ui.game.writing.HandwritingChecker
 import com.jworks.kanjiquest.core.data.AchievementRepositoryImpl
 import com.jworks.kanjiquest.core.data.AuthRepositoryImpl
+import com.jworks.kanjiquest.core.data.CollectionRepositoryImpl
 import com.jworks.kanjiquest.core.data.DevChatRepositoryImpl
 import com.jworks.kanjiquest.core.data.FeedbackRepositoryImpl
+import com.jworks.kanjiquest.core.data.FieldJournalRepositoryImpl
 import com.jworks.kanjiquest.core.data.FlashcardRepositoryImpl
 import com.jworks.kanjiquest.core.data.DatabaseDriverFactory
 import com.jworks.kanjiquest.core.data.JCoinRepositoryImpl
@@ -27,8 +29,10 @@ import com.jworks.kanjiquest.core.domain.UserSessionProvider
 import com.jworks.kanjiquest.core.domain.UserSessionProviderImpl
 import com.jworks.kanjiquest.core.domain.repository.AchievementRepository
 import com.jworks.kanjiquest.core.domain.repository.AuthRepository
+import com.jworks.kanjiquest.core.domain.repository.CollectionRepository
 import com.jworks.kanjiquest.core.domain.repository.DevChatRepository
 import com.jworks.kanjiquest.core.domain.repository.FeedbackRepository
+import com.jworks.kanjiquest.core.domain.repository.FieldJournalRepository
 import com.jworks.kanjiquest.core.domain.repository.FlashcardRepository
 import com.jworks.kanjiquest.core.domain.repository.JCoinRepository
 import com.jworks.kanjiquest.core.domain.repository.KanaRepository
@@ -45,6 +49,9 @@ import com.jworks.kanjiquest.core.domain.usecase.CompleteSessionUseCase
 import com.jworks.kanjiquest.core.domain.usecase.DataRestorationUseCase
 import com.jworks.kanjiquest.core.domain.usecase.MigrateLocalDataUseCase
 import com.jworks.kanjiquest.core.domain.usecase.WordOfTheDayUseCase
+import com.jworks.kanjiquest.core.collection.EncounterEngine
+import com.jworks.kanjiquest.core.collection.ItemLevelEngine
+import com.jworks.kanjiquest.core.collection.RarityCalculator
 import com.jworks.kanjiquest.core.engine.GameEngine
 import com.jworks.kanjiquest.core.engine.GradeMasteryProvider
 import com.jworks.kanjiquest.core.engine.KanaQuestionGenerator
@@ -146,6 +153,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideFieldJournalRepository(db: KanjiQuestDatabase): FieldJournalRepository {
+        return FieldJournalRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
     fun provideFlashcardRepository(db: KanjiQuestDatabase): FlashcardRepository {
         return FlashcardRepositoryImpl(db)
     }
@@ -178,6 +191,29 @@ object AppModule {
     @Singleton
     fun provideRadicalSrsRepository(db: KanjiQuestDatabase): RadicalSrsRepository {
         return RadicalSrsRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideCollectionRepository(db: KanjiQuestDatabase): CollectionRepository {
+        return CollectionRepositoryImpl(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideEncounterEngine(
+        collectionRepository: CollectionRepository,
+        kanjiRepository: KanjiRepository
+    ): EncounterEngine {
+        return EncounterEngine(collectionRepository, kanjiRepository)
+    }
+
+    @Provides
+    @Singleton
+    fun provideItemLevelEngine(
+        collectionRepository: CollectionRepository
+    ): ItemLevelEngine {
+        return ItemLevelEngine(collectionRepository)
     }
 
     @Provides
@@ -234,7 +270,10 @@ object AppModule {
         kanaQuestionGenerator: KanaQuestionGenerator,
         kanaSrsRepository: KanaSrsRepository,
         radicalQuestionGenerator: RadicalQuestionGenerator,
-        radicalSrsRepository: RadicalSrsRepository
+        radicalSrsRepository: RadicalSrsRepository,
+        collectionRepository: CollectionRepository,
+        encounterEngine: EncounterEngine,
+        itemLevelEngine: ItemLevelEngine
     ): GameEngine {
         return GameEngine(
             questionGenerator, srsAlgorithm, srsRepository, scoringEngine,
@@ -243,7 +282,10 @@ object AppModule {
             kanaQuestionGenerator = kanaQuestionGenerator,
             kanaSrsRepository = kanaSrsRepository,
             radicalQuestionGenerator = radicalQuestionGenerator,
-            radicalSrsRepository = radicalSrsRepository
+            radicalSrsRepository = radicalSrsRepository,
+            collectionRepository = collectionRepository,
+            encounterEngine = encounterEngine,
+            itemLevelEngine = itemLevelEngine
         )
     }
 

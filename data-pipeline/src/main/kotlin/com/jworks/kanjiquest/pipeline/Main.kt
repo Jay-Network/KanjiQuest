@@ -70,9 +70,9 @@ fun main(args: Array<String>) {
         val kanaCount = KanaDataGenerator.generate(connection)
         println("  Inserted $kanaCount kana entries")
 
-        // 5. Parse Radicals
-        println("\nGenerating Radical data...")
-        val radicalCount = RadicalParser.parse(connection)
+        // 5. Parse Radicals (KRADFILE-based decomposition)
+        println("\nGenerating Radical data from KRADFILE...")
+        val radicalCount = RadicalParser.parse(connection, rawDataDir)
         println("  Inserted $radicalCount radical entries")
 
         connection.commit()
@@ -220,7 +220,8 @@ private fun createSchema(conn: Connection) {
                 stroke_svg TEXT,
                 frequency INTEGER NOT NULL DEFAULT 0,
                 example_kanji TEXT NOT NULL DEFAULT '[]',
-                position TEXT
+                position TEXT,
+                priority INTEGER NOT NULL DEFAULT 2
             )
         """)
 

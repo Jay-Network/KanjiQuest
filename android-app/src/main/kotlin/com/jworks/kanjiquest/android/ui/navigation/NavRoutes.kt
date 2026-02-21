@@ -1,6 +1,7 @@
 package com.jworks.kanjiquest.android.ui.navigation
 
 sealed class NavRoute(val route: String) {
+    data object Splash : NavRoute("splash")
     data object Login : NavRoute("login")
     data object Home : NavRoute("home")
     data object KanjiDetail : NavRoute("kanji/{kanjiId}") {
@@ -28,7 +29,9 @@ sealed class NavRoute(val route: String) {
         fun createRoute(kanjiId: Int) = "game/camera/$kanjiId"
     }
     data object Flashcards : NavRoute("flashcards")
-    data object FlashcardStudy : NavRoute("flashcards/study")
+    data object FlashcardStudy : NavRoute("flashcards/study/{deckId}") {
+        fun createRoute(deckId: Long) = "flashcards/study/$deckId"
+    }
     data object DevChat : NavRoute("devchat")
     data object PlacementTest : NavRoute("placement_test")
     data object WordDetail : NavRoute("word/{wordId}") {
@@ -40,6 +43,11 @@ sealed class NavRoute(val route: String) {
     data object KanaWriting : NavRoute("game/kana_writing/{kanaType}") {
         fun createRoute(kanaType: String) = "game/kana_writing/$kanaType"
     }
+    data object RadicalDetail : NavRoute("radical/{radicalId}") {
+        fun createRoute(radicalId: Int) = "radical/$radicalId"
+    }
     data object RadicalRecognition : NavRoute("game/radical_recognition")
     data object RadicalBuilder : NavRoute("game/radical_builder")
+    data object FieldJournal : NavRoute("field_journal")
+    data object Collection : NavRoute("collection")
 }

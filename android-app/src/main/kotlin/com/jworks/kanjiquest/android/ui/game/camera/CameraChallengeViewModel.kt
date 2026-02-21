@@ -3,6 +3,7 @@ package com.jworks.kanjiquest.android.ui.game.camera
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jworks.kanjiquest.core.domain.model.Kanji
+import com.jworks.kanjiquest.core.domain.repository.FieldJournalRepository
 import com.jworks.kanjiquest.core.domain.repository.KanjiRepository
 import com.jworks.kanjiquest.core.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -46,7 +47,8 @@ data class CameraChallengeUiState(
 @HiltViewModel
 class CameraChallengeViewModel @Inject constructor(
     private val kanjiRepository: KanjiRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val fieldJournalRepository: FieldJournalRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CameraChallengeUiState())
@@ -59,6 +61,7 @@ class CameraChallengeViewModel @Inject constructor(
     private var successCount = 0
     private var sessionXp = 0
     private var targetKanjiId: Int? = null
+    private val foundKanjiLiterals = mutableListOf<String>()
 
     fun startSession(targetKanjiId: Int? = null) {
         this.targetKanjiId = targetKanjiId
@@ -146,6 +149,7 @@ class CameraChallengeViewModel @Inject constructor(
 
     private fun onSuccess(targetKanji: Kanji) {
         successCount++
+        foundKanjiLiterals.add(targetKanji.literal)
         val xpGained = 50 // Base XP for successful camera scan
 
         sessionXp += xpGained
@@ -173,6 +177,16 @@ class CameraChallengeViewModel @Inject constructor(
                     userRepository.updateXpAndLevel(newXp, profile.level)
                 }
 
+                // Save field journal entry if any kanji were found
+                if (foundKanjiLiterals.isNotEmpty()) {
+                    fieldJournalRepository.insert(
+                        imagePath = "",
+                        locationLabel = "",
+                        kanjiFound = foundKanjiLiterals.toList(),
+                        capturedAt = System.currentTimeMillis() / 1000
+                    )
+                }
+
                 val accuracy = (successCount.toFloat() / totalChallenges * 100).toInt()
 
                 _uiState.value = CameraChallengeUiState(
@@ -196,6 +210,7 @@ class CameraChallengeViewModel @Inject constructor(
         successCount = 0
         sessionXp = 0
         usedKanjiIds.clear()
+        foundKanjiLiterals.clear()
         _uiState.value = CameraChallengeUiState()
     }
 }

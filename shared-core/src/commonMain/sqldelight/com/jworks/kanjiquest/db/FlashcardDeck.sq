@@ -1,31 +1,54 @@
 CREATE TABLE flashcard_deck (
-    kanji_id INTEGER NOT NULL PRIMARY KEY,
+    deck_id INTEGER NOT NULL DEFAULT 1,
+    kanji_id INTEGER NOT NULL,
     added_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_studied_at TEXT,
     study_count INTEGER NOT NULL DEFAULT 0,
-    notes TEXT
+    notes TEXT,
+    PRIMARY KEY (deck_id, kanji_id)
 );
 
 getAll:
 SELECT * FROM flashcard_deck ORDER BY added_at DESC;
 
+getByDeckId:
+SELECT * FROM flashcard_deck WHERE deck_id = ? ORDER BY added_at DESC;
+
 getByKanjiId:
 SELECT * FROM flashcard_deck WHERE kanji_id = ?;
 
 isInDeck:
+SELECT COUNT(*) FROM flashcard_deck WHERE deck_id = ? AND kanji_id = ?;
+
+isInAnyDeck:
 SELECT COUNT(*) FROM flashcard_deck WHERE kanji_id = ?;
 
+getDecksForKanji:
+SELECT deck_id FROM flashcard_deck WHERE kanji_id = ?;
+
 insert:
-INSERT OR IGNORE INTO flashcard_deck(kanji_id) VALUES (?);
+INSERT OR IGNORE INTO flashcard_deck(deck_id, kanji_id) VALUES (?, ?);
 
 remove:
+DELETE FROM flashcard_deck WHERE deck_id = ? AND kanji_id = ?;
+
+removeFromAllDecks:
 DELETE FROM flashcard_deck WHERE kanji_id = ?;
 
+removeAllFromDeck:
+DELETE FROM flashcard_deck WHERE deck_id = ?;
+
 updateStudied:
-UPDATE flashcard_deck SET last_studied_at = datetime('now'), study_count = study_count + 1 WHERE kanji_id = ?;
+UPDATE flashcard_deck SET last_studied_at = datetime('now'), study_count = study_count + 1 WHERE deck_id = ? AND kanji_id = ?;
 
 getCount:
 SELECT COUNT(*) FROM flashcard_deck;
 
+getCountByDeck:
+SELECT COUNT(*) FROM flashcard_deck WHERE deck_id = ?;
+
 getAllKanjiIds:
 SELECT kanji_id FROM flashcard_deck ORDER BY added_at DESC;
+
+getKanjiIdsByDeck:
+SELECT kanji_id FROM flashcard_deck WHERE deck_id = ? ORDER BY added_at DESC;

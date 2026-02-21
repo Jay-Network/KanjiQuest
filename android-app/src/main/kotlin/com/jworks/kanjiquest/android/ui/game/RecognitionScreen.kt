@@ -33,6 +33,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jworks.kanjiquest.core.engine.GameState
@@ -52,12 +56,18 @@ fun RecognitionScreen(
     viewModel: RecognitionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showDiscoveryOverlay by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val sessionLength = remember {
+        context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
+            .getInt("session_length", 10)
+    }
 
     LaunchedEffect(targetKanjiId) {
         if (targetKanjiId != null && uiState.gameState is GameState.Idle) {
             viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId)
         } else if (targetKanjiId == null) {
-            viewModel.startGame()
+            viewModel.startGame(questionCount = sessionLength)
         }
     }
 
@@ -86,31 +96,53 @@ fun RecognitionScreen(
         ) {
             when (val state = uiState.gameState) {
                 is GameState.Idle, is GameState.Preparing -> LoadingContent()
-                is GameState.AwaitingAnswer -> QuestionContent(
-                    kanjiLiteral = state.question.kanjiLiteral,
-                    choices = state.question.choices,
-                    questionNumber = state.questionNumber,
-                    totalQuestions = state.totalQuestions,
-                    currentCombo = state.currentCombo,
-                    sessionXp = state.sessionXp,
-                    selectedAnswer = null,
-                    correctAnswer = null,
-                    onAnswerClick = { viewModel.submitAnswer(it) }
-                )
-                is GameState.ShowingResult -> QuestionContent(
-                    kanjiLiteral = state.question.kanjiLiteral,
-                    choices = state.question.choices,
-                    questionNumber = state.questionNumber,
-                    totalQuestions = state.totalQuestions,
-                    currentCombo = state.currentCombo,
-                    sessionXp = state.sessionXp,
-                    selectedAnswer = state.selectedAnswer,
-                    correctAnswer = state.question.correctAnswer,
-                    onAnswerClick = {},
-                    xpGained = state.xpGained,
-                    isCorrect = state.isCorrect,
-                    onNext = { viewModel.nextQuestion() }
-                )
+                is GameState.AwaitingAnswer -> {
+                    showDiscoveryOverlay = false
+                    QuestionContent(
+                        kanjiLiteral = state.question.kanjiLiteral,
+                        choices = state.question.choices,
+                        questionNumber = state.questionNumber,
+                        totalQuestions = state.totalQuestions,
+                        currentCombo = state.currentCombo,
+                        sessionXp = state.sessionXp,
+                        selectedAnswer = null,
+                        correctAnswer = null,
+                        onAnswerClick = { viewModel.submitAnswer(it) }
+                    )
+                }
+                is GameState.ShowingResult -> {
+                    // Trigger discovery overlay if a new item was found
+                    LaunchedEffect(state.discoveredItem) {
+                        if (state.discoveredItem != null) {
+                            showDiscoveryOverlay = true
+                        }
+                    }
+                    QuestionContent(
+                        kanjiLiteral = state.question.kanjiLiteral,
+                        choices = state.question.choices,
+                        questionNumber = state.questionNumber,
+                        totalQuestions = state.totalQuestions,
+                        currentCombo = state.currentCombo,
+                        sessionXp = state.sessionXp,
+                        selectedAnswer = state.selectedAnswer,
+                        correctAnswer = state.question.correctAnswer,
+                        onAnswerClick = {},
+                        xpGained = state.xpGained,
+                        isCorrect = state.isCorrect,
+                        onNext = { viewModel.nextQuestion() }
+                    )
+                    // Discovery overlay
+                    val discovered = state.discoveredItem
+                    if (showDiscoveryOverlay && discovered != null) {
+                        DiscoveryOverlay(
+                            discoveredItem = discovered,
+                            kanjiLiteral = state.question.kanjiLiteral,
+                            kanjiMeaning = state.question.questionText.removePrefix("What is the reading of this kanji?").takeIf { it.isNotEmpty() }
+                                ?: state.question.kanjiLiteral,
+                            onDismiss = { showDiscoveryOverlay = false }
+                        )
+                    }
+                }
                 is GameState.SessionComplete -> SessionCompleteContent(
                     stats = state.stats,
                     sessionResult = uiState.sessionResult,

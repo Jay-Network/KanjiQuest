@@ -36,6 +36,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,7 +53,9 @@ import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.android.ui.game.DiscoveryOverlay
 import com.jworks.kanjiquest.core.engine.GameState
 import com.jworks.kanjiquest.core.engine.SessionStats
 
@@ -62,6 +67,12 @@ fun WritingScreen(
     viewModel: WritingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showDiscoveryOverlay by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val sessionLength = remember {
+        context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
+            .getInt("session_length", 10)
+    }
 
     // Auto-start for targeted kanji sessions
     LaunchedEffect(targetKanjiId) {
@@ -102,10 +113,12 @@ fun WritingScreen(
                     isAdmin = uiState.isAdmin,
                     adminDifficultyOverride = uiState.adminDifficultyOverride,
                     onAdminDifficultyChange = { viewModel.setAdminDifficultyOverride(it) },
-                    onStart = { viewModel.startGame() }
+                    onStart = { viewModel.startGame(questionCount = sessionLength) }
                 )
                 is GameState.Preparing -> LoadingContent()
-                is GameState.AwaitingAnswer -> WritingQuestionContent(
+                is GameState.AwaitingAnswer -> {
+                    showDiscoveryOverlay = false
+                    WritingQuestionContent(
                     question = state,
                     completedStrokes = uiState.completedStrokes,
                     activeStroke = uiState.activeStroke,
@@ -118,15 +131,32 @@ fun WritingScreen(
                     onClear = { viewModel.clearStrokes() },
                     onSubmit = { viewModel.submitDrawing() }
                 )
-                is GameState.ShowingResult -> WritingResultContent(
-                    state = state,
-                    aiFeedback = uiState.aiFeedback,
-                    aiLoading = uiState.aiLoading,
-                    analyzedImageBase64 = uiState.analyzedImageBase64,
-                    aiReportSubmitted = uiState.aiReportSubmitted,
-                    onReportAi = { viewModel.reportAiFeedback() },
-                    onNext = { viewModel.nextQuestion() }
-                )
+                }
+                is GameState.ShowingResult -> {
+                    LaunchedEffect(state.discoveredItem) {
+                        if (state.discoveredItem != null) {
+                            showDiscoveryOverlay = true
+                        }
+                    }
+                    WritingResultContent(
+                        state = state,
+                        aiFeedback = uiState.aiFeedback,
+                        aiLoading = uiState.aiLoading,
+                        analyzedImageBase64 = uiState.analyzedImageBase64,
+                        aiReportSubmitted = uiState.aiReportSubmitted,
+                        onReportAi = { viewModel.reportAiFeedback() },
+                        onNext = { viewModel.nextQuestion() }
+                    )
+                    val discovered = state.discoveredItem
+                    if (showDiscoveryOverlay && discovered != null) {
+                        DiscoveryOverlay(
+                            discoveredItem = discovered,
+                            kanjiLiteral = state.question.kanjiLiteral,
+                            kanjiMeaning = null,
+                            onDismiss = { showDiscoveryOverlay = false }
+                        )
+                    }
+                }
                 is GameState.SessionComplete -> SessionCompleteContent(
                     stats = state.stats,
                     sessionResult = uiState.sessionResult,

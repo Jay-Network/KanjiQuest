@@ -1,0 +1,47 @@
+CREATE TABLE IF NOT EXISTS collection (
+    item_id INTEGER NOT NULL,
+    item_type TEXT NOT NULL,
+    rarity TEXT NOT NULL DEFAULT 'common',
+    item_level INTEGER NOT NULL DEFAULT 1,
+    item_xp INTEGER NOT NULL DEFAULT 0,
+    discovered_at INTEGER NOT NULL,
+    source TEXT NOT NULL DEFAULT 'gameplay',
+    PRIMARY KEY (item_id, item_type)
+);
+
+getByType:
+SELECT * FROM collection WHERE item_type = ?;
+
+getByTypeAndRarity:
+SELECT * FROM collection WHERE item_type = ? AND rarity = ?;
+
+isCollected:
+SELECT COUNT(*) FROM collection WHERE item_id = ? AND item_type = ?;
+
+insert:
+INSERT OR IGNORE INTO collection (item_id, item_type, rarity, item_level, item_xp, discovered_at, source)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+addXp:
+UPDATE collection SET item_xp = item_xp + ? WHERE item_id = ? AND item_type = ?;
+
+updateLevel:
+UPDATE collection SET item_level = ?, item_xp = ? WHERE item_id = ? AND item_type = ?;
+
+getCollectionCount:
+SELECT COUNT(*) FROM collection WHERE item_type = ?;
+
+getCountByRarity:
+SELECT COUNT(*) FROM collection WHERE item_type = ? AND rarity = ?;
+
+getTotalCount:
+SELECT COUNT(*) FROM collection;
+
+getItem:
+SELECT * FROM collection WHERE item_id = ? AND item_type = ?;
+
+getCollectedKanjiIds:
+SELECT item_id FROM collection WHERE item_type = 'kanji';
+
+getAllCollected:
+SELECT * FROM collection ORDER BY discovered_at DESC;

@@ -21,11 +21,30 @@ class RadicalQuestionGenerator(
         val srsState: String = "new"
     )
 
-    suspend fun prepareSession(questionCount: Int, currentTime: Long): Boolean {
+    /**
+     * Prepares a session of radical questions.
+     *
+     * Priority-based selection ensures beginners see the most common, recognizable
+     * components first (priority 1 = essential, covers ~75% of joyo kanji).
+     * As users progress, priority 2 (common) and 3 (uncommon) are mixed in.
+     *
+     * @param playerLevel Used to determine which priority tiers to introduce.
+     *   Levels 1-5: Priority 1 only (essential components like 口, 木, 水)
+     *   Levels 6-15: Priority 1+2 (add common components)
+     *   Levels 16+: All priorities (include rare components)
+     */
+    suspend fun prepareSession(questionCount: Int, currentTime: Long, playerLevel: Int = 1): Boolean {
         questionQueue.clear()
         val addedIds = mutableSetOf<Int>()
 
-        // 1. Due SRS cards
+        // Determine max priority tier based on player level
+        val maxPriority = when {
+            playerLevel <= 5 -> 1   // Only essential radicals
+            playerLevel <= 15 -> 2  // Essential + common
+            else -> 3               // All radicals
+        }
+
+        // 1. Due SRS cards (always review regardless of priority)
         val dueCards = radicalSrsRepository.getDueCards(currentTime)
         for (card in dueCards.take(questionCount)) {
             val radical = radicalRepository.getRadicalById(card.kanjiId) ?: continue
@@ -53,15 +72,17 @@ class RadicalQuestionGenerator(
                 if (questionQueue.size >= questionCount) break
                 if (card.kanjiId in addedIds) continue
                 val radical = radicalRepository.getRadicalById(card.kanjiId) ?: continue
+                // Skip radicals beyond current priority tier for new cards
+                if (radical.priority > maxPriority) continue
                 questionQueue.add(RadicalQueueEntry(radical, isNew = true))
                 addedIds.add(radical.id)
             }
         }
 
-        // 4. Unseen radicals
+        // 4. Unseen radicals — filtered by priority tier
         remaining = questionCount - questionQueue.size
         if (remaining > 0) {
-            val unseen = radicalRepository.getUnseenRadicals(remaining)
+            val unseen = radicalRepository.getUnseenByPriority(maxPriority, remaining)
             for (radical in unseen) {
                 if (radical.id in addedIds) continue
                 radicalSrsRepository.ensureCardExists(radical.id)
@@ -70,7 +91,7 @@ class RadicalQuestionGenerator(
             }
         }
 
-        // Build distractor pool
+        // Build distractor pool (all radicals for variety in choices)
         distractorPool = radicalRepository.getAllRadicals()
 
         questionQueue.shuffle()
@@ -95,7 +116,8 @@ class RadicalQuestionGenerator(
             choices = choices,
             questionText = "What does this radical mean?",
             isNewCard = entry.isNew,
-            srsState = entry.srsState
+            srsState = entry.srsState,
+            radicalNameJp = radical.meaningJp
         )
     }
 
@@ -162,14 +184,18 @@ class RadicalQuestionGenerator(
             questionText = "Which kanji contains these radicals?",
             isNewCard = entry.isNew,
             srsState = entry.srsState,
-            kanjiBreakdown = kanjiRadicals.map { "${it.literal} = ${it.meaningEn}" }
+            kanjiBreakdown = kanjiRadicals.map {
+                val jpName = if (!it.meaningJp.isNullOrBlank()) " (${it.meaningJp})" else ""
+                "${it.literal} = ${it.meaningEn}$jpName"
+            },
+            radicalNameJp = radical.meaningJp
         )
     }
 
     private fun generateMeaningDistractors(targetRadical: Radical, correctMeaning: String, count: Int): List<String> {
         val distractors = mutableSetOf<String>()
 
-        // Prefer radicals with similar stroke count
+        // Prefer radicals with similar stroke count and same priority tier
         val similarStrokes = distractorPool.filter {
             it.id != targetRadical.id &&
             it.meaningEn != correctMeaning &&

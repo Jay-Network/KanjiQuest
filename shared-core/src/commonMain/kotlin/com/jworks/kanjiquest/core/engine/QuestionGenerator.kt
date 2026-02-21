@@ -207,7 +207,10 @@ class QuestionGenerator(
             choices = choices,
             questionText = "What is the reading of this kanji?",
             isNewCard = entry.isNew,
-            srsState = entry.srsState
+            srsState = entry.srsState,
+            kanjiGrade = kanji.grade,
+            kanjiFrequency = kanji.frequency,
+            kanjiStrokeCount = kanji.strokeCount
         )
     }
 
@@ -251,7 +254,10 @@ class QuestionGenerator(
             questionText = prompt,
             isNewCard = entry.isNew,
             strokePaths = strokePaths,
-            srsState = entry.srsState
+            srsState = entry.srsState,
+            kanjiGrade = kanji.grade,
+            kanjiFrequency = kanji.frequency,
+            kanjiStrokeCount = kanji.strokeCount
         )
     }
 

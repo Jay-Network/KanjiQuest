@@ -34,9 +34,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.android.ui.components.AssetImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -104,12 +106,26 @@ fun AchievementsScreen(
                 // Achievement Categories
                 uiState.categories.forEach { category ->
                     item {
-                        Text(
-                            text = category.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(vertical = 8.dp)
-                        )
+                        ) {
+                            val categoryAsset = categoryImageAsset(category.name)
+                            if (categoryAsset != null) {
+                                AssetImage(
+                                    filename = categoryAsset,
+                                    contentDescription = category.name,
+                                    modifier = Modifier.size(32.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = category.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     items(category.achievements) { achievement ->
@@ -138,9 +154,11 @@ private fun AchievementSummaryCard(unlockedCount: Int, totalCount: Int) {
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "🏆",
-                fontSize = 48.sp
+            AssetImage(
+                filename = "achievement-mastery.png",
+                contentDescription = "Achievements",
+                modifier = Modifier.size(64.dp),
+                contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -254,4 +272,14 @@ private fun AchievementCard(achievement: AchievementDefinition) {
             }
         }
     }
+}
+
+private fun categoryImageAsset(categoryName: String): String? = when (categoryName) {
+    "Progress" -> "achievement-learning.png"
+    "Mastery" -> "achievement-mastery.png"
+    "Consistency" -> "achievement-streak.png"
+    "Games" -> "achievement-exploration.png"
+    "Accuracy" -> "achievement-speed.png"
+    "Rewards" -> "achievement-social.png"
+    else -> null
 }

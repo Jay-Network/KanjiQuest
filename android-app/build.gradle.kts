@@ -17,8 +17,8 @@ android {
         applicationId = "com.jworks.kanjiquest"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.0-beta2"
+        versionCode = 13
+        versionName = "0.1.0-beta13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -117,6 +117,7 @@ dependencies {
     implementation(project(":shared-tokenizer"))
 
     // Core Android
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

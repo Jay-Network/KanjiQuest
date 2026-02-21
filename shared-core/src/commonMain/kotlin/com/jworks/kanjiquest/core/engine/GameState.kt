@@ -1,5 +1,6 @@
 package com.jworks.kanjiquest.core.engine
 
+import com.jworks.kanjiquest.core.domain.model.CollectedItem
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.KanaType
 
@@ -17,7 +18,11 @@ data class Question(
     val vocabQuestionType: String? = null,
     val exampleSentenceJa: String? = null,
     val exampleSentenceEn: String? = null,
-    val kanjiBreakdown: List<String> = emptyList()
+    val kanjiBreakdown: List<String> = emptyList(),
+    val radicalNameJp: String? = null,
+    val kanjiGrade: Int? = null,
+    val kanjiFrequency: Int? = null,
+    val kanjiStrokeCount: Int = 0
 )
 
 data class SessionStats(
@@ -55,7 +60,9 @@ sealed class GameState {
         val currentCombo: Int,
         val questionNumber: Int,
         val totalQuestions: Int,
-        val sessionXp: Int
+        val sessionXp: Int,
+        val discoveredItem: CollectedItem? = null,
+        val itemLevelUp: Boolean = false
     ) : GameState()
 
     data class SessionComplete(

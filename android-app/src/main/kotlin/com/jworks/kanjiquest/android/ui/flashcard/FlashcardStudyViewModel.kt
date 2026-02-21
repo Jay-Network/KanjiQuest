@@ -1,5 +1,6 @@
 package com.jworks.kanjiquest.android.ui.flashcard
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jworks.kanjiquest.core.domain.model.Kanji
@@ -44,11 +45,14 @@ enum class StudyGrade(val quality: Int, val label: String) {
 
 @HiltViewModel
 class FlashcardStudyViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val flashcardRepository: FlashcardRepository,
     private val kanjiRepository: KanjiRepository,
     private val srsRepository: SrsRepository,
     private val srsAlgorithm: SrsAlgorithm
 ) : ViewModel() {
+
+    private val deckId: Long = checkNotNull(savedStateHandle["deckId"])
 
     private val _uiState = MutableStateFlow(FlashcardStudyUiState())
     val uiState: StateFlow<FlashcardStudyUiState> = _uiState.asStateFlow()
@@ -61,7 +65,7 @@ class FlashcardStudyViewModel @Inject constructor(
 
     private fun loadCards() {
         viewModelScope.launch {
-            val kanjiIds = flashcardRepository.getAllKanjiIds()
+            val kanjiIds = flashcardRepository.getKanjiIdsByDeck(deckId)
             val cards = kanjiIds.mapNotNull { id ->
                 val kanji = kanjiRepository.getKanjiById(id) ?: return@mapNotNull null
                 val vocab = kanjiRepository.getVocabularyForKanji(id).take(3)
@@ -96,7 +100,7 @@ class FlashcardStudyViewModel @Inject constructor(
             }
 
             // Update flashcard study count
-            flashcardRepository.markStudied(kanjiId)
+            flashcardRepository.markStudied(deckId, kanjiId)
 
             // Advance to next card or complete
             val nextIndex = _uiState.value.currentIndex + 1

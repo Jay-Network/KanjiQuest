@@ -17,9 +17,15 @@ interface KanjiRepository {
     suspend fun getExampleSentence(vocabId: Long): ExampleSentence?
     suspend fun getVocabularyAtOffset(offset: Long): Vocabulary?
     suspend fun getVocabularyCount(): Long
+    suspend fun getCommonVocabularyAtOffset(offset: Long): Vocabulary?
+    suspend fun getCommonVocabularyCount(): Long
     suspend fun getKanjiIdsForVocab(vocabId: Long): List<Long>
     suspend fun getUnseenKanjiByGrade(grade: Int, limit: Int): List<Kanji>
     suspend fun searchKanji(query: String, limit: Int = 20): List<Kanji>
     suspend fun getKanjiCount(): Long
     suspend fun getKanjiCountByGrade(grade: Int): Long
+    suspend fun getKanjiCountByJlptLevel(level: Int): Long
+    suspend fun getKanjiByStrokeCount(strokeCount: Int): List<Kanji>
+    suspend fun getDistinctStrokeCounts(): List<Int>
+    suspend fun getKanjiByFrequencyRange(from: Int, to: Int): List<Kanji>
 }

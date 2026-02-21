@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jworks.kanjiquest.core.domain.model.KanaType
 import com.jworks.kanjiquest.core.engine.GameState
@@ -55,11 +57,16 @@ fun KanaRecognitionScreen(
     viewModel: KanaRecognitionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val sessionLength = remember {
+        context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
+            .getInt("session_length", 10)
+    }
     val accentColor = if (kanaType == KanaType.HIRAGANA) HiraganaColor else KatakanaColor
     val title = if (kanaType == KanaType.HIRAGANA) "Hiragana" else "Katakana"
 
     LaunchedEffect(kanaType) {
-        viewModel.startGame(kanaType)
+        viewModel.startGame(kanaType, questionCount = sessionLength)
     }
 
     Scaffold(

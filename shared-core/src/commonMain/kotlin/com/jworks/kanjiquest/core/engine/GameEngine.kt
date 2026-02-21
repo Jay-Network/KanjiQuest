@@ -1,10 +1,16 @@
 package com.jworks.kanjiquest.core.engine
 
+import com.jworks.kanjiquest.core.collection.EncounterEngine
+import com.jworks.kanjiquest.core.collection.ItemLevelEngine
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
+import com.jworks.kanjiquest.core.domain.model.CollectedItem
+import com.jworks.kanjiquest.core.domain.model.CollectionItemType
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.KanaType
+import com.jworks.kanjiquest.core.domain.model.LevelProgression
 import com.jworks.kanjiquest.core.domain.model.SrsState
 import com.jworks.kanjiquest.core.domain.model.VocabSrsCard
+import com.jworks.kanjiquest.core.domain.repository.CollectionRepository
 import com.jworks.kanjiquest.core.domain.repository.KanaSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.RadicalSrsRepository
 import com.jworks.kanjiquest.core.domain.repository.SrsRepository
@@ -32,6 +38,9 @@ class GameEngine(
     private val kanaSrsRepository: KanaSrsRepository? = null,
     private val radicalQuestionGenerator: RadicalQuestionGenerator? = null,
     private val radicalSrsRepository: RadicalSrsRepository? = null,
+    private val collectionRepository: CollectionRepository? = null,
+    private val encounterEngine: EncounterEngine? = null,
+    private val itemLevelEngine: ItemLevelEngine? = null,
     private val timeProvider: () -> Long = { kotlinx.datetime.Clock.System.now().epochSeconds }
 ) {
     private val _state = MutableStateFlow<GameState>(GameState.Idle)
@@ -88,7 +97,7 @@ class GameEngine(
                     kanaQuestionGenerator?.prepareSession(totalQuestions, timeProvider(), kanaType) ?: false
                 }
                 gameMode.isRadicalMode -> {
-                    radicalQuestionGenerator?.prepareSession(totalQuestions, timeProvider()) ?: false
+                    radicalQuestionGenerator?.prepareSession(totalQuestions, timeProvider(), playerLevel) ?: false
                 }
                 event.targetKanjiId != null -> {
                     questionGenerator.prepareTargetedSession(event.targetKanjiId, totalQuestions)
@@ -218,6 +227,59 @@ class GameEngine(
             }
         }
 
+        // Collection system: item XP + encounter rolls
+        var discoveredItem: CollectedItem? = null
+        var itemLevelUp = false
+
+        if (collectionRepository != null) {
+            withContext(Dispatchers.IO) {
+                val itemType = when {
+                    gameMode.isKanaMode -> null // Kana encounters handled separately if needed
+                    gameMode.isRadicalMode -> CollectionItemType.RADICAL
+                    else -> CollectionItemType.KANJI
+                }
+
+                if (itemType != null && itemLevelEngine != null) {
+                    // Add XP to collected items
+                    val levelResult = itemLevelEngine.addXp(
+                        question.kanjiId, itemType, isCorrect, currentCombo
+                    )
+                    if (levelResult != null) {
+                        itemLevelUp = levelResult.leveledUp
+                    }
+                }
+
+                // Roll for encounter on correct answer (kanji modes only)
+                if (isCorrect && itemType == CollectionItemType.KANJI && encounterEngine != null) {
+                    val isUncollected = !collectionRepository.isCollected(question.kanjiId, CollectionItemType.KANJI)
+                    if (isUncollected) {
+                        // The question itself was uncollected — auto-collect it on correct answer
+                        val rarity = com.jworks.kanjiquest.core.collection.RarityCalculator.calculateKanjiRarity(
+                            question.kanjiGrade, question.kanjiFrequency, question.kanjiStrokeCount
+                        )
+                        val newItem = CollectedItem(
+                            itemId = question.kanjiId,
+                            itemType = CollectionItemType.KANJI,
+                            rarity = rarity,
+                            itemLevel = 1,
+                            itemXp = 0,
+                            discoveredAt = timeProvider(),
+                            source = "gameplay"
+                        )
+                        collectionRepository.collect(newItem)
+                        discoveredItem = newItem
+                    } else {
+                        // Already collected — roll for a bonus encounter of a new kanji
+                        val unlockedGrades = LevelProgression.getUnlockedGrades(playerLevel)
+                        val encounter = encounterEngine.rollEncounter(unlockedGrades, timeProvider())
+                        if (encounter != null) {
+                            discoveredItem = encounter.collectedItem
+                        }
+                    }
+                }
+            }
+        }
+
         _state.value = GameState.ShowingResult(
             question = question,
             selectedAnswer = event.answer,
@@ -227,7 +289,9 @@ class GameEngine(
             currentCombo = currentCombo,
             questionNumber = current.questionNumber,
             totalQuestions = current.totalQuestions,
-            sessionXp = sessionXp
+            sessionXp = sessionXp,
+            discoveredItem = discoveredItem,
+            itemLevelUp = itemLevelUp
         )
     }
 

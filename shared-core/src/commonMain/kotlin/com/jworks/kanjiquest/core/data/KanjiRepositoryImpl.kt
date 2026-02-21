@@ -37,7 +37,16 @@ class KanjiRepositoryImpl(
     }
 
     override suspend fun getStudiedKanjiVocabulary(): List<Vocabulary> {
-        return db.vocabularyQueries.getForStudiedKanji().executeAsList().map { it.toVocabulary() }
+        return db.vocabularyQueries.getForStudiedKanji { id, kanji_form, reading, meanings_en, jlpt_level, frequency ->
+            Vocabulary(
+                id = id,
+                kanjiForm = kanji_form,
+                reading = reading,
+                meaningsEn = parseJsonStringArray(meanings_en),
+                jlptLevel = jlpt_level?.toInt(),
+                frequency = frequency?.toInt()
+            )
+        }.executeAsList()
     }
 
     override suspend fun getRandomStudiedVocabulary(): Vocabulary? {
@@ -60,6 +69,23 @@ class KanjiRepositoryImpl(
         return db.vocabularyQueries.countAll().executeAsOne()
     }
 
+    override suspend fun getCommonVocabularyAtOffset(offset: Long): Vocabulary? {
+        return db.vocabularyQueries.getCommonAtOffset(offset) { id, kanji_form, reading, meanings_en, jlpt_level, frequency ->
+            Vocabulary(
+                id = id,
+                kanjiForm = kanji_form,
+                reading = reading,
+                meaningsEn = parseJsonStringArray(meanings_en),
+                jlptLevel = jlpt_level?.toInt(),
+                frequency = frequency?.toInt()
+            )
+        }.executeAsOneOrNull()
+    }
+
+    override suspend fun getCommonVocabularyCount(): Long {
+        return db.vocabularyQueries.countCommon().executeAsOne()
+    }
+
     override suspend fun getKanjiIdsForVocab(vocabId: Long): List<Long> {
         return db.kanjiVocabularyQueries.getKanjiIdsForVocab(vocabId).executeAsList()
     }
@@ -79,6 +105,22 @@ class KanjiRepositoryImpl(
 
     override suspend fun getKanjiCountByGrade(grade: Int): Long {
         return db.kanjiQueries.countByGrade(grade.toLong()).executeAsOne()
+    }
+
+    override suspend fun getKanjiCountByJlptLevel(level: Int): Long {
+        return db.kanjiQueries.countByJlptLevel(level.toLong()).executeAsOne()
+    }
+
+    override suspend fun getKanjiByStrokeCount(strokeCount: Int): List<Kanji> {
+        return db.kanjiQueries.getByStrokeCount(strokeCount.toLong()).executeAsList().map { it.toKanji() }
+    }
+
+    override suspend fun getDistinctStrokeCounts(): List<Int> {
+        return db.kanjiQueries.getDistinctStrokeCounts().executeAsList().map { it.toInt() }
+    }
+
+    override suspend fun getKanjiByFrequencyRange(from: Int, to: Int): List<Kanji> {
+        return db.kanjiQueries.getByFrequencyRange(from.toLong(), to.toLong()).executeAsList().map { it.toKanji() }
     }
 }
 

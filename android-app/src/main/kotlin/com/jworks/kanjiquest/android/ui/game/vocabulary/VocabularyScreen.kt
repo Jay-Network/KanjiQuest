@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -33,6 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,8 +47,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.android.ui.game.DiscoveryOverlay
 import com.jworks.kanjiquest.core.engine.GameState
 import com.jworks.kanjiquest.core.engine.Question
 
@@ -53,12 +62,18 @@ fun VocabularyScreen(
     viewModel: VocabularyViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showDiscoveryOverlay by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val sessionLength = remember {
+        context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
+            .getInt("session_length", 10)
+    }
 
     LaunchedEffect(targetKanjiId) {
         if (targetKanjiId != null && uiState.gameState is GameState.Idle) {
             viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId)
         } else if (targetKanjiId == null) {
-            viewModel.startGame()
+            viewModel.startGame(questionCount = sessionLength)
         }
     }
 
@@ -87,29 +102,48 @@ fun VocabularyScreen(
         ) {
             when (val state = uiState.gameState) {
                 is GameState.Idle, is GameState.Preparing -> LoadingContent()
-                is GameState.AwaitingAnswer -> VocabQuestionContent(
-                    question = state.question,
-                    questionNumber = state.questionNumber,
-                    totalQuestions = state.totalQuestions,
-                    currentCombo = state.currentCombo,
-                    sessionXp = state.sessionXp,
-                    selectedAnswer = null,
-                    correctAnswer = null,
-                    onAnswerClick = { viewModel.submitAnswer(it) }
-                )
-                is GameState.ShowingResult -> VocabQuestionContent(
-                    question = state.question,
-                    questionNumber = state.questionNumber,
-                    totalQuestions = state.totalQuestions,
-                    currentCombo = state.currentCombo,
-                    sessionXp = state.sessionXp,
-                    selectedAnswer = state.selectedAnswer,
-                    correctAnswer = state.question.correctAnswer,
-                    onAnswerClick = {},
-                    xpGained = state.xpGained,
-                    isCorrect = state.isCorrect,
-                    onNext = { viewModel.nextQuestion() }
-                )
+                is GameState.AwaitingAnswer -> {
+                    showDiscoveryOverlay = false
+                    VocabQuestionContent(
+                        question = state.question,
+                        questionNumber = state.questionNumber,
+                        totalQuestions = state.totalQuestions,
+                        currentCombo = state.currentCombo,
+                        sessionXp = state.sessionXp,
+                        selectedAnswer = null,
+                        correctAnswer = null,
+                        onAnswerClick = { viewModel.submitAnswer(it) }
+                    )
+                }
+                is GameState.ShowingResult -> {
+                    LaunchedEffect(state.discoveredItem) {
+                        if (state.discoveredItem != null) {
+                            showDiscoveryOverlay = true
+                        }
+                    }
+                    VocabQuestionContent(
+                        question = state.question,
+                        questionNumber = state.questionNumber,
+                        totalQuestions = state.totalQuestions,
+                        currentCombo = state.currentCombo,
+                        sessionXp = state.sessionXp,
+                        selectedAnswer = state.selectedAnswer,
+                        correctAnswer = state.question.correctAnswer,
+                        onAnswerClick = {},
+                        xpGained = state.xpGained,
+                        isCorrect = state.isCorrect,
+                        onNext = { viewModel.nextQuestion() }
+                    )
+                    val discovered = state.discoveredItem
+                    if (showDiscoveryOverlay && discovered != null) {
+                        DiscoveryOverlay(
+                            discoveredItem = discovered,
+                            kanjiLiteral = state.question.kanjiLiteral,
+                            kanjiMeaning = null,
+                            onDismiss = { showDiscoveryOverlay = false }
+                        )
+                    }
+                }
                 is GameState.SessionComplete -> VocabSessionCompleteContent(
                     stats = state.stats,
                     sessionResult = uiState.sessionResult,
@@ -339,27 +373,7 @@ private fun VocabQuestionContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (question.kanjiBreakdown.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = "Kanji breakdown",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        for (entry in question.kanjiBreakdown) {
-                            Text(
-                                text = entry,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-                }
+                VocabularyDecompositionCard(breakdown = question.kanjiBreakdown)
             }
 
             question.exampleSentenceJa?.let { sentenceJa ->
@@ -540,4 +554,107 @@ private fun formatDuration(seconds: Int): String {
     val minutes = seconds / 60
     val secs = seconds % 60
     return if (minutes > 0) "${minutes}m ${secs}s" else "${secs}s"
+}
+
+/**
+ * Visual decomposition card that splits a vocabulary word into component kanji boxes.
+ * Each box shows the kanji character and its meaning, connected by "+" symbols.
+ * Entries are parsed from the kanjiBreakdown format: "学 = study", "校 = school"
+ */
+@Composable
+private fun VocabularyDecompositionCard(breakdown: List<String>) {
+    val components = breakdown.map { entry ->
+        val parts = entry.split("=", limit = 2).map { it.trim() }
+        val kanji = parts.getOrElse(0) { "?" }
+        val meaning = parts.getOrElse(1) { "" }
+        kanji to meaning
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Composition",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                components.forEachIndexed { index, (kanji, meaning) ->
+                    // Kanji component box
+                    Box(contentAlignment = Alignment.Center) {
+                        Card(
+                            modifier = Modifier.size(width = 80.dp, height = 90.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                com.jworks.kanjiquest.android.ui.theme.KanjiText(
+                                    text = kanji,
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = meaning,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        // Known indicator badge
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 4.dp, y = (-4).dp)
+                                .size(20.dp)
+                                .background(Color(0xFF4CAF50), CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "\u2713",
+                                fontSize = 12.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // "+" connector between components
+                    if (index < components.size - 1) {
+                        Text(
+                            text = "+",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

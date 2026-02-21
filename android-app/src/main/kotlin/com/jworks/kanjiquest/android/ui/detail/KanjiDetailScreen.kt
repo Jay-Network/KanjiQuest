@@ -1,5 +1,6 @@
 package com.jworks.kanjiquest.android.ui.detail
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -14,11 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -301,6 +305,52 @@ fun KanjiDetailScreen(
                 Text("Loading...")
             }
         }
+    }
+
+    // Deck chooser dialog
+    if (uiState.showDeckChooser) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDeckChooser() },
+            title = { Text("Add to Deck") },
+            text = {
+                Column {
+                    uiState.deckGroups.forEach { deck ->
+                        val isInThisDeck = deck.id in uiState.kanjiInDecks
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (isInThisDeck) {
+                                        viewModel.removeFromDeck(deck.id)
+                                    } else {
+                                        viewModel.addToDeck(deck.id)
+                                    }
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isInThisDeck,
+                                onCheckedChange = { checked ->
+                                    if (checked) viewModel.addToDeck(deck.id)
+                                    else viewModel.removeFromDeck(deck.id)
+                                }
+                            )
+                            Text(
+                                text = deck.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissDeckChooser() }) {
+                    Text("Done")
+                }
+            }
+        )
     }
 }
 

@@ -2,6 +2,7 @@ package com.jworks.kanjiquest.android.ui.flashcard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jworks.kanjiquest.core.domain.model.FlashcardDeckGroup
 import com.jworks.kanjiquest.core.domain.model.FlashcardEntry
 import com.jworks.kanjiquest.core.domain.model.Kanji
 import com.jworks.kanjiquest.core.domain.repository.FlashcardRepository
@@ -20,7 +21,11 @@ data class FlashcardItem(
 
 data class FlashcardUiState(
     val items: List<FlashcardItem> = emptyList(),
-    val isLoading: Boolean = true
+    val deckGroups: List<FlashcardDeckGroup> = emptyList(),
+    val selectedDeckId: Long = 1,
+    val isLoading: Boolean = true,
+    val showCreateDeckDialog: Boolean = false,
+    val editingDeck: FlashcardDeckGroup? = null
 )
 
 @HiltViewModel
@@ -33,23 +38,100 @@ class FlashcardViewModel @Inject constructor(
     val uiState: StateFlow<FlashcardUiState> = _uiState.asStateFlow()
 
     init {
-        loadDeck()
+        loadDecks()
     }
 
-    private fun loadDeck() {
+    private fun loadDecks() {
         viewModelScope.launch {
-            val entries = flashcardRepository.getAllFlashcards()
+            flashcardRepository.ensureDefaultDeck()
+            val groups = flashcardRepository.getAllDeckGroups()
+            val selectedId = _uiState.value.selectedDeckId
+            val effectiveId = if (groups.any { it.id == selectedId }) selectedId else groups.firstOrNull()?.id ?: 1
+            _uiState.value = _uiState.value.copy(deckGroups = groups, selectedDeckId = effectiveId)
+            loadDeck(effectiveId)
+        }
+    }
+
+    private fun loadDeck(deckId: Long) {
+        viewModelScope.launch {
+            val entries = flashcardRepository.getFlashcardsByDeck(deckId)
             val items = entries.mapNotNull { entry ->
                 val kanji = kanjiRepository.getKanjiById(entry.kanjiId)
                 if (kanji != null) FlashcardItem(entry, kanji) else null
             }
-            _uiState.value = FlashcardUiState(items = items, isLoading = false)
+            _uiState.value = _uiState.value.copy(
+                items = items,
+                selectedDeckId = deckId,
+                isLoading = false
+            )
         }
+    }
+
+    fun selectDeck(deckId: Long) {
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        loadDeck(deckId)
+    }
+
+    fun createDeck(name: String) {
+        viewModelScope.launch {
+            val newId = flashcardRepository.createDeckGroup(name)
+            val groups = flashcardRepository.getAllDeckGroups()
+            _uiState.value = _uiState.value.copy(
+                deckGroups = groups,
+                showCreateDeckDialog = false
+            )
+            selectDeck(newId)
+        }
+    }
+
+    fun renameDeck(deckId: Long, newName: String) {
+        viewModelScope.launch {
+            flashcardRepository.renameDeckGroup(deckId, newName)
+            val groups = flashcardRepository.getAllDeckGroups()
+            _uiState.value = _uiState.value.copy(
+                deckGroups = groups,
+                editingDeck = null
+            )
+        }
+    }
+
+    fun deleteDeck(deckId: Long) {
+        viewModelScope.launch {
+            flashcardRepository.deleteDeckGroup(deckId)
+            val groups = flashcardRepository.getAllDeckGroups()
+            if (groups.isEmpty()) {
+                flashcardRepository.ensureDefaultDeck()
+                val refreshedGroups = flashcardRepository.getAllDeckGroups()
+                _uiState.value = _uiState.value.copy(deckGroups = refreshedGroups, editingDeck = null)
+                selectDeck(refreshedGroups.first().id)
+            } else {
+                _uiState.value = _uiState.value.copy(deckGroups = groups, editingDeck = null)
+                if (deckId == _uiState.value.selectedDeckId) {
+                    selectDeck(groups.first().id)
+                }
+            }
+        }
+    }
+
+    fun showCreateDeckDialog() {
+        _uiState.value = _uiState.value.copy(showCreateDeckDialog = true)
+    }
+
+    fun dismissCreateDeckDialog() {
+        _uiState.value = _uiState.value.copy(showCreateDeckDialog = false)
+    }
+
+    fun showEditDeckDialog(deck: FlashcardDeckGroup) {
+        _uiState.value = _uiState.value.copy(editingDeck = deck)
+    }
+
+    fun dismissEditDeckDialog() {
+        _uiState.value = _uiState.value.copy(editingDeck = null)
     }
 
     fun removeFromDeck(kanjiId: Int) {
         viewModelScope.launch {
-            flashcardRepository.removeFromDeck(kanjiId)
+            flashcardRepository.removeFromDeck(_uiState.value.selectedDeckId, kanjiId)
             _uiState.value = _uiState.value.copy(
                 items = _uiState.value.items.filter { it.entry.kanjiId != kanjiId }
             )
@@ -57,6 +139,6 @@ class FlashcardViewModel @Inject constructor(
     }
 
     fun refresh() {
-        loadDeck()
+        loadDecks()
     }
 }

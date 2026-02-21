@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.KanjiQuest" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.KanjiQuest.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FFFF8C42</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#FFFF8C42</item>
+        <item name="postSplashScreenTheme">@style/Theme.KanjiQuest</item>
+    </style>
 </resources>

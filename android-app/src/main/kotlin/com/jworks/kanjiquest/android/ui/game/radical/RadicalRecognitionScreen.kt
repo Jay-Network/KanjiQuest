@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +41,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.android.ui.components.RadicalImage
 import com.jworks.kanjiquest.core.engine.GameState
 
 val RadicalColor = Color(0xFF795548)
@@ -52,9 +55,14 @@ fun RadicalRecognitionScreen(
     viewModel: RadicalRecognitionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val sessionLength = remember {
+        context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
+            .getInt("session_length", 10)
+    }
 
     LaunchedEffect(Unit) {
-        viewModel.startGame()
+        viewModel.startGame(questionCount = sessionLength)
     }
 
     Scaffold(
@@ -79,6 +87,7 @@ fun RadicalRecognitionScreen(
                 is GameState.Idle, is GameState.Preparing -> LoadingContent()
                 is GameState.AwaitingAnswer -> QuestionContent(
                     literal = state.question.kanjiLiteral,
+                    radicalId = state.question.kanjiId,
                     questionText = state.question.questionText,
                     choices = state.question.choices,
                     questionNumber = state.questionNumber,
@@ -90,6 +99,7 @@ fun RadicalRecognitionScreen(
                 )
                 is GameState.ShowingResult -> QuestionContent(
                     literal = state.question.kanjiLiteral,
+                    radicalId = state.question.kanjiId,
                     questionText = state.question.questionText,
                     choices = state.question.choices,
                     questionNumber = state.questionNumber,
@@ -101,6 +111,7 @@ fun RadicalRecognitionScreen(
                     onAnswerClick = {},
                     xpGained = state.xpGained,
                     isCorrect = state.isCorrect,
+                    radicalNameJp = state.question.radicalNameJp,
                     onNext = { viewModel.nextQuestion() }
                 )
                 is GameState.SessionComplete -> SessionCompleteContent(
@@ -127,6 +138,7 @@ private fun LoadingContent() {
 @Composable
 private fun QuestionContent(
     literal: String,
+    radicalId: Int,
     questionText: String,
     choices: List<String>,
     questionNumber: Int,
@@ -138,6 +150,7 @@ private fun QuestionContent(
     onAnswerClick: (String) -> Unit,
     xpGained: Int = 0,
     isCorrect: Boolean? = null,
+    radicalNameJp: String? = null,
     onNext: (() -> Unit)? = null
 ) {
     Column(
@@ -171,7 +184,11 @@ private fun QuestionContent(
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = literal, fontSize = 80.sp, textAlign = TextAlign.Center)
+                RadicalImage(
+                    radicalId = radicalId,
+                    contentDescription = literal,
+                    modifier = Modifier.size(160.dp)
+                )
             }
         }
 
@@ -179,11 +196,27 @@ private fun QuestionContent(
 
         if (isCorrect != null) {
             AnimatedVisibility(visible = true, enter = fadeIn() + scaleIn()) {
-                Text(
-                    text = if (isCorrect) "+$xpGained XP" else "Incorrect",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                    color = if (isCorrect) RadicalColor else MaterialTheme.colorScheme.error
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isCorrect) "+$xpGained XP" else "Incorrect",
+                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                        color = if (isCorrect) RadicalColor else MaterialTheme.colorScheme.error
+                    )
+                    if (!radicalNameJp.isNullOrBlank()) {
+                        Text(
+                            text = "$literal  $radicalNameJp",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (!isCorrect && correctAnswer != null) {
+                        Text(
+                            text = "Answer: $correctAnswer",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

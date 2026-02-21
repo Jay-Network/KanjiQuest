@@ -42,6 +42,7 @@ import java.util.concurrent.Executors
 fun CameraChallengeScreen(
     onBack: () -> Unit,
     targetKanjiId: Int? = null,
+    onJournal: (() -> Unit)? = null,
     viewModel: CameraChallengeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -80,13 +81,21 @@ fun CameraChallengeScreen(
                 title = { Text("Camera Challenge") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Text("←", fontSize = 24.sp)
+                        Text("\u2190", fontSize = 24.sp)
+                    }
+                },
+                actions = {
+                    if (onJournal != null) {
+                        IconButton(onClick = onJournal) {
+                            Text("\uD83D\uDCD3", fontSize = 20.sp)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -120,7 +129,8 @@ fun CameraChallengeScreen(
                             onDone = {
                                 viewModel.reset()
                                 onBack()
-                            }
+                            },
+                            onJournal = onJournal
                         )
                     }
                     is CameraChallengeState.Error -> {
@@ -379,7 +389,8 @@ private fun SuccessOverlay(
 @Composable
 private fun SessionCompleteContent(
     state: CameraChallengeState.SessionComplete,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    onJournal: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -421,6 +432,20 @@ private fun SessionCompleteContent(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text("Done", fontSize = 18.sp)
+        }
+
+        if (onJournal != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = onJournal,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("View Field Journal", fontSize = 18.sp)
+            }
         }
     }
 }

@@ -1,0 +1,29 @@
+CREATE TABLE flashcard_deck_group (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+getAll:
+SELECT * FROM flashcard_deck_group ORDER BY id ASC;
+
+getById:
+SELECT * FROM flashcard_deck_group WHERE id = ?;
+
+insert:
+INSERT INTO flashcard_deck_group(name) VALUES (?);
+
+insertWithId:
+INSERT OR IGNORE INTO flashcard_deck_group(id, name) VALUES (?, ?);
+
+rename:
+UPDATE flashcard_deck_group SET name = ? WHERE id = ?;
+
+delete:
+DELETE FROM flashcard_deck_group WHERE id = ?;
+
+getCount:
+SELECT COUNT(*) FROM flashcard_deck_group;
+
+getLastInsertId:
+SELECT last_insert_rowid();

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jworks.kanjiquest.android.data.PreviewTrialManager
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
+import com.jworks.kanjiquest.core.domain.model.FlashcardDeckGroup
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.Kanji
 import com.jworks.kanjiquest.core.domain.model.UserLevel
@@ -36,7 +37,10 @@ data class KanjiDetailUiState(
     val isPremium: Boolean = false,
     val isAdmin: Boolean = false,
     val modeTrials: Map<GameMode, ModeTrialInfo> = emptyMap(),
-    val modeStats: Map<String, Int> = emptyMap()
+    val modeStats: Map<String, Int> = emptyMap(),
+    val showDeckChooser: Boolean = false,
+    val deckGroups: List<FlashcardDeckGroup> = emptyList(),
+    val kanjiInDecks: List<Long> = emptyList()
 )
 
 @HiltViewModel
@@ -119,9 +123,48 @@ class KanjiDetailViewModel @Inject constructor(
 
     fun toggleFlashcard() {
         viewModelScope.launch {
-            val nowInDeck = flashcardRepository.toggleInDeck(kanjiId)
-            _uiState.value = _uiState.value.copy(isInFlashcardDeck = nowInDeck)
+            flashcardRepository.ensureDefaultDeck()
+            val deckGroups = flashcardRepository.getAllDeckGroups()
+            if (deckGroups.size <= 1) {
+                // Single deck: toggle directly
+                val nowInDeck = flashcardRepository.toggleInDeck(kanjiId)
+                _uiState.value = _uiState.value.copy(isInFlashcardDeck = nowInDeck)
+            } else {
+                // Multiple decks: show chooser
+                val kanjiInDecks = flashcardRepository.getDecksForKanji(kanjiId)
+                _uiState.value = _uiState.value.copy(
+                    showDeckChooser = true,
+                    deckGroups = deckGroups,
+                    kanjiInDecks = kanjiInDecks
+                )
+            }
         }
+    }
+
+    fun addToDeck(deckId: Long) {
+        viewModelScope.launch {
+            flashcardRepository.addToDeck(deckId, kanjiId)
+            val kanjiInDecks = flashcardRepository.getDecksForKanji(kanjiId)
+            _uiState.value = _uiState.value.copy(
+                isInFlashcardDeck = true,
+                kanjiInDecks = kanjiInDecks
+            )
+        }
+    }
+
+    fun removeFromDeck(deckId: Long) {
+        viewModelScope.launch {
+            flashcardRepository.removeFromDeck(deckId, kanjiId)
+            val kanjiInDecks = flashcardRepository.getDecksForKanji(kanjiId)
+            _uiState.value = _uiState.value.copy(
+                isInFlashcardDeck = kanjiInDecks.isNotEmpty(),
+                kanjiInDecks = kanjiInDecks
+            )
+        }
+    }
+
+    fun dismissDeckChooser() {
+        _uiState.value = _uiState.value.copy(showDeckChooser = false)
     }
 
     fun useWritingTrial(): Boolean {

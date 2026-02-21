@@ -56,17 +56,24 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import com.jworks.kanjiquest.android.ui.components.AssetImage
+import com.jworks.kanjiquest.android.ui.components.RadicalImage
+import androidx.compose.foundation.border
+import com.jworks.kanjiquest.core.domain.model.CollectedItem
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.GradeMastery
 import com.jworks.kanjiquest.core.domain.model.Kanji
 import com.jworks.kanjiquest.core.domain.model.KanaType
 import com.jworks.kanjiquest.core.domain.model.MasteryLevel
+import com.jworks.kanjiquest.core.domain.model.Radical
 import com.jworks.kanjiquest.core.domain.model.UserLevel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onKanjiClick: (Int) -> Unit,
+    onRadicalClick: (Int) -> Unit = {},
     onGameModeClick: (GameMode) -> Unit,
     onWordOfDayClick: (Long) -> Unit = {},
     onShopClick: () -> Unit = {},
@@ -77,6 +84,7 @@ fun HomeScreen(
     onPreviewModeClick: (GameMode) -> Unit = {},
     onFlashcardsClick: () -> Unit = {},
     onKanaModeClick: (KanaType, Boolean) -> Unit = { _, _ -> },
+    onCollectionClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -447,6 +455,7 @@ fun HomeScreen(
                     subtitle = "Recognition",
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFFE91E63),
+                    imageAsset = "mode-kana-recognition.png",
                     onClick = { onKanaModeClick(KanaType.HIRAGANA, false) }
                 )
                 GameModeButton(
@@ -454,6 +463,7 @@ fun HomeScreen(
                     subtitle = "Recognition",
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFF00BCD4),
+                    imageAsset = "mode-kana-writing.png",
                     onClick = { onKanaModeClick(KanaType.KATAKANA, false) }
                 )
             }
@@ -470,6 +480,7 @@ fun HomeScreen(
                     subtitle = "Free",
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFF795548),
+                    imageAsset = "mode-radical-recognition.png",
                     onClick = { onGameModeClick(GameMode.RADICAL_RECOGNITION) }
                 )
                 PreviewableGameModeButton(
@@ -479,6 +490,7 @@ fun HomeScreen(
                     trialInfo = uiState.previewTrials[GameMode.RADICAL_BUILDER],
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFF795548),
+                    imageAsset = "mode-radical-builder.png",
                     onPremiumClick = { onGameModeClick(GameMode.RADICAL_BUILDER) },
                     onPreviewClick = { onPreviewModeClick(GameMode.RADICAL_BUILDER) },
                     onUpgradeClick = onSubscriptionClick
@@ -505,6 +517,7 @@ fun HomeScreen(
                     subtitle = "Free",
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFF2196F3),
+                    imageAsset = "mode-recognition.png",
                     onClick = { onGameModeClick(GameMode.RECOGNITION) }
                 )
                 PreviewableGameModeButton(
@@ -514,6 +527,7 @@ fun HomeScreen(
                     trialInfo = uiState.previewTrials[GameMode.WRITING],
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFF4CAF50),
+                    imageAsset = "mode-writing.png",
                     onPremiumClick = { onGameModeClick(GameMode.WRITING) },
                     onPreviewClick = { onPreviewModeClick(GameMode.WRITING) },
                     onUpgradeClick = onSubscriptionClick
@@ -533,6 +547,7 @@ fun HomeScreen(
                     trialInfo = uiState.previewTrials[GameMode.VOCABULARY],
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFFFF9800),
+                    imageAsset = "mode-vocabulary.png",
                     onPremiumClick = { onGameModeClick(GameMode.VOCABULARY) },
                     onPreviewClick = { onPreviewModeClick(GameMode.VOCABULARY) },
                     onUpgradeClick = onSubscriptionClick
@@ -544,6 +559,7 @@ fun HomeScreen(
                     trialInfo = uiState.previewTrials[GameMode.CAMERA_CHALLENGE],
                     modifier = Modifier.weight(1f),
                     modeColor = Color(0xFF9C27B0),
+                    imageAsset = "mode-camera.png",
                     onPremiumClick = { onGameModeClick(GameMode.CAMERA_CHALLENGE) },
                     onPreviewClick = { onPreviewModeClick(GameMode.CAMERA_CHALLENGE) },
                     onUpgradeClick = onSubscriptionClick
@@ -552,91 +568,327 @@ fun HomeScreen(
 
             // Flashcard deck button (bookmarked kanji)
             Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onFlashcardsClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = if (uiState.flashcardDeckCount > 0)
-                        "Flashcards (${uiState.flashcardDeckCount})"
-                    else
-                        "Flashcards",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    fontSize = 14.sp
-                )
+                Button(
+                    onClick = onFlashcardsClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Text(
+                        text = if (uiState.flashcardDeckCount > 0)
+                            "Flashcards (${uiState.flashcardDeckCount})"
+                        else
+                            "Flashcards",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontSize = 14.sp
+                    )
+                }
+                Button(
+                    onClick = onCollectionClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF9C27B0).copy(alpha = 0.8f)
+                    )
+                ) {
+                    Text(
+                        text = "Collection ${uiState.collectedKanjiCount}/${uiState.totalKanjiInGrades}",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Kanji grid — with grade selector
+            // ===== LAYER 1: Main tabs (Hiragana | Katakana | 部首 | Kanji) =====
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = "Grade ${uiState.selectedGrade} Kanji",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                if (uiState.unlockedGrades.size > 1) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                    ) {
-                        uiState.unlockedGrades.forEach { grade ->
-                            val isSelected = grade == uiState.selectedGrade
-                            Text(
-                                text = "G$grade",
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .background(
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                                                else MaterialTheme.colorScheme.surfaceVariant,
-                                        shape = RoundedCornerShape(6.dp)
-                                    )
-                                    .clickable { viewModel.selectGrade(grade) }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                MainTab.entries.forEach { tab ->
+                    val isSelected = tab == uiState.selectedMainTab
+                    Text(
+                        text = tab.label,
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(6.dp)
                             )
+                            .clickable { viewModel.selectMainTab(tab) }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+
+            // ===== LAYER 2 + 3: Sub-tabs (only for Kanji tab) =====
+            if (uiState.selectedMainTab == MainTab.KANJI) {
+                Spacer(modifier = Modifier.height(4.dp))
+                // Layer 2: Sort mode tabs
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    KanjiSortMode.entries.forEach { mode ->
+                        val isSelected = mode == uiState.kanjiSortMode
+                        Text(
+                            text = mode.label,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) Color.White
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .background(
+                                    color = if (isSelected) MaterialTheme.colorScheme.tertiary
+                                            else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .clickable { viewModel.selectSortMode(mode) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Layer 3: Level selectors
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    when (uiState.kanjiSortMode) {
+                        KanjiSortMode.SCHOOL_GRADE -> {
+                            uiState.allGrades.forEach { grade ->
+                                val isSelected = grade == uiState.selectedGrade
+                                val hasCollection = grade in uiState.gradesWithCollection
+                                val isEnabled = hasCollection
+                                Text(
+                                    text = if (grade == 8) "G8+" else "G$grade",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = when {
+                                        isSelected -> MaterialTheme.colorScheme.onPrimary
+                                        !isEnabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                        else -> MaterialTheme.colorScheme.primary
+                                    },
+                                    modifier = Modifier
+                                        .background(
+                                            color = when {
+                                                isSelected -> MaterialTheme.colorScheme.primary
+                                                !isEnabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                            },
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .then(
+                                            if (isEnabled) Modifier.clickable { viewModel.selectGrade(grade) }
+                                            else Modifier
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        KanjiSortMode.JLPT_LEVEL -> {
+                            listOf(5, 4, 3, 2, 1).forEach { level ->
+                                val isSelected = level == uiState.selectedJlptLevel
+                                Text(
+                                    text = "N$level",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .background(
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable { viewModel.selectJlptLevel(level) }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        KanjiSortMode.STROKES -> {
+                            uiState.availableStrokeCounts.forEach { count ->
+                                val isSelected = count == uiState.selectedStrokeCount
+                                Text(
+                                    text = "${count}画",
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .background(
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable { viewModel.selectStrokeCount(count) }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        KanjiSortMode.FREQUENCY -> {
+                            HomeViewModel.frequencyLabels.forEachIndexed { index, label ->
+                                val isSelected = index == uiState.selectedFrequencyRange
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .background(
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable { viewModel.selectFrequencyRange(index) }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
 
+            // Section title
+            Text(
+                text = when (uiState.selectedMainTab) {
+                    MainTab.HIRAGANA -> "ひらがな Hiragana"
+                    MainTab.KATAKANA -> "カタカナ Katakana"
+                    MainTab.RADICALS -> "部首 Radicals"
+                    MainTab.KANJI -> when (uiState.kanjiSortMode) {
+                        KanjiSortMode.SCHOOL_GRADE -> "Grade ${uiState.selectedGrade} Kanji"
+                        KanjiSortMode.JLPT_LEVEL -> "JLPT N${uiState.selectedJlptLevel} Kanji"
+                        KanjiSortMode.STROKES -> "${uiState.selectedStrokeCount}-Stroke Kanji"
+                        KanjiSortMode.FREQUENCY -> "${HomeViewModel.frequencyLabels[uiState.selectedFrequencyRange]} Kanji"
+                    }
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Use a Column with items instead of LazyVerticalGrid inside scrollable
-            val kanjiChunks = uiState.gradeOneKanji.chunked(5)
-            kanjiChunks.forEach { rowKanji ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    rowKanji.forEach { kanji ->
-                        KanjiGridItem(
-                            kanji = kanji,
-                            practiceCount = uiState.kanjiPracticeCounts[kanji.id] ?: 0,
-                            modeStats = uiState.kanjiModeStats[kanji.id] ?: emptyMap(),
-                            modifier = Modifier.weight(1f),
-                            onClick = { onKanjiClick(kanji.id) }
-                        )
-                    }
-                    // Fill remaining space if row is not full
-                    repeat(5 - rowKanji.size) {
-                        Spacer(modifier = Modifier.weight(1f))
+            when (uiState.selectedMainTab) {
+                MainTab.HIRAGANA -> {
+                    val kanaChunks = uiState.hiraganaList.chunked(5)
+                    kanaChunks.forEach { rowKana ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowKana.forEach { kana ->
+                                val collected = uiState.collectedHiraganaItems[kana.id]
+                                KanaGridItem(
+                                    kana = kana,
+                                    collectedItem = collected,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onKanaModeClick(KanaType.HIRAGANA, false) }
+                                )
+                            }
+                            repeat(5 - rowKana.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                MainTab.KATAKANA -> {
+                    val kanaChunks = uiState.katakanaList.chunked(5)
+                    kanaChunks.forEach { rowKana ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowKana.forEach { kana ->
+                                val collected = uiState.collectedKatakanaItems[kana.id]
+                                KanaGridItem(
+                                    kana = kana,
+                                    collectedItem = collected,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onKanaModeClick(KanaType.KATAKANA, false) }
+                                )
+                            }
+                            repeat(5 - rowKana.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+                MainTab.RADICALS -> {
+                    val radicalChunks = uiState.radicals.chunked(4)
+                    radicalChunks.forEach { rowRadicals ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowRadicals.forEach { radical ->
+                                val collected = uiState.collectedRadicalItems[radical.id]
+                                RadicalGridItem(
+                                    radical = radical,
+                                    collectedItem = collected,
+                                    onClick = { onRadicalClick(radical.id) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            repeat(4 - rowRadicals.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+                MainTab.KANJI -> {
+                    val kanjiChunks = uiState.gradeOneKanji.chunked(5)
+                    kanjiChunks.forEach { rowKanji ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowKanji.forEach { kanji ->
+                                KanjiGridItem(
+                                    kanji = kanji,
+                                    practiceCount = uiState.kanjiPracticeCounts[kanji.id] ?: 0,
+                                    modeStats = uiState.kanjiModeStats[kanji.id] ?: emptyMap(),
+                                    collectedItem = uiState.collectedItems[kanji.id],
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onKanjiClick(kanji.id) }
+                                )
+                            }
+                            repeat(5 - rowKanji.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
             }
 
             // Bottom padding
@@ -650,63 +902,197 @@ private fun KanjiGridItem(
     kanji: Kanji,
     practiceCount: Int = 0,
     modeStats: Map<String, Int> = emptyMap(),
+    collectedItem: CollectedItem? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val isCollected = collectedItem != null
+    val borderColor = collectedItem?.let { Color(it.rarity.colorValue) }
+    val borderMod = if (borderColor != null) {
+        Modifier.border(2.dp, borderColor, RoundedCornerShape(12.dp))
+    } else Modifier
+
     Card(
         modifier = modifier
             .height(64.dp)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            .then(borderMod)
+            .then(
+                if (isCollected) Modifier.clickable(onClick = onClick)
+                else Modifier
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCollected)
+                MaterialTheme.colorScheme.surface
+            else
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+        )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            com.jworks.kanjiquest.android.ui.theme.KanjiText(
-                text = kanji.literal,
-                fontSize = 28.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.align(Alignment.Center)
-            )
-            // 4-corner per-mode badges
-            val recCount = modeStats["recognition"] ?: 0
-            val vocCount = modeStats["vocabulary"] ?: 0
-            val wrtCount = modeStats["writing"] ?: 0
-            val camCount = modeStats["camera_challenge"] ?: 0
-            if (recCount > 0) {
+            if (collectedItem != null) {
+                // Collected: show kanji with rarity border
+                com.jworks.kanjiquest.android.ui.theme.KanjiText(
+                    text = kanji.literal,
+                    fontSize = 28.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                // Level badge in top-right
+                if (collectedItem.itemLevel > 1) {
+                    Text(
+                        text = "Lv.${collectedItem.itemLevel}",
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(collectedItem.rarity.colorValue),
+                        modifier = Modifier.align(Alignment.TopEnd).padding(2.dp)
+                    )
+                }
+
+                // 4-corner per-mode badges
+                val recCount = modeStats["recognition"] ?: 0
+                val vocCount = modeStats["vocabulary"] ?: 0
+                val wrtCount = modeStats["writing"] ?: 0
+                val camCount = modeStats["camera_challenge"] ?: 0
+                if (recCount > 0) {
+                    Text(
+                        text = "$recCount",
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2196F3),
+                        modifier = Modifier.align(Alignment.TopStart).padding(3.dp)
+                    )
+                }
+                if (vocCount > 0 && collectedItem.itemLevel <= 1) {
+                    Text(
+                        text = "$vocCount",
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF9800),
+                        modifier = Modifier.align(Alignment.TopEnd).padding(3.dp)
+                    )
+                }
+                if (wrtCount > 0) {
+                    Text(
+                        text = "$wrtCount",
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.align(Alignment.BottomStart).padding(3.dp)
+                    )
+                }
+                if (camCount > 0) {
+                    Text(
+                        text = "$camCount",
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF9C27B0),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp)
+                    )
+                }
+            }
+            // Uncollected: empty placeholder — no kanji shown, not clickable
+        }
+    }
+}
+
+@Composable
+private fun RadicalGridItem(
+    radical: Radical,
+    collectedItem: CollectedItem? = null,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val isCollected = collectedItem != null
+    val borderColor = collectedItem?.let { Color(it.rarity.colorValue) }
+    val borderMod = if (borderColor != null) {
+        Modifier.border(2.dp, borderColor, RoundedCornerShape(12.dp))
+    } else Modifier
+
+    Card(
+        modifier = modifier
+            .height(72.dp)
+            .then(borderMod)
+            .then(
+                if (isCollected) Modifier.clickable { onClick() }
+                else Modifier
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCollected)
+                MaterialTheme.colorScheme.surface
+            else
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+        )
+    ) {
+        if (isCollected) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                RadicalImage(
+                    radicalId = radical.id,
+                    contentDescription = radical.literal,
+                    modifier = Modifier.size(36.dp)
+                )
+                if (!radical.meaningJp.isNullOrBlank()) {
+                    Text(
+                        text = radical.meaningJp!!,
+                        fontSize = 9.sp,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        // Uncollected: empty placeholder
+    }
+}
+
+@Composable
+private fun KanaGridItem(
+    kana: com.jworks.kanjiquest.core.domain.model.Kana,
+    collectedItem: CollectedItem? = null,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val isCollected = collectedItem != null
+    val borderColor = collectedItem?.let { Color(it.rarity.colorValue) }
+    val borderMod = if (borderColor != null) {
+        Modifier.border(2.dp, borderColor, RoundedCornerShape(12.dp))
+    } else Modifier
+
+    Card(
+        modifier = modifier
+            .height(64.dp)
+            .then(borderMod)
+            .then(
+                if (isCollected) Modifier.clickable(onClick = onClick)
+                else Modifier
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCollected)
+                MaterialTheme.colorScheme.surface
+            else
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.3f)
+        )
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isCollected) {
                 Text(
-                    text = "$recCount",
-                    fontSize = 7.sp,
+                    text = kana.literal,
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2196F3),
-                    modifier = Modifier.align(Alignment.TopStart).padding(3.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                Text(
+                    text = kana.romanization,
+                    fontSize = 8.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp)
                 )
             }
-            if (vocCount > 0) {
-                Text(
-                    text = "$vocCount",
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF9800),
-                    modifier = Modifier.align(Alignment.TopEnd).padding(3.dp)
-                )
-            }
-            if (wrtCount > 0) {
-                Text(
-                    text = "$wrtCount",
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF4CAF50),
-                    modifier = Modifier.align(Alignment.BottomStart).padding(3.dp)
-                )
-            }
-            if (camCount > 0) {
-                Text(
-                    text = "$camCount",
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF9C27B0),
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp)
-                )
-            }
+            // Uncollected: empty placeholder
         }
     }
 }
@@ -718,32 +1104,49 @@ private fun GameModeButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     modeColor: Color = Color.Unspecified,
+    imageAsset: String? = null,
     onClick: () -> Unit
 ) {
     val containerColor = if (modeColor != Color.Unspecified) modeColor else MaterialTheme.colorScheme.primary
-    Button(
+    Card(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(if (subtitle != null) 64.dp else 56.dp),
+        modifier = modifier.height(80.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
+        colors = CardDefaults.cardColors(
             containerColor = containerColor,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = label,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                fontSize = 14.sp
-            )
-            if (subtitle != null) {
-                Text(
-                    text = subtitle,
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 10.sp
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (imageAsset != null) {
+                AssetImage(
+                    filename = imageAsset,
+                    contentDescription = label,
+                    modifier = Modifier.size(48.dp),
+                    contentScale = ContentScale.Fit
                 )
+                Spacer(modifier = Modifier.padding(start = 8.dp))
+            }
+            Column {
+                Text(
+                    text = label,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 10.sp
+                    )
+                }
             }
         }
     }
@@ -763,6 +1166,7 @@ private fun PreviewableGameModeButton(
     trialInfo: PreviewTrialInfo?,
     modifier: Modifier = Modifier,
     modeColor: Color = Color.Unspecified,
+    imageAsset: String? = null,
     onPremiumClick: () -> Unit,
     onPreviewClick: () -> Unit,
     onUpgradeClick: () -> Unit
@@ -772,46 +1176,63 @@ private fun PreviewableGameModeButton(
             label = label,
             modifier = modifier,
             modeColor = modeColor,
+            imageAsset = imageAsset,
             onClick = onPremiumClick
         )
     } else {
         val remaining = trialInfo?.remaining ?: 0
         val hasTrials = remaining > 0
 
-        Button(
+        Card(
             onClick = {
                 if (hasTrials) onPreviewClick()
                 else onUpgradeClick()
             },
-            modifier = modifier.height(64.dp),
+            modifier = modifier.height(80.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
+            colors = CardDefaults.cardColors(
                 containerColor = if (hasTrials)
                     MaterialTheme.colorScheme.secondaryContainer
                 else
                     MaterialTheme.colorScheme.surfaceVariant
             )
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = label,
-                    fontWeight = FontWeight.Bold,
-                    color = if (hasTrials)
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = if (hasTrials) "Preview ($remaining left)"
-                           else "Upgrade to unlock",
-                    color = if (hasTrials)
-                        MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                    else
-                        Color(0xFFB8860B),
-                    fontSize = 10.sp,
-                    fontWeight = if (!hasTrials) FontWeight.Bold else FontWeight.Normal
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (imageAsset != null) {
+                    AssetImage(
+                        filename = imageAsset,
+                        contentDescription = label,
+                        modifier = Modifier.size(48.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(modifier = Modifier.padding(start = 8.dp))
+                }
+                Column {
+                    Text(
+                        text = label,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasTrials)
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = if (hasTrials) "Preview ($remaining left)"
+                               else "Upgrade to unlock",
+                        color = if (hasTrials)
+                            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        else
+                            Color(0xFFB8860B),
+                        fontSize = 10.sp,
+                        fontWeight = if (!hasTrials) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
         }
     }
@@ -850,6 +1271,13 @@ private fun LearningPathCard(
 
 @Composable
 private fun GradeMasteryBadge(mastery: GradeMastery) {
+    val badgeAsset = when (mastery.masteryLevel) {
+        MasteryLevel.BEGINNING -> "grade-beginning.png"
+        MasteryLevel.DEVELOPING -> "grade-developing.png"
+        MasteryLevel.PROFICIENT -> "grade-proficient.png"
+        MasteryLevel.ADVANCED -> "grade-advanced.png"
+    }
+
     val ringColor = when (mastery.masteryLevel) {
         MasteryLevel.BEGINNING -> Color(0xFFE57373)
         MasteryLevel.DEVELOPING -> Color(0xFFFFB74D)
@@ -861,44 +1289,21 @@ private fun GradeMasteryBadge(mastery: GradeMastery) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(4.dp)
     ) {
-        // Circular progress ring with grade number
-        val progress = mastery.masteryScore.coerceIn(0f, 1f)
-        val bgColor = MaterialTheme.colorScheme.surfaceVariant
-
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.size(56.dp)
         ) {
-            Canvas(modifier = Modifier.size(56.dp)) {
-                val strokeWidth = 6.dp.toPx()
-                val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
-                val topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
-
-                // Background ring
-                drawArc(
-                    color = bgColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-                // Progress ring
-                drawArc(
-                    color = ringColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-            }
+            AssetImage(
+                filename = badgeAsset,
+                contentDescription = "${mastery.masteryLevel.label} badge",
+                modifier = Modifier.size(56.dp),
+                contentScale = ContentScale.Fit
+            )
             Text(
                 text = "G${mastery.grade}",
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
         }
 

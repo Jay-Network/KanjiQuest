@@ -7,7 +7,8 @@ CREATE TABLE radical (
     stroke_svg TEXT,
     frequency INTEGER NOT NULL DEFAULT 0,
     example_kanji TEXT NOT NULL DEFAULT '[]',
-    position TEXT
+    position TEXT,
+    priority INTEGER NOT NULL DEFAULT 2
 );
 
 CREATE TABLE kanji_radical (
@@ -23,10 +24,13 @@ getByLiteral:
 SELECT * FROM radical WHERE literal = ?;
 
 getAll:
-SELECT * FROM radical ORDER BY id ASC;
+SELECT * FROM radical ORDER BY priority ASC, frequency DESC;
 
 getByStrokeCount:
-SELECT * FROM radical WHERE stroke_count = ? ORDER BY id ASC;
+SELECT * FROM radical WHERE stroke_count = ? ORDER BY priority ASC, frequency DESC;
+
+getByPriority:
+SELECT * FROM radical WHERE priority = ? ORDER BY frequency DESC;
 
 countAll:
 SELECT COUNT(*) FROM radical;
@@ -35,11 +39,14 @@ getRandom:
 SELECT * FROM radical ORDER BY RANDOM() LIMIT ?;
 
 getUnseen:
-SELECT * FROM radical WHERE id NOT IN (SELECT radical_id FROM radical_srs_card) ORDER BY frequency DESC LIMIT ?;
+SELECT * FROM radical WHERE id NOT IN (SELECT radical_id FROM radical_srs_card) ORDER BY priority ASC, frequency DESC LIMIT ?;
+
+getUnseenByPriority:
+SELECT * FROM radical WHERE id NOT IN (SELECT radical_id FROM radical_srs_card) AND priority <= ? ORDER BY priority ASC, frequency DESC LIMIT ?;
 
 insert:
-INSERT OR REPLACE INTO radical(id, literal, meaning_en, meaning_jp, stroke_count, stroke_svg, frequency, example_kanji, position)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO radical(id, literal, meaning_en, meaning_jp, stroke_count, stroke_svg, frequency, example_kanji, position, priority)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertKanjiRadical:
 INSERT OR IGNORE INTO kanji_radical(kanji_id, radical_id) VALUES (?, ?);

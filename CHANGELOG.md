@@ -4,6 +4,42 @@ All notable changes to KanjiQuest are documented here.
 
 ---
 
+## [0.1.0-beta5] - 2026-02-21
+
+### Added
+- **Collection Gameplay System**: "Gotta Catch 'Em All" mechanic — kanji, kana, and radicals are discovered through gameplay with probability-based encounters and a pity system
+- **Rarity System**: 5 tiers (Common/Uncommon/Rare/Epic/Legendary) based on grade, frequency, and stroke count; color-coded borders on collected items
+- **Encounter Engine**: Per-answer encounter rolls (40%→2% by rarity), pity counters guarantee discoveries after N correct answers
+- **Item Level Engine**: Collected items earn XP per practice (+10 correct, +2 wrong); max level 10 with quadratic scaling
+- **Discovery Overlay**: Pokémon-catch-style animation when a new item is discovered during gameplay (all game modes)
+- **Collection Screen**: Full browser with tabs per type, rarity filters, stats, and grid with rarity borders + level badges
+- **JWorks Splash Screen**: Branded splash matching KanjiLens (black bg, logo shimmer, teal title, fade out)
+- **KanjiLens Deep Link Integration**: `kanjiquest://collect?kanji_id=XXX&source=kanjilens` adds kanji to collection from KanjiLens
+- **Starter Pack**: New players receive 5 hiragana + 5 katakana + 3 Grade 1 kanji on first launch
+- **Radical Detail Screen**: View radical info, related kanji, and practice buttons
+- **Field Journal**: Camera challenge scan history with photo entries
+- **Flashcard Deck Groups**: Organize flashcard decks into folders
+- **Kana Game Modes**: Hiragana/Katakana recognition and writing practice screens
+- **Radical Game Modes**: Radical recognition quiz and radical builder (compose kanji from radicals)
+
+### Changed
+- **Home Screen Panel Tabs**: 3-layer tab system — Layer 1: Hiragana/Katakana/部首/Kanji; Layer 2 (Kanji): School Grade/JLPT/Strokes/Frequency; Layer 3: level selectors (G1-G8+, N1-N5, etc.)
+- **Home Screen Selection Persistence**: Tab, sort mode, and grade/level selections now persist when navigating back from detail pages
+- **All Grades Visible**: School Grade shows G1-G8+ with grayed-out tabs for grades with no collected kanji
+- **Hidden Uncollected Kanji**: Uncollected items are blank placeholders (no character, not clickable) maintaining sort order (虫食い pattern)
+- **Home Grid**: Shows collection-aware items with rarity borders and level badges for kanji, kana, and radicals
+- **Collection Counter**: Shows "N/Total Kanji Collected" on home screen
+- **Game Engine**: Integrated encounter rolls and item XP on correct/wrong answers
+- **Question Generator**: Collection-aware — mixes collected items for review with uncollected for exploration encounters
+- **Navigation**: Added routes for Splash, Collection, Radical Detail, Field Journal, Kana Recognition/Writing, Radical Recognition/Builder
+- **Database**: New `collection` and `field_journal` tables with migration for existing SRS data → collection
+- **Data Pipeline**: Enhanced radical parser with image generation
+
+### Fixed
+- Smart cast errors across modules for `discoveredItem` in game result screens
+
+---
+
 ## [0.1.0-beta4] - 2026-02-13
 
 ### Added

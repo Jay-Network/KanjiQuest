@@ -1,5 +1,7 @@
 package com.jworks.kanjiquest.android.ui.navigation
 
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,17 +21,21 @@ import com.jworks.kanjiquest.android.ui.achievements.AchievementsScreen
 import com.jworks.kanjiquest.android.ui.auth.AuthViewModel
 import com.jworks.kanjiquest.android.ui.auth.LoginScreen
 import com.jworks.kanjiquest.android.ui.detail.KanjiDetailScreen
+import com.jworks.kanjiquest.android.ui.detail.RadicalDetailScreen
 import com.jworks.kanjiquest.android.ui.feedback.FeedbackDialog
 import com.jworks.kanjiquest.android.ui.feedback.FeedbackFAB
 import com.jworks.kanjiquest.android.ui.feedback.FeedbackViewModel
+import com.jworks.kanjiquest.android.ui.game.DiscoveryOverlay
 import com.jworks.kanjiquest.android.ui.game.RecognitionScreen
 import com.jworks.kanjiquest.android.ui.game.camera.CameraChallengeScreen
+import com.jworks.kanjiquest.android.ui.game.camera.FieldJournalScreen
 import com.jworks.kanjiquest.android.ui.game.kana.KanaRecognitionScreen
 import com.jworks.kanjiquest.android.ui.game.kana.KanaWritingScreen
 import com.jworks.kanjiquest.android.ui.game.radical.RadicalBuilderScreen
 import com.jworks.kanjiquest.android.ui.game.radical.RadicalRecognitionScreen
 import com.jworks.kanjiquest.android.ui.game.vocabulary.VocabularyScreen
 import com.jworks.kanjiquest.android.ui.game.writing.WritingScreen
+import com.jworks.kanjiquest.android.ui.collection.CollectionScreen
 import com.jworks.kanjiquest.android.ui.home.HomeScreen
 import com.jworks.kanjiquest.android.ui.home.HomeViewModel
 import com.jworks.kanjiquest.android.ui.progress.ProgressScreen
@@ -42,11 +48,15 @@ import com.jworks.kanjiquest.android.ui.shop.ShopScreen
 import com.jworks.kanjiquest.android.ui.subscription.SubscriptionScreen
 import com.jworks.kanjiquest.android.ui.worddetail.WordDetailScreen
 import androidx.compose.ui.platform.LocalContext
+import com.jworks.kanjiquest.core.domain.model.CollectedItem
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.KanaType
 
 @Composable
-fun KanjiQuestNavHost() {
+fun KanjiQuestNavHost(
+    deepLinkUri: Uri? = null,
+    onDeepLinkConsumed: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -55,10 +65,46 @@ fun KanjiQuestNavHost() {
     val feedbackViewModel: FeedbackViewModel = hiltViewModel()
     val feedbackUiState by feedbackViewModel.uiState.collectAsState()
 
-    // Show FAB on all screens except Login
-    val showFAB = currentRoute != NavRoute.Login.route
+    // Deep link collection state
+    var deepLinkCollectedItem by remember { mutableStateOf<CollectedItem?>(null) }
+    var deepLinkKanjiLiteral by remember { mutableStateOf<String?>(null) }
+    var showDeepLinkOverlay by remember { mutableStateOf(false) }
+
+    // Show FAB on all screens except Login and Splash
+    val showFAB = currentRoute != NavRoute.Login.route && currentRoute != NavRoute.Splash.route
 
     val context = LocalContext.current
+
+    // Handle deep link: kanjiquest://collect?kanji_id=XXX&source=kanjilens
+    val deepLinkViewModel: DeepLinkCollectionViewModel = hiltViewModel()
+    LaunchedEffect(deepLinkUri) {
+        if (deepLinkUri == null) return@LaunchedEffect
+        val host = deepLinkUri.host
+        when (host) {
+            "collect" -> {
+                val kanjiIdStr = deepLinkUri.getQueryParameter("kanji_id")
+                val source = deepLinkUri.getQueryParameter("source") ?: "kanjilens"
+                val kanjiId = kanjiIdStr?.toIntOrNull()
+                if (kanjiId != null) {
+                    val result = deepLinkViewModel.collectFromDeepLink(kanjiId, source)
+                    if (result != null) {
+                        deepLinkCollectedItem = result.first
+                        deepLinkKanjiLiteral = result.second
+                        showDeepLinkOverlay = true
+                    } else {
+                        Toast.makeText(context, "Already in collection!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                onDeepLinkConsumed()
+            }
+            "subscription" -> {
+                // Navigate to subscription screen
+                navController.navigate(NavRoute.Subscription.route)
+                onDeepLinkConsumed()
+            }
+            else -> onDeepLinkConsumed()
+        }
+    }
 
     // Helper to navigate after login: placement test if first time, otherwise home
     fun navigateAfterLogin() {
@@ -89,8 +135,18 @@ fun KanjiQuestNavHost() {
 
         NavHost(
             navController = navController,
-            startDestination = NavRoute.Login.route
+            startDestination = NavRoute.Splash.route
         ) {
+        composable(NavRoute.Splash.route) {
+            com.jworks.kanjiquest.android.ui.splash.SplashScreen(
+                onSplashComplete = {
+                    navController.navigate(NavRoute.Login.route) {
+                        popUpTo(NavRoute.Splash.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(NavRoute.Login.route) {
             LoginScreen(
                 onLoginSuccess = { navigateAfterLogin() },
@@ -104,6 +160,9 @@ fun KanjiQuestNavHost() {
             HomeScreen(
                 onKanjiClick = { kanjiId ->
                     navController.navigate(NavRoute.KanjiDetail.createRoute(kanjiId))
+                },
+                onRadicalClick = { radicalId ->
+                    navController.navigate(NavRoute.RadicalDetail.createRoute(radicalId))
                 },
                 onGameModeClick = { mode ->
                     when (mode) {
@@ -157,6 +216,9 @@ fun KanjiQuestNavHost() {
                 onFlashcardsClick = {
                     navController.navigate(NavRoute.Flashcards.route)
                 },
+                onCollectionClick = {
+                    navController.navigate(NavRoute.Collection.route)
+                },
                 viewModel = homeViewModel
             )
         }
@@ -209,7 +271,8 @@ fun KanjiQuestNavHost() {
 
         composable(NavRoute.Camera.route) {
             CameraChallengeScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onJournal = { navController.navigate(NavRoute.FieldJournal.route) }
             )
         }
 
@@ -242,7 +305,8 @@ fun KanjiQuestNavHost() {
             val kanjiId = backStackEntry.arguments?.getInt("kanjiId") ?: return@composable
             CameraChallengeScreen(
                 onBack = { navController.popBackStack() },
-                targetKanjiId = kanjiId
+                targetKanjiId = kanjiId,
+                onJournal = { navController.navigate(NavRoute.FieldJournal.route) }
             )
         }
 
@@ -261,14 +325,19 @@ fun KanjiQuestNavHost() {
         composable(NavRoute.Flashcards.route) {
             FlashcardScreen(
                 onBack = { navController.popBackStack() },
-                onStudy = { navController.navigate(NavRoute.FlashcardStudy.route) },
+                onStudy = { deckId ->
+                    navController.navigate(NavRoute.FlashcardStudy.createRoute(deckId))
+                },
                 onKanjiClick = { kanjiId ->
                     navController.navigate(NavRoute.KanjiDetail.createRoute(kanjiId))
                 }
             )
         }
 
-        composable(NavRoute.FlashcardStudy.route) {
+        composable(
+            route = NavRoute.FlashcardStudy.route,
+            arguments = listOf(navArgument("deckId") { type = NavType.LongType })
+        ) {
             FlashcardStudyScreen(
                 onBack = { navController.popBackStack() }
             )
@@ -308,6 +377,20 @@ fun KanjiQuestNavHost() {
             )
         }
 
+        composable(
+            route = NavRoute.RadicalDetail.route,
+            arguments = listOf(navArgument("radicalId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val radicalId = backStackEntry.arguments?.getInt("radicalId") ?: return@composable
+            RadicalDetailScreen(
+                radicalId = radicalId,
+                onBack = { navController.popBackStack() },
+                onKanjiClick = { kanjiId ->
+                    navController.navigate(NavRoute.KanjiDetail.createRoute(kanjiId))
+                }
+            )
+        }
+
         composable(NavRoute.RadicalRecognition.route) {
             RadicalRecognitionScreen(
                 onBack = { navController.popBackStack() }
@@ -317,6 +400,21 @@ fun KanjiQuestNavHost() {
         composable(NavRoute.RadicalBuilder.route) {
             RadicalBuilderScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoute.FieldJournal.route) {
+            FieldJournalScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoute.Collection.route) {
+            CollectionScreen(
+                onBack = { navController.popBackStack() },
+                onKanjiClick = { kanjiId ->
+                    navController.navigate(NavRoute.KanjiDetail.createRoute(kanjiId))
+                }
             )
         }
 
@@ -361,6 +459,20 @@ fun KanjiQuestNavHost() {
                 }
             )
         }
+        }
+
+        // Deep link discovery overlay (shown on top of any screen)
+        if (showDeepLinkOverlay && deepLinkCollectedItem != null) {
+            DiscoveryOverlay(
+                discoveredItem = deepLinkCollectedItem!!,
+                kanjiLiteral = deepLinkKanjiLiteral,
+                kanjiMeaning = null,
+                onDismiss = {
+                    showDeepLinkOverlay = false
+                    deepLinkCollectedItem = null
+                    deepLinkKanjiLiteral = null
+                }
+            )
         }
     }
 }

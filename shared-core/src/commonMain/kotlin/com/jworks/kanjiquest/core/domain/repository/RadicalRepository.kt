@@ -9,6 +9,7 @@ interface RadicalRepository {
     suspend fun countAll(): Long
     suspend fun getRandomRadicals(limit: Int): List<Radical>
     suspend fun getUnseenRadicals(limit: Int): List<Radical>
+    suspend fun getUnseenByPriority(maxPriority: Int, limit: Int): List<Radical>
     suspend fun getRadicalsForKanji(kanjiId: Int): List<Radical>
     suspend fun getKanjiIdsForRadical(radicalId: Int): List<Long>
     suspend fun getKanjiContainingAllRadicals(radicalIds: List<Int>): List<Long>
