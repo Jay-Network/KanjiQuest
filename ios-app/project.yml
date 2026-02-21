@@ -54,9 +54,9 @@ targets:
           SWIFT_COMPILATION_MODE: wholemodule
 
     dependencies:
-      - framework: Frameworks/SharedCore.xcframework
+      - framework: $(PROJECT_DIR)/Frameworks/SharedCore.xcframework
         embed: true
-      - framework: Frameworks/SharedJapanese.xcframework
+      - framework: $(PROJECT_DIR)/Frameworks/SharedJapanese.xcframework
         embed: true
 
     preBuildScripts:
