@@ -1,61 +1,145 @@
 import CoreGraphics
 import UIKit
 
+// MARK: - BrushSize
+
+/// Three brush sizes matching traditional calligraphy brush categories.
+enum BrushSize: CaseIterable, Identifiable {
+    case small   // 細筆 (hosofude)
+    case medium  // 中筆 (chufude)
+    case large   // 太筆 (futofude)
+
+    var id: Self { self }
+
+    var minWidth: CGFloat {
+        switch self {
+        case .small:  return 0.8
+        case .medium: return 1.5
+        case .large:  return 3.0
+        }
+    }
+
+    var maxWidth: CGFloat {
+        switch self {
+        case .small:  return 14.0
+        case .medium: return 32.0
+        case .large:  return 55.0
+        }
+    }
+
+    var bristleCount: Int {
+        switch self {
+        case .small:  return 8
+        case .medium: return 14
+        case .large:  return 20
+        }
+    }
+
+    /// Visual indicator size for the picker UI
+    var dotSize: CGFloat {
+        switch self {
+        case .small:  return 8
+        case .medium: return 14
+        case .large:  return 22
+        }
+    }
+}
+
+// MARK: - BrushEngine Protocol
+
 /// Protocol for brush rendering engines.
 /// Different implementations can simulate different brush types (筆, 筆ペン, 万年筆).
 protocol BrushEngine {
     func render(points: [CalligraphyPointData], in context: CGContext, bounds: CGRect)
 }
 
-/// Fude (筆) brush engine with full Apple Pencil tilt/azimuth support.
+// MARK: - FudeBrushEngine
+
+/// Fude (筆) brush engine with bristle-strip rendering and ink physics.
 ///
 /// Simulates a traditional calligraphy brush by:
-/// - **Tilt (altitude)** → elliptical stamp shape (perpendicular = round, flat = elongated)
+/// - **Bristle strips** → visible texture instead of smooth ellipses
+/// - **Tilt (altitude)** → stamp shape (perpendicular = round, flat = elongated)
 /// - **Azimuth** → stamp rotation following pencil direction
 /// - **Pressure (force)** → stamp width + ink saturation
-/// - **Velocity** → stamp spacing for 飛白 (kasure/dry brush) at speed
-/// - **Edge softness** → radial gradient stamps instead of solid fill
+/// - **Velocity** → bristle dropout for structured 飛白 (kasure/dry brush)
+/// - **Ink depletion** → natural fading over long strokes
+/// - **Edge irregularity** → outer bristles fade and perturb for organic edges
 final class FudeBrushEngine: BrushEngine {
+
+    // MARK: - Configurable Properties
+
+    /// Current brush size (affects width range and bristle count)
+    var brushSize: BrushSize = .medium
+
+    /// Ink concentration: 1.0 = 濃墨 kouboku (dense black), 0.2 = 淡墨 tanboku (diluted warm gray)
+    var inkConcentration: CGFloat = 1.0
+
+    /// 8x8 absorption map from the paper surface (0.92–1.08 multipliers)
+    var absorptionMap: [[CGFloat]]?
+
+    /// Canvas bounds for absorption map lookup
+    var canvasBounds: CGRect = .zero
 
     // MARK: - Brush Parameters
 
-    /// Minimum stroke width at zero pressure
-    private let minWidth: CGFloat = 1.5
-
-    /// Maximum stroke width at full pressure
-    private let maxWidth: CGFloat = 32.0
-
-    /// Power curve exponent for pressure-to-width mapping.
-    /// > 1.0 = more range in light pressure zone (better for calligraphy)
+    /// Power curve exponent for pressure-to-width mapping (>1 = more range in light pressure)
     private let pressureCurve: CGFloat = 1.8
 
-    /// Tilt-to-height ratio range: altitude maps to [flatRatio, 1.0]
-    /// At flatRatio the stamp is a flat ellipse (brush laid sideways)
+    /// Minimum height-to-width ratio at flat tilt
     private let flatRatio: CGFloat = 0.3
 
-    /// Soft edge multiplier — how far the gradient fades beyond the core
-    private let inkBleedRadius: CGFloat = 1.4
-
     /// Base spacing factor (fraction of width between stamps)
-    /// Slower strokes use this directly; faster strokes increase it
     private let baseSpacingFactor: CGFloat = 0.12
 
-    /// Maximum spacing factor for fast strokes (飛白 dry brush effect)
+    /// Maximum spacing factor for fast strokes (飛白)
     private let maxSpacingFactor: CGFloat = 0.30
 
-    /// Velocity normalization — pixels/second considered "fast"
+    /// Pixels/second considered "fast"
     private let fastVelocityThreshold: CGFloat = 2000.0
 
-    /// Ink color (sumi)
-    private let inkColor = UIColor.black
+    // MARK: - Ink Depletion
+
+    /// Distance in points over which ink fully depletes
+    private let inkDepletionDistance: CGFloat = 500.0
+
+    /// Minimum ink level (never fully dry)
+    private let minInkLevel: CGFloat = 0.4
+
+    // MARK: - Per-Stroke State
+
+    private var inkLevel: CGFloat = 1.0
+    private var strokeSeed: UInt64 = 0
+
+    // MARK: - Computed Properties
+
+    /// Ink color shifts from pure black to warm brown-gray as concentration decreases.
+    /// 濃墨 = black, 淡墨 = warm diluted gray-brown
+    private var inkUIColor: UIColor {
+        let dilution = 1.0 - inkConcentration
+        let r = 0.22 * dilution
+        let g = 0.18 * dilution
+        let b = 0.14 * dilution
+        return UIColor(red: r, green: g, blue: b, alpha: 1.0)
+    }
+
+    /// Opacity ceiling — diluted ink is more transparent even at full pressure
+    private var opacityCeiling: CGFloat {
+        0.5 + 0.5 * inkConcentration
+    }
 
     // MARK: - BrushEngine
 
     func render(points: [CalligraphyPointData], in context: CGContext, bounds: CGRect) {
         guard points.count >= 2 else { return }
 
+        strokeSeed = computeStrokeSeed(from: points[0])
+        inkLevel = 1.0
+
         context.saveGState()
         context.setBlendMode(.normal)
+
+        var stampIndex = 0
 
         for i in 1..<points.count {
             let prev = points[i - 1]
@@ -79,6 +163,9 @@ final class FudeBrushEngine: BrushEngine {
             let spacing = max(width * spacingFactor, 0.5)
             let steps = max(Int(distance / spacing), 1)
 
+            // Deplete ink over distance
+            inkLevel = max(minInkLevel, inkLevel - distance / inkDepletionDistance)
+
             for step in 0...steps {
                 let t = CGFloat(step) / CGFloat(steps)
                 let x = prev.x + dx * t
@@ -90,22 +177,29 @@ final class FudeBrushEngine: BrushEngine {
                 let azimuth = lerpAngle(prev.azimuth, curr.azimuth, t)
 
                 let w = widthForPressure(pressure)
-                let alpha = alphaForPressure(pressure, altitude: altitude)
+                let baseAlpha = alphaForPressure(pressure, altitude: altitude)
+                let alpha = baseAlpha * inkLevel * opacityCeiling
 
                 // Tilt → ellipse height ratio
                 let altitudeNorm = min(1.0, max(0.0, altitude / (.pi / 2)))
                 let heightRatio = flatRatio + (1.0 - flatRatio) * altitudeNorm
                 let h = w * heightRatio
 
-                stampGradientEllipse(
+                // Absorption map lookup
+                let absorption = lookupAbsorption(at: CGPoint(x: x, y: y))
+
+                stampBristles(
                     in: context,
                     center: CGPoint(x: x, y: y),
                     width: w,
                     height: h,
                     angle: azimuth,
-                    alpha: alpha,
-                    velocityNorm: velocityNorm
+                    alpha: alpha * absorption,
+                    velocityNorm: velocityNorm,
+                    stampIndex: stampIndex
                 )
+
+                stampIndex += 1
             }
         }
 
@@ -118,7 +212,7 @@ final class FudeBrushEngine: BrushEngine {
     private func widthForPressure(_ pressure: CGFloat) -> CGFloat {
         let normalizedPressure = max(0, min(1, pressure))
         let curved = pow(normalizedPressure, 1.0 / pressureCurve)
-        return minWidth + (maxWidth - minWidth) * curved
+        return brushSize.minWidth + (brushSize.maxWidth - brushSize.minWidth) * curved
     }
 
     /// Pressure + tilt → ink alpha.
@@ -141,73 +235,118 @@ final class FudeBrushEngine: BrushEngine {
         return basePressureAlpha * (0.7 + 0.3 * altitudeNorm)
     }
 
-    // MARK: - Gradient Stamp Rendering
+    // MARK: - Bristle Strip Rendering
 
-    /// Renders an elliptical stamp with a radial gradient for soft edges.
-    /// Core is solid ink; edge fades to transparent over the outer portion.
-    private func stampGradientEllipse(
+    /// Renders a stamp as parallel bristle strips instead of a single smooth ellipse.
+    ///
+    /// Each bristle has:
+    /// - Deterministic alpha variation (from hash of bristleIndex + strokeSeed)
+    /// - Edge fading (outer ~25% of bristles have reduced alpha for stray fiber effect)
+    /// - Velocity-based dropout (fast strokes lose outer bristles → structured 飛白)
+    /// - Height perturbation (±15% for irregular edges)
+    private func stampBristles(
         in context: CGContext,
         center: CGPoint,
         width: CGFloat,
         height: CGFloat,
         angle: CGFloat,
         alpha: CGFloat,
-        velocityNorm: CGFloat
+        velocityNorm: CGFloat,
+        stampIndex: Int
     ) {
-        context.saveGState()
+        let bristleCount = brushSize.bristleCount
+        guard bristleCount > 0, width > 0.5 else { return }
 
-        // Transform: translate to center, rotate by azimuth
+        context.saveGState()
         context.translateBy(x: center.x, y: center.y)
         context.rotate(by: angle)
 
-        // Scale context to make the gradient circular in transformed space,
-        // then we draw a circle that maps to the desired ellipse
-        let radius = max(width, height) / 2 * inkBleedRadius
-        let scaleX = width / max(width, height)
-        let scaleY = height / max(width, height)
-        context.scaleBy(x: scaleX, y: scaleY)
+        let stripWidth = width / CGFloat(bristleCount)
+        let halfCount = CGFloat(bristleCount - 1) / 2.0
+        let gap: CGFloat = max(0.2, stripWidth * 0.08) // tiny gap between bristles
+        let effectiveStripWidth = max(0.3, stripWidth - gap)
+        let inkCG = inkUIColor
 
-        // Create radial gradient: solid core → transparent edge
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let coreAlpha = alpha
-        // Edge becomes more transparent at high velocity (dry brush texture)
-        let edgeAlpha = coreAlpha * (0.15 - 0.1 * velocityNorm)
+        for i in 0..<bristleCount {
+            let hash = bristleHash(bristleIndex: i, seed: strokeSeed, stampIndex: stampIndex)
 
-        let colors = [
-            inkColor.withAlphaComponent(coreAlpha).cgColor,
-            inkColor.withAlphaComponent(coreAlpha * 0.85).cgColor,
-            inkColor.withAlphaComponent(edgeAlpha).cgColor,
-        ] as CFArray
+            // Alpha modulation from hash (0.65–1.0 range)
+            let hashNorm = CGFloat(hash & 0xFF) / 255.0
+            let alphaModulation = 0.65 + hashNorm * 0.35
 
-        let locations: [CGFloat] = [0.0, 0.65, 1.0]
+            // Distance from center (0 = center, 1 = edge)
+            let distFromCenter = abs(CGFloat(i) - halfCount) / max(halfCount, 1.0)
 
-        guard let gradient = CGGradient(
-            colorsSpace: colorSpace,
-            colors: colors,
-            locations: locations
-        ) else {
-            // Fallback to solid fill
-            context.setFillColor(inkColor.withAlphaComponent(alpha).cgColor)
-            context.fillEllipse(in: CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2))
-            context.restoreGState()
-            return
+            // Edge bristles: stray fiber effect (outer ~25% faded)
+            let edgeFactor: CGFloat
+            if distFromCenter > 0.75 {
+                let edgeDepth = (distFromCenter - 0.75) / 0.25  // 0→1 within edge zone
+                edgeFactor = 1.0 - edgeDepth * 0.6  // fade to 0.4 at extreme edge
+            } else {
+                edgeFactor = 1.0
+            }
+
+            // Velocity-based bristle dropout: fast strokes → outer bristles disappear
+            // Center bristles survive even at high velocity; edge bristles drop out first
+            let survivalThreshold = 0.3 + 0.7 * (1.0 - distFromCenter)
+            if velocityNorm > survivalThreshold {
+                continue  // bristle drops out → visible 飛白 gap with structure
+            }
+
+            // Height perturbation ±15% from hash
+            let heightHash = (hash >> 8) & 0xFF
+            let heightPerturb = 1.0 + (CGFloat(heightHash) / 255.0 - 0.5) * 0.3
+            let stripHeight = height * heightPerturb
+
+            let bristleAlpha = alpha * alphaModulation * edgeFactor
+
+            // Position of this bristle strip along the width axis
+            let x = -width / 2.0 + CGFloat(i) * stripWidth + (stripWidth - effectiveStripWidth) / 2.0
+
+            // Draw bristle as a filled ellipse (capsule shape at narrow widths)
+            context.setFillColor(inkCG.withAlphaComponent(bristleAlpha).cgColor)
+            context.fillEllipse(in: CGRect(
+                x: x,
+                y: -stripHeight / 2.0,
+                width: effectiveStripWidth,
+                height: stripHeight
+            ))
         }
 
-        // Clip to ellipse bounds to prevent gradient bleed
-        let clipRect = CGRect(x: -radius, y: -radius, width: radius * 2, height: radius * 2)
-        context.addEllipse(in: clipRect)
-        context.clip()
-
-        context.drawRadialGradient(
-            gradient,
-            startCenter: .zero,
-            startRadius: 0,
-            endCenter: .zero,
-            endRadius: radius,
-            options: [.drawsAfterEndLocation]
-        )
-
         context.restoreGState()
+    }
+
+    // MARK: - Absorption Map
+
+    /// Look up paper absorption multiplier for a given canvas position.
+    private func lookupAbsorption(at point: CGPoint) -> CGFloat {
+        guard let map = absorptionMap,
+              canvasBounds.width > 0, canvasBounds.height > 0 else { return 1.0 }
+        let col = max(0, min(7, Int(point.x / canvasBounds.width * 8.0)))
+        let row = max(0, min(7, Int(point.y / canvasBounds.height * 8.0)))
+        return map[row][col]
+    }
+
+    // MARK: - Hashing
+
+    /// Deterministic hash for bristle properties (splitmix64 variant).
+    /// Same inputs → same result on every redraw.
+    private func bristleHash(bristleIndex: Int, seed: UInt64, stampIndex: Int) -> UInt64 {
+        var h = seed
+        h ^= UInt64(bitPattern: Int64(bristleIndex)) &* 0x517cc1b727220a95
+        h ^= UInt64(bitPattern: Int64(stampIndex)) &* 0x6c62272e07bb0142
+        h = (h ^ (h >> 30)) &* 0xbf58476d1ce4e5b9
+        h = (h ^ (h >> 27)) &* 0x94d049bb133111eb
+        h = h ^ (h >> 31)
+        return h
+    }
+
+    /// Compute a stroke seed from the first point's position.
+    /// Ensures consistent bristle pattern on redraw.
+    private func computeStrokeSeed(from point: CalligraphyPointData) -> UInt64 {
+        let xBits = UInt64(bitPattern: Int64(point.x * 1000))
+        let yBits = UInt64(bitPattern: Int64(point.y * 1000))
+        return xBits &* 0x9E3779B97F4A7C15 ^ yBits &* 0x517CC1B727220A95
     }
 
     // MARK: - Interpolation Helpers

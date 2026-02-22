@@ -7,12 +7,18 @@ struct CalligraphyCanvasView: UIViewRepresentable {
     @Binding var activeStroke: [CalligraphyPointData]
     let referenceStrokePaths: [String]  // SVG path strings for ghost overlay
     var canvasVersion: Int = 0
+    var brushSize: BrushSize = .medium
+    var inkConcentration: CGFloat = 1.0
+    var isSoundMuted: Bool = false
     var onStrokeComplete: (([CalligraphyPointData]) -> Void)?
 
     func makeUIView(context: Context) -> CalligraphyCanvasUIView {
         let view = CalligraphyCanvasUIView()
         view.delegate = context.coordinator
         view.referenceStrokePaths = referenceStrokePaths
+        view.brushSize = brushSize
+        view.inkConcentration = inkConcentration
+        view.isSoundMuted = isSoundMuted
         context.coordinator.lastCanvasVersion = canvasVersion
         return view
     }
@@ -23,6 +29,9 @@ struct CalligraphyCanvasView: UIViewRepresentable {
             uiView.clearDrawing()
         }
         uiView.referenceStrokePaths = referenceStrokePaths
+        uiView.brushSize = brushSize
+        uiView.inkConcentration = inkConcentration
+        uiView.isSoundMuted = isSoundMuted
     }
 
     func makeCoordinator() -> Coordinator {
