@@ -159,7 +159,7 @@ private struct QuestionContent: View {
                 .font(KanjiQuestTheme.titleMedium)
                 .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
 
-            // Large kanji display
+            // Large kanji display — responsive sizing for iPad/iPhone
             ZStack {
                 RoundedRectangle(cornerRadius: KanjiQuestTheme.radiusL)
                     .fill(KanjiQuestTheme.surface)
@@ -167,9 +167,11 @@ private struct QuestionContent: View {
 
                 Text(question.kanjiLiteral)
                     .font(.system(size: 96))
+                    .minimumScaleFactor(0.6)
                     .foregroundColor(KanjiQuestTheme.onSurface)
             }
-            .frame(width: 200, height: 200)
+            .frame(maxWidth: 300)
+            .aspectRatio(1.0, contentMode: .fit)
 
             // XP feedback
             if let correct = isCorrect {

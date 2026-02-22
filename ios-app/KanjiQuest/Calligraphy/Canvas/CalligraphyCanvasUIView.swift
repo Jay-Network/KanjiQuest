@@ -402,6 +402,15 @@ final class CalligraphyCanvasUIView: UIView {
         delegate?.canvasDidClear()
     }
 
+    /// Programmatic clear for when a new kanji loads or the canvas is reset externally.
+    /// Does not notify delegate (avoids recursive binding updates).
+    func clearDrawing() {
+        completedStrokes = []
+        activePoints = []
+        completedImage = nil
+        setNeedsDisplay()
+    }
+
     func undo() {
         guard !completedStrokes.isEmpty else { return }
         completedStrokes.removeLast()

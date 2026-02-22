@@ -3,6 +3,7 @@ import SharedCore
 
 struct CalligraphySessionView: View {
     @EnvironmentObject var container: AppContainer
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = CalligraphySessionViewModel()
 
     let kanjiLiteral: String
@@ -10,6 +11,7 @@ struct CalligraphySessionView: View {
 
     @State private var strokes: [[CalligraphyPointData]] = []
     @State private var activeStroke: [CalligraphyPointData] = []
+    @State private var canvasVersion = 0
 
     /// Warm paper color matching the canvas
     private let paperBackground = Color(red: 1.0, green: 0.973, blue: 0.941)
@@ -50,12 +52,12 @@ struct CalligraphySessionView: View {
 
     private var headerSection: some View {
         HStack {
-            Text(kanjiLiteral)
+            Text(viewModel.currentKanji)
                 .font(KanjiQuestTheme.kanjiMedium)
                 .foregroundColor(KanjiQuestTheme.primary)
 
             VStack(alignment: .leading) {
-                Text("Strokes: \(strokePaths.count)")
+                Text("Strokes: \(viewModel.currentStrokePaths.count)")
                     .font(KanjiQuestTheme.labelLarge)
                 Text("Drawn: \(strokes.count)")
                     .font(KanjiQuestTheme.labelSmall)
@@ -76,10 +78,11 @@ struct CalligraphySessionView: View {
         CalligraphyCanvasView(
             strokes: $strokes,
             activeStroke: $activeStroke,
-            referenceStrokePaths: strokePaths,
+            referenceStrokePaths: viewModel.currentStrokePaths,
+            canvasVersion: canvasVersion,
             onStrokeComplete: { _ in
                 // Auto-submit when stroke count matches
-                if strokes.count == strokePaths.count {
+                if strokes.count == viewModel.currentStrokePaths.count {
                     Task {
                         await viewModel.submitDrawing(strokes: strokes)
                     }
@@ -92,6 +95,13 @@ struct CalligraphySessionView: View {
             RoundedRectangle(cornerRadius: KanjiQuestTheme.radiusM)
                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
         )
+        .background(
+            GeometryReader { geo in
+                Color.clear.onAppear {
+                    viewModel.updateCanvasSize(geo.size)
+                }
+            }
+        )
         .padding(.horizontal)
     }
 
@@ -100,6 +110,7 @@ struct CalligraphySessionView: View {
             Button("Clear") {
                 strokes = []
                 activeStroke = []
+                canvasVersion += 1
                 viewModel.reset()
             }
             .buttonStyle(.bordered)
@@ -198,6 +209,7 @@ struct CalligraphySessionView: View {
             Button("Next Kanji") {
                 strokes = []
                 activeStroke = []
+                canvasVersion += 1
                 Task {
                     await viewModel.nextKanji()
                 }
@@ -318,7 +330,7 @@ struct CalligraphySessionView: View {
                 .cornerRadius(KanjiQuestTheme.radiusL)
 
                 Button("Done") {
-                    // Navigate back to home (handled by NavigationStack pop)
+                    dismiss()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(KanjiQuestTheme.primary)
