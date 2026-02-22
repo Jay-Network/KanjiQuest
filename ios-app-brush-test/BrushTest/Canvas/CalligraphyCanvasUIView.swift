@@ -11,6 +11,15 @@ struct CalligraphyPointData {
     let timestamp: TimeInterval // seconds since stroke start
 }
 
+/// Tracks a region where the brush dwells, producing ink bleeding.
+struct DwellRegion {
+    var center: CGPoint
+    var dwellDuration: TimeInterval
+    var currentRadius: CGFloat
+    var maxRadius: CGFloat
+    var alpha: CGFloat
+}
+
 protocol CalligraphyCanvasDelegate: AnyObject {
     func canvasDidUpdateActiveStroke(_ points: [CalligraphyPointData])
     func canvasDidCompleteStroke(_ points: [CalligraphyPointData])
@@ -67,6 +76,34 @@ final class CalligraphyCanvasUIView: UIView {
     // 8x8 absorption map for per-region ink opacity variation
     private var absorptionMap: [[CGFloat]] = []
 
+    // MARK: - Brush Tip Overlay
+
+    /// Last active touch point for brush tip overlay rendering
+    private var lastActivePoint: CalligraphyPointData?
+
+    /// Hover point (iPadOS 16+ only) for ghost brush preview
+    private var hoverPoint: CalligraphyPointData?
+
+    // MARK: - Ink Bleeding (Dwell)
+
+    /// Regions where the brush rested, accumulating ink bleed
+    private var activeDwellRegions: [DwellRegion] = []
+
+    /// Maximum tracked dwell regions per stroke
+    private let maxDwellRegions: Int = 20
+
+    /// Velocity threshold below which dwell tracking begins (px/sec)
+    private let dwellVelocityThreshold: CGFloat = 30.0
+
+    /// Radius within which consecutive low-velocity points merge into one region
+    private let dwellMergeRadius: CGFloat = 10.0
+
+    /// Display link for animating ink bleed expansion
+    private var displayLink: CADisplayLink?
+
+    /// Timestamp when dwell animation last ticked
+    private var dwellAnimationStart: TimeInterval = 0
+
     /// Warm paper background color (half-white 半紙 tone)
     private let paperColor = UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1.0) // #FFF8F0
 
@@ -98,6 +135,12 @@ final class CalligraphyCanvasUIView: UIView {
         backgroundColor = paperColor
         isMultipleTouchEnabled = false
         contentMode = .redraw
+
+        // Hover preview (iPadOS 16+): show ghost brush tip before contact
+        if #available(iOS 16.0, *) {
+            let hoverGesture = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
+            addGestureRecognizer(hoverGesture)
+        }
     }
 
     override func layoutSubviews() {
@@ -122,12 +165,19 @@ final class CalligraphyCanvasUIView: UIView {
         guard let touch = touches.first else { return }
         strokeStartTime = touch.timestamp
         activePoints = []
+        activeDwellRegions = []
+        hoverPoint = nil  // Clear hover when touching
 
         // Process coalesced touches for higher resolution
         let coalesced = event?.coalescedTouches(for: touch) ?? [touch]
         for t in coalesced {
             activePoints.append(pointData(from: t))
         }
+
+        lastActivePoint = activePoints.last
+
+        // Start display link for dwell bleed animation
+        startDisplayLink()
 
         // Haptic feedback on brush contact
         hapticGenerator.prepare()
@@ -147,6 +197,16 @@ final class CalligraphyCanvasUIView: UIView {
         let coalesced = event?.coalescedTouches(for: touch) ?? [touch]
         for t in coalesced {
             activePoints.append(pointData(from: t))
+        }
+
+        lastActivePoint = activePoints.last
+
+        // Track dwell regions for ink bleeding
+        if activePoints.count >= 2 {
+            let velocity = computePointVelocity(points: activePoints, index: activePoints.count - 1)
+            if velocity < dwellVelocityThreshold, let lastPt = activePoints.last {
+                trackDwellRegion(at: CGPoint(x: lastPt.x, y: lastPt.y), pressure: lastPt.force)
+            }
         }
 
         // Haptic on significant pressure increase
@@ -181,16 +241,24 @@ final class CalligraphyCanvasUIView: UIView {
         // Sound: brush lift
         soundEngine.endContact()
 
-        // Commit stroke to completed buffer
+        // Stop dwell animation
+        stopDisplayLink()
+
+        // Commit stroke + dwell bleed to completed buffer
         commitActiveStroke()
         delegate?.canvasDidCompleteStroke(activePoints)
         activePoints = []
+        lastActivePoint = nil
+        activeDwellRegions = []
         setNeedsDisplay()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         soundEngine.endContact()
+        stopDisplayLink()
         activePoints = []
+        lastActivePoint = nil
+        activeDwellRegions = []
         setNeedsDisplay()
     }
 
@@ -207,7 +275,7 @@ final class CalligraphyCanvasUIView: UIView {
         if let texture = paperTextureImage {
             context.saveGState()
             context.setBlendMode(.multiply)
-            context.setAlpha(0.12) // Upgraded from 0.08
+            context.setAlpha(0.12)
             texture.draw(in: bounds)
             context.restoreGState()
         }
@@ -221,8 +289,19 @@ final class CalligraphyCanvasUIView: UIView {
         // 5. Draw active stroke
         if !activePoints.isEmpty {
             brushEngine.render(points: activePoints, in: context, bounds: bounds)
-            // Render ink pooling at start of active stroke
             renderInkPooling(points: activePoints, in: context)
+        }
+
+        // 6. Render ink bleed from dwell regions
+        if !activeDwellRegions.isEmpty {
+            renderDwellBleeding(in: context)
+        }
+
+        // 7. Draw brush tip overlay (during touch or hover)
+        if let point = lastActivePoint {
+            drawBrushTipOverlay(at: point, in: context)
+        } else if let point = hoverPoint {
+            drawBrushTipOverlay(at: point, in: context)
         }
     }
 
@@ -506,11 +585,16 @@ final class CalligraphyCanvasUIView: UIView {
     private func commitActiveStroke() {
         guard !activePoints.isEmpty else { return }
 
+        let dwellSnapshot = activeDwellRegions
         let renderer = UIGraphicsImageRenderer(size: bounds.size)
         completedImage = renderer.image { ctx in
             completedImage?.draw(in: bounds)
             brushEngine.render(points: activePoints, in: ctx.cgContext, bounds: bounds)
             renderInkPooling(points: activePoints, in: ctx.cgContext)
+            // Bake dwell bleed into completed image
+            for region in dwellSnapshot {
+                renderSingleDwellBleed(region, in: ctx.cgContext)
+            }
         }
 
         completedStrokes.append(CompletedStrokeLayer(points: activePoints))
@@ -553,6 +637,172 @@ final class CalligraphyCanvasUIView: UIView {
                 renderInkPooling(points: stroke.points, in: ctx.cgContext)
             }
         }
+    }
+
+    // MARK: - Hover Gesture (iPadOS 16+)
+
+    @objc private func handleHover(_ gesture: UIHoverGestureRecognizer) {
+        switch gesture.state {
+        case .began, .changed:
+            let location = gesture.location(in: self)
+            // Approximate hover data (no pressure/altitude during hover)
+            hoverPoint = CalligraphyPointData(
+                x: location.x,
+                y: location.y,
+                force: 0.1,             // Light default for preview
+                altitude: .pi / 4,     // 45° default tilt
+                azimuth: 0,
+                timestamp: 0
+            )
+            setNeedsDisplay()
+        case .ended, .cancelled:
+            hoverPoint = nil
+            setNeedsDisplay()
+        default:
+            break
+        }
+    }
+
+    // MARK: - Brush Tip Overlay
+
+    /// Draws a semi-transparent brush footprint preview at the given point.
+    /// Shows elliptical shape (pressure/tilt), bristle indicator lines, and handle direction.
+    private func drawBrushTipOverlay(at point: CalligraphyPointData, in context: CGContext) {
+        let w = brushEngine.widthForPressure(point.force)
+        let altitudeNorm = min(1.0, max(0.0, point.altitude / (.pi / 2)))
+        let heightRatio = 0.15 + 0.85 * altitudeNorm  // Match flatRatio=0.15
+        let h = w * heightRatio
+
+        context.saveGState()
+        context.translateBy(x: point.x, y: point.y)
+        context.rotate(by: point.azimuth)
+
+        // Elliptical footprint (alpha ~0.12)
+        context.setFillColor(UIColor.black.withAlphaComponent(0.12).cgColor)
+        context.fillEllipse(in: CGRect(x: -w / 2, y: -h / 2, width: w, height: h))
+
+        // Bristle indicator lines within the ellipse
+        let bristleCount = brushSize.bristleCount
+        let halfCount = CGFloat(bristleCount - 1) / 2.0
+        context.setStrokeColor(UIColor.black.withAlphaComponent(0.25).cgColor)
+        context.setLineWidth(0.3)
+
+        for i in 0..<bristleCount {
+            let normalizedPos = (CGFloat(i) - halfCount) / max(halfCount, 1.0)
+            let bx = normalizedPos * (w / 2.0) * 0.85
+            context.beginPath()
+            context.move(to: CGPoint(x: bx, y: -h * 0.35))
+            context.addLine(to: CGPoint(x: bx, y: h * 0.35))
+            context.strokePath()
+        }
+
+        // Handle direction line (shows pencil azimuth)
+        context.setStrokeColor(UIColor.systemGray3.withAlphaComponent(0.4).cgColor)
+        context.setLineWidth(0.5)
+        context.beginPath()
+        context.move(to: .zero)
+        context.addLine(to: CGPoint(x: 0, y: -(h / 2 + 8)))
+        context.strokePath()
+
+        context.restoreGState()
+    }
+
+    // MARK: - Dwell Tracking & Ink Bleeding
+
+    /// Track or merge a dwell region when velocity is below threshold.
+    private func trackDwellRegion(at point: CGPoint, pressure: CGFloat) {
+        // Try to merge with existing nearby region
+        for i in 0..<activeDwellRegions.count {
+            let dx = activeDwellRegions[i].center.x - point.x
+            let dy = activeDwellRegions[i].center.y - point.y
+            if sqrt(dx * dx + dy * dy) < dwellMergeRadius {
+                activeDwellRegions[i].dwellDuration += 1.0 / 60.0  // ~one frame
+                activeDwellRegions[i].maxRadius = max(
+                    activeDwellRegions[i].maxRadius,
+                    brushEngine.widthForPressure(pressure) * 1.5
+                )
+                activeDwellRegions[i].alpha = min(1.0, activeDwellRegions[i].alpha + 0.02)
+                return
+            }
+        }
+
+        // Create new region if under cap
+        guard activeDwellRegions.count < maxDwellRegions else { return }
+        activeDwellRegions.append(DwellRegion(
+            center: point,
+            dwellDuration: 0,
+            currentRadius: brushEngine.widthForPressure(pressure) * 0.3,
+            maxRadius: brushEngine.widthForPressure(pressure) * 1.5,
+            alpha: 0.05
+        ))
+    }
+
+    /// CADisplayLink tick: grow each dwell region's radius toward its max.
+    @objc private func displayLinkTick(_ link: CADisplayLink) {
+        var needsRedraw = false
+        for i in 0..<activeDwellRegions.count {
+            if activeDwellRegions[i].currentRadius < activeDwellRegions[i].maxRadius {
+                activeDwellRegions[i].currentRadius = min(
+                    activeDwellRegions[i].maxRadius,
+                    activeDwellRegions[i].currentRadius + 0.5
+                )
+                // Ramp alpha with dwell duration (0→full over ~1 second)
+                activeDwellRegions[i].dwellDuration += link.duration
+                let ramp = min(1.0, activeDwellRegions[i].dwellDuration)
+                activeDwellRegions[i].alpha = min(0.5, activeDwellRegions[i].alpha) * CGFloat(ramp)
+                needsRedraw = true
+            }
+        }
+        if needsRedraw {
+            setNeedsDisplay()
+        }
+    }
+
+    private func startDisplayLink() {
+        guard displayLink == nil else { return }
+        displayLink = CADisplayLink(target: self, selector: #selector(displayLinkTick(_:)))
+        displayLink?.add(to: .main, forMode: .common)
+    }
+
+    private func stopDisplayLink() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+
+    /// Render all active dwell regions as expanding radial gradients.
+    private func renderDwellBleeding(in context: CGContext) {
+        for region in activeDwellRegions {
+            renderSingleDwellBleed(region, in: context)
+        }
+    }
+
+    /// Render a single dwell bleed region: dark core → transparent edge.
+    private func renderSingleDwellBleed(_ region: DwellRegion, in context: CGContext) {
+        guard region.currentRadius > 1.0, region.alpha > 0.01 else { return }
+
+        context.saveGState()
+        context.translateBy(x: region.center.x, y: region.center.y)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let colors = [
+            UIColor.black.withAlphaComponent(region.alpha).cgColor,
+            UIColor.black.withAlphaComponent(region.alpha * 0.3).cgColor,
+            UIColor.black.withAlphaComponent(0).cgColor,
+        ] as CFArray
+        let locations: [CGFloat] = [0.0, 0.4, 1.0]
+
+        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: locations) {
+            context.drawRadialGradient(
+                gradient,
+                startCenter: .zero,
+                startRadius: 0,
+                endCenter: .zero,
+                endRadius: region.currentRadius,
+                options: [.drawsAfterEndLocation]
+            )
+        }
+
+        context.restoreGState()
     }
 
     // MARK: - Helpers

@@ -86,8 +86,8 @@ final class FudeBrushEngine: BrushEngine {
     /// Power curve exponent for pressure-to-width mapping (>1 = more range in light pressure)
     private let pressureCurve: CGFloat = 1.8
 
-    /// Minimum height-to-width ratio at flat tilt
-    private let flatRatio: CGFloat = 0.3
+    /// Minimum height-to-width ratio at flat tilt (0.15 = dramatic side-brush 側筆)
+    private let flatRatio: CGFloat = 0.15
 
     /// Base spacing factor (fraction of width between stamps)
     private let baseSpacingFactor: CGFloat = 0.12
@@ -110,6 +110,7 @@ final class FudeBrushEngine: BrushEngine {
 
     private var inkLevel: CGFloat = 1.0
     private var strokeSeed: UInt64 = 0
+    private var smoothedAngle: CGFloat = 0
 
     // MARK: - Computed Properties
 
@@ -135,6 +136,7 @@ final class FudeBrushEngine: BrushEngine {
 
         strokeSeed = computeStrokeSeed(from: points[0])
         inkLevel = 1.0
+        smoothedAngle = points[0].azimuth
 
         context.saveGState()
         context.setBlendMode(.normal)
@@ -166,6 +168,9 @@ final class FudeBrushEngine: BrushEngine {
             // Deplete ink over distance
             inkLevel = max(minInkLevel, inkLevel - distance / inkDepletionDistance)
 
+            // Movement direction from consecutive points
+            let movementAngle = atan2(dy, dx)
+
             for step in 0...steps {
                 let t = CGFloat(step) / CGFloat(steps)
                 let x = prev.x + dx * t
@@ -185,6 +190,20 @@ final class FudeBrushEngine: BrushEngine {
                 let heightRatio = flatRatio + (1.0 - flatRatio) * altitudeNorm
                 let h = w * heightRatio
 
+                // Blend pencil azimuth with movement direction (drag lag)
+                // Low velocity: azimuth dominates; high velocity: movement direction dominates
+                let blendFactor = min(1.0, velocityNorm * 1.5)
+                let effectiveAngle = lerpAngle(azimuth, movementAngle, blendFactor)
+
+                // Smooth angle using exponential moving average (prevents jitter)
+                smoothedAngle = lerpAngle(smoothedAngle, effectiveAngle, 0.3)
+
+                // Drag elongation: fast stamps stretch up to 1.8x
+                let effectiveHeight = h * (1.0 + velocityNorm * 0.8)
+
+                // Bristle splay: high pressure fans bristles outward (up to 40% wider)
+                let splayFactor = 1.0 + pressure * 0.4
+
                 // Absorption map lookup
                 let absorption = lookupAbsorption(at: CGPoint(x: x, y: y))
 
@@ -192,11 +211,13 @@ final class FudeBrushEngine: BrushEngine {
                     in: context,
                     center: CGPoint(x: x, y: y),
                     width: w,
-                    height: h,
-                    angle: azimuth,
+                    height: effectiveHeight,
+                    angle: smoothedAngle,
                     alpha: alpha * absorption,
                     velocityNorm: velocityNorm,
-                    stampIndex: stampIndex
+                    stampIndex: stampIndex,
+                    splayFactor: splayFactor,
+                    altitude: altitude
                 )
 
                 stampIndex += 1
@@ -209,7 +230,7 @@ final class FudeBrushEngine: BrushEngine {
     // MARK: - Pressure Mapping
 
     /// Non-linear pressure-to-width curve.
-    private func widthForPressure(_ pressure: CGFloat) -> CGFloat {
+    func widthForPressure(_ pressure: CGFloat) -> CGFloat {
         let normalizedPressure = max(0, min(1, pressure))
         let curved = pow(normalizedPressure, 1.0 / pressureCurve)
         return brushSize.minWidth + (brushSize.maxWidth - brushSize.minWidth) * curved
@@ -237,12 +258,15 @@ final class FudeBrushEngine: BrushEngine {
 
     // MARK: - Bristle Strip Rendering
 
-    /// Renders a stamp as parallel bristle strips instead of a single smooth ellipse.
+    /// Renders a stamp as parallel bristle strips with soft-fringe edges.
     ///
     /// Each bristle has:
+    /// - **Two-pass rendering**: core fill (85% width, full alpha) + soft fringe (140% width, 20% alpha)
     /// - Deterministic alpha variation (from hash of bristleIndex + strokeSeed)
     /// - Edge fading (outer ~25% of bristles have reduced alpha for stray fiber effect)
     /// - Velocity-based dropout (fast strokes lose outer bristles → structured 飛白)
+    /// - Tilt bias (低い altitude → one-sided bristle dropout for 側筆 sokuhitsu)
+    /// - Pressure splay (high pressure fans bristles outward, showing individual tracks)
     /// - Height perturbation (±15% for irregular edges)
     private func stampBristles(
         in context: CGContext,
@@ -252,7 +276,9 @@ final class FudeBrushEngine: BrushEngine {
         angle: CGFloat,
         alpha: CGFloat,
         velocityNorm: CGFloat,
-        stampIndex: Int
+        stampIndex: Int,
+        splayFactor: CGFloat,
+        altitude: CGFloat
     ) {
         let bristleCount = brushSize.bristleCount
         guard bristleCount > 0, width > 0.5 else { return }
@@ -267,6 +293,11 @@ final class FudeBrushEngine: BrushEngine {
         let effectiveStripWidth = max(0.3, stripWidth - gap)
         let inkCG = inkUIColor
 
+        // Tilt bias: at low altitude (<~25°), bias bristle survival toward one side
+        // Simulates only one edge of the brush contacting paper (側筆)
+        let altNorm = min(1.0, max(0.0, altitude / (.pi / 2)))
+        let tiltBiasStrength: CGFloat = altNorm < 0.55 ? (1.0 - altNorm / 0.55) * 0.5 : 0.0
+
         for i in 0..<bristleCount {
             let hash = bristleHash(bristleIndex: i, seed: strokeSeed, stampIndex: stampIndex)
 
@@ -274,8 +305,11 @@ final class FudeBrushEngine: BrushEngine {
             let hashNorm = CGFloat(hash & 0xFF) / 255.0
             let alphaModulation = 0.65 + hashNorm * 0.35
 
+            // Normalized position from center (-1 = left edge, +1 = right edge)
+            let normalizedPos = (CGFloat(i) - halfCount) / max(halfCount, 1.0)
+
             // Distance from center (0 = center, 1 = edge)
-            let distFromCenter = abs(CGFloat(i) - halfCount) / max(halfCount, 1.0)
+            let distFromCenter = abs(normalizedPos)
 
             // Edge bristles: stray fiber effect (outer ~25% faded)
             let edgeFactor: CGFloat
@@ -293,6 +327,16 @@ final class FudeBrushEngine: BrushEngine {
                 continue  // bristle drops out → visible 飛白 gap with structure
             }
 
+            // Tilt bias: at low altitude, bristles on one side drop out
+            if tiltBiasStrength > 0 {
+                let sideBias = (normalizedPos + 1.0) / 2.0  // 0 = left, 1 = right
+                let survivalChance = sideBias + (1.0 - tiltBiasStrength)
+                let biasHash = CGFloat((hash >> 16) & 0xFF) / 255.0
+                if biasHash > survivalChance {
+                    continue  // bristle drops out from tilt bias
+                }
+            }
+
             // Height perturbation ±15% from hash
             let heightHash = (hash >> 8) & 0xFF
             let heightPerturb = 1.0 + (CGFloat(heightHash) / 255.0 - 0.5) * 0.3
@@ -300,15 +344,29 @@ final class FudeBrushEngine: BrushEngine {
 
             let bristleAlpha = alpha * alphaModulation * edgeFactor
 
-            // Position of this bristle strip along the width axis
-            let x = -width / 2.0 + CGFloat(i) * stripWidth + (stripWidth - effectiveStripWidth) / 2.0
+            // Position with splay: bristles fan outward under pressure
+            let splayedX = normalizedPos * splayFactor * (width / 2.0)
+            let x = splayedX - effectiveStripWidth / 2.0
 
-            // Draw bristle as a filled ellipse (capsule shape at narrow widths)
+            // Fringe and core widths for soft-edge two-pass rendering
+            let coreWidth = effectiveStripWidth * 0.85
+            let fringeWidth = effectiveStripWidth * 1.4
+
+            // Pass 1: Soft fringe (wider, 20% alpha — drawn first as underlay)
+            context.setFillColor(inkCG.withAlphaComponent(bristleAlpha * 0.2).cgColor)
+            context.fillEllipse(in: CGRect(
+                x: x + (effectiveStripWidth - fringeWidth) / 2.0,
+                y: -stripHeight / 2.0,
+                width: fringeWidth,
+                height: stripHeight
+            ))
+
+            // Pass 2: Core fill (narrower, full alpha — crisp center)
             context.setFillColor(inkCG.withAlphaComponent(bristleAlpha).cgColor)
             context.fillEllipse(in: CGRect(
-                x: x,
+                x: x + (effectiveStripWidth - coreWidth) / 2.0,
                 y: -stripHeight / 2.0,
-                width: effectiveStripWidth,
+                width: coreWidth,
                 height: stripHeight
             ))
         }

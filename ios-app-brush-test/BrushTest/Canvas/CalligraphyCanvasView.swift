@@ -29,8 +29,17 @@ struct CalligraphyCanvasView: UIViewRepresentable {
             uiView.clearDrawing()
         }
         uiView.referenceStrokePaths = referenceStrokePaths
-        uiView.brushSize = brushSize
-        uiView.inkConcentration = inkConcentration
+
+        // Force-set brush properties when changed (SwiftUI bridge can silently drop updates)
+        if context.coordinator.lastBrushSize != brushSize {
+            context.coordinator.lastBrushSize = brushSize
+            uiView.brushSize = brushSize
+        }
+        if context.coordinator.lastInkConcentration != inkConcentration {
+            context.coordinator.lastInkConcentration = inkConcentration
+            uiView.inkConcentration = inkConcentration
+        }
+
         uiView.isSoundMuted = isSoundMuted
     }
 
@@ -41,9 +50,13 @@ struct CalligraphyCanvasView: UIViewRepresentable {
     final class Coordinator: NSObject, CalligraphyCanvasDelegate {
         let parent: CalligraphyCanvasView
         var lastCanvasVersion: Int = 0
+        var lastBrushSize: BrushSize = .medium
+        var lastInkConcentration: CGFloat = 1.0
 
         init(_ parent: CalligraphyCanvasView) {
             self.parent = parent
+            self.lastBrushSize = parent.brushSize
+            self.lastInkConcentration = parent.inkConcentration
         }
 
         func canvasDidUpdateActiveStroke(_ points: [CalligraphyPointData]) {
