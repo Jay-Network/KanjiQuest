@@ -101,7 +101,11 @@ data class HomeUiState(
     val collectedRadicalIds: Set<Int> = emptySet(),
     val collectedHiraganaItems: Map<Int, CollectedItem> = emptyMap(),
     val collectedKatakanaItems: Map<Int, CollectedItem> = emptyMap(),
-    val collectedRadicalItems: Map<Int, CollectedItem> = emptyMap()
+    val collectedRadicalItems: Map<Int, CollectedItem> = emptyMap(),
+    val perGradeCollectedCounts: Map<Int, Int> = emptyMap(),
+    val perGradeTotalCounts: Map<Int, Int> = emptyMap(),
+    val perJlptCollectedCounts: Map<Int, Int> = emptyMap(),
+    val perJlptTotalCounts: Map<Int, Int> = emptyMap()
 )
 
 @HiltViewModel
@@ -211,6 +215,24 @@ class HomeViewModel @Inject constructor(
                 kanjiRepository.getKanjiCountByGrade(g).toInt()
             }
 
+            // Per-grade collection counts
+            val perGradeCollected = mutableMapOf<Int, Int>()
+            val perGradeTotal = mutableMapOf<Int, Int>()
+            for (grade in listOf(1, 2, 3, 4, 5, 6, 8)) {
+                val gradeKanjiList = kanjiRepository.getKanjiByGrade(grade)
+                perGradeTotal[grade] = gradeKanjiList.size
+                perGradeCollected[grade] = gradeKanjiList.count { it.id in collectedKanjiIds }
+            }
+
+            // Per-JLPT collection counts
+            val perJlptCollected = mutableMapOf<Int, Int>()
+            val perJlptTotal = mutableMapOf<Int, Int>()
+            for (level in listOf(5, 4, 3, 2, 1)) {
+                val jlptKanjiList = kanjiRepository.getKanjiByJlptLevel(level)
+                perJlptTotal[level] = jlptKanjiList.size
+                perJlptCollected[level] = jlptKanjiList.count { it.id in collectedKanjiIds }
+            }
+
             // Collection data — hiragana, katakana, radicals
             val collectedHiraganaItems = try {
                 collectionRepository.getCollectedByType(CollectionItemType.HIRAGANA)
@@ -286,6 +308,10 @@ class HomeViewModel @Inject constructor(
                 collectedHiraganaItems = collectedHiraganaItems.associateBy { it.itemId },
                 collectedKatakanaItems = collectedKatakanaItems.associateBy { it.itemId },
                 collectedRadicalItems = collectedRadicalItems.associateBy { it.itemId },
+                perGradeCollectedCounts = perGradeCollected,
+                perGradeTotalCounts = perGradeTotal,
+                perJlptCollectedCounts = perJlptCollected,
+                perJlptTotalCounts = perJlptTotal,
                 kanjiSortMode = if (isFirstLoad) KanjiSortMode.SCHOOL_GRADE else preserveSortMode,
                 selectedJlptLevel = if (isFirstLoad) 5 else preserveJlpt,
                 selectedStrokeCount = if (isFirstLoad) (strokeCounts.firstOrNull() ?: 1) else preserveStroke,

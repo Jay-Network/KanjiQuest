@@ -1,98 +1,135 @@
 import SwiftUI
 
+/// Subscription screen. Mirrors Android's SubscriptionScreen.kt.
+/// Current plan badge, feature comparison table, upgrade button ($4.99/mo).
 struct SubscriptionView: View {
-    @State private var isSubscribed = false
-    @State private var isLoading = false
+    @EnvironmentObject var container: AppContainer
+    @StateObject private var viewModel = SubscriptionViewModel()
+    var onBack: () -> Void = {}
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: KanjiQuestTheme.spacingL) {
-                // Header
-                VStack(spacing: KanjiQuestTheme.spacingS) {
-                    Image(systemName: "star.circle.fill")
-                        .font(.system(size: 64))
-                        .foregroundColor(KanjiQuestTheme.coinGold)
+        ZStack {
+            KanjiQuestTheme.background.ignoresSafeArea()
 
-                    Text("KanjiQuest Premium")
-                        .font(KanjiQuestTheme.titleLarge)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Current plan badge
+                    let isPremium = viewModel.isPremium
+                    VStack(spacing: 4) {
+                        Text("Current Plan")
+                            .font(KanjiQuestTheme.labelLarge)
+                            .foregroundColor(isPremium ? .black : KanjiQuestTheme.onSurfaceVariant)
 
-                    Text(KanjiQuestTheme.isPhone ? "漢字 Learning Edition" : "書道 Calligraphy Edition")
-                        .font(KanjiQuestTheme.bodyLarge)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, KanjiQuestTheme.spacingXL)
+                        Text(isPremium ? "Premium" : "Free")
+                            .font(KanjiQuestTheme.headlineMedium).fontWeight(.bold)
+                            .foregroundColor(isPremium ? .black : KanjiQuestTheme.onSurface)
 
-                // Price
-                VStack(spacing: KanjiQuestTheme.spacingXS) {
-                    Text("$9.99/month")
-                        .font(KanjiQuestTheme.titleMedium)
-                        .foregroundColor(KanjiQuestTheme.primary)
-
-                    Text(KanjiQuestTheme.isPhone
-                         ? "Premium recognition & calligraphy features"
-                         : "Premium calligraphy features with Apple Pencil")
-                        .font(KanjiQuestTheme.bodyMedium)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-
-                // Features list
-                VStack(alignment: .leading, spacing: KanjiQuestTheme.spacingM) {
-                    FeatureRow(icon: "pencil.tip", text: "Full pressure-sensitive calligraphy")
-                    FeatureRow(icon: "brain.head.profile", text: "AI 書道 feedback (5 aspects)")
-                    FeatureRow(icon: "arrow.triangle.2.circlepath", text: "SRS scheduling for mastery")
-                    FeatureRow(icon: "chart.bar.fill", text: "Detailed progress analytics")
-                    FeatureRow(icon: "j.circle.fill", text: "Earn J Coins for rewards")
-                    FeatureRow(icon: "icloud.fill", text: "Cloud sync across devices")
-                }
-                .padding()
-                .background(KanjiQuestTheme.surface)
-                .cornerRadius(KanjiQuestTheme.radiusL)
-
-                // Subscribe button
-                Button {
-                    // StoreKit 2 purchase will be implemented in Phase 3
-                    isLoading = true
-                } label: {
-                    if isLoading {
-                        SwiftUI.ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white)
-                    } else {
-                        Text(isSubscribed ? "Subscribed" : "Subscribe Now")
+                        if isPremium {
+                            Text("$4.99/month")
+                                .font(KanjiQuestTheme.bodyMedium)
+                                .foregroundColor(.black.opacity(0.7))
+                        }
                     }
+                    .padding(24)
+                    .frame(maxWidth: .infinity)
+                    .background(isPremium ? Color(hex: 0xFFD700) : KanjiQuestTheme.surfaceVariant)
+                    .cornerRadius(KanjiQuestTheme.radiusM)
+                    .padding(.horizontal, 16)
+
+                    Spacer().frame(height: 24)
+
+                    // Feature comparison
+                    Text("Feature Comparison")
+                        .font(KanjiQuestTheme.titleMedium).fontWeight(.bold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+
+                    Spacer().frame(height: 12)
+
+                    VStack(spacing: 0) {
+                        featureRow("Recognition Mode", free: true, premium: true)
+                        featureRow("Writing Mode", free: false, premium: true)
+                        featureRow("Vocabulary Mode", free: false, premium: true)
+                        featureRow("Camera Challenge", free: false, premium: true)
+                        featureRow("Daily Questions", freeText: "15/day", premiumText: "Unlimited")
+                        featureRow("Kanji Grades", freeText: "1-2", premiumText: "All")
+                        featureRow("J Coin Earning", free: false, premium: true)
+                        featureRow("AI Handwriting", free: false, premium: true)
+                        featureRow("Shop Purchases", freeText: "View only", premiumText: "Full")
+                    }
+                    .padding(.horizontal, 16)
+
+                    Spacer().frame(height: 24)
+
+                    if !isPremium {
+                        Button(action: {
+                            if let url = URL(string: "https://portal.tutoringjay.com/subscribe/kanjiquest") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            Text("Upgrade to Premium - $4.99/mo")
+                                .fontWeight(.bold).font(.system(size: 16))
+                                .foregroundColor(.black)
+                                .frame(maxWidth: .infinity).frame(height: 56)
+                                .background(Color(hex: 0xFFD700))
+                                .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 16)
+
+                        Spacer().frame(height: 8)
+
+                        Text("Managed through portal.tutoringjay.com")
+                            .font(KanjiQuestTheme.labelSmall)
+                            .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 16)
+                    } else {
+                        Button(action: {
+                            if let url = URL(string: "https://portal.tutoringjay.com/subscription") {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            Text("Manage Subscription")
+                                .fontWeight(.bold).font(.system(size: 16))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity).frame(height: 56)
+                                .background(KanjiQuestTheme.primary)
+                                .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 16)
+                    }
+
+                    Spacer().frame(height: 32)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(isSubscribed ? KanjiQuestTheme.success : KanjiQuestTheme.primary)
-                .foregroundColor(.white)
-                .cornerRadius(KanjiQuestTheme.radiusM)
-                .disabled(isSubscribed)
-
-                Text("Cancel anytime. Subscription auto-renews monthly.")
-                    .font(KanjiQuestTheme.labelSmall)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
             }
-            .padding()
         }
-        .background(KanjiQuestTheme.background)
-        .navigationTitle("Premium")
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: onBack) { Image(systemName: "chevron.left"); Text("Back") }.foregroundColor(.white)
+            }
+            ToolbarItem(placement: .principal) { Text("Subscription").font(.headline).foregroundColor(.white) }
+        }
+        .toolbarBackground(KanjiQuestTheme.primary, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .task { viewModel.loadSubscription(container: container) }
     }
-}
 
-private struct FeatureRow: View {
-    let icon: String
-    let text: String
+    private func featureRow(_ feature: String, free: Bool = false, premium: Bool = false, freeText: String? = nil, premiumText: String? = nil) -> some View {
+        HStack {
+            Text(feature).font(KanjiQuestTheme.bodyMedium).frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 0) {
+                Text(freeText ?? (free ? "Yes" : "---"))
+                    .font(KanjiQuestTheme.bodySmall)
+                    .foregroundColor(free || freeText != nil ? KanjiQuestTheme.onSurface : KanjiQuestTheme.onSurfaceVariant.opacity(0.5))
+                    .frame(width: 70, alignment: .center)
 
-    var body: some View {
-        HStack(spacing: KanjiQuestTheme.spacingM) {
-            Image(systemName: icon)
-                .foregroundColor(KanjiQuestTheme.primary)
-                .frame(width: 24)
-
-            Text(text)
-                .font(KanjiQuestTheme.bodyLarge)
+                Text(premiumText ?? (premium ? "Yes" : "---"))
+                    .font(KanjiQuestTheme.bodySmall).fontWeight(.bold)
+                    .foregroundColor(Color(hex: 0xFFD700))
+                    .frame(width: 70, alignment: .center)
+            }
         }
+        .padding(.vertical, 6)
     }
 }

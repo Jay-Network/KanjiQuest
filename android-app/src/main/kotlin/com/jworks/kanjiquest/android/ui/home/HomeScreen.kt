@@ -685,10 +685,16 @@ fun HomeScreen(
                                 val isSelected = grade == uiState.selectedGrade
                                 val hasCollection = grade in uiState.gradesWithCollection
                                 val isEnabled = hasCollection
+                                val collected = uiState.perGradeCollectedCounts[grade] ?: 0
+                                val total = uiState.perGradeTotalCounts[grade] ?: 0
+                                val gradeLabel = if (grade == 8) "G8+" else "G$grade"
+                                val labelText = if (total > 0) "$gradeLabel\n$collected/$total" else gradeLabel
                                 Text(
-                                    text = if (grade == 8) "G8+" else "G$grade",
-                                    fontSize = 12.sp,
+                                    text = labelText,
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
                                     color = when {
                                         isSelected -> MaterialTheme.colorScheme.onPrimary
                                         !isEnabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
@@ -714,10 +720,15 @@ fun HomeScreen(
                         KanjiSortMode.JLPT_LEVEL -> {
                             listOf(5, 4, 3, 2, 1).forEach { level ->
                                 val isSelected = level == uiState.selectedJlptLevel
+                                val collected = uiState.perJlptCollectedCounts[level] ?: 0
+                                val total = uiState.perJlptTotalCounts[level] ?: 0
+                                val labelText = if (total > 0) "N$level\n$collected/$total" else "N$level"
                                 Text(
-                                    text = "N$level",
-                                    fontSize = 12.sp,
+                                    text = labelText,
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimary
                                             else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier

@@ -186,7 +186,7 @@ class QuestionGenerator(
 
     fun hasNextQuestion(): Boolean = questionQueue.isNotEmpty()
 
-    fun generateRecognitionQuestion(): Question? {
+    suspend fun generateRecognitionQuestion(): Question? {
         val entry = questionQueue.removeFirstOrNull() ?: return null
         val kanji = entry.kanji
 
@@ -200,6 +200,11 @@ class QuestionGenerator(
         // Combine and shuffle choices
         val choices = (distractors + correctReading).shuffled()
 
+        // Load example vocabulary for this kanji
+        val exampleWords = try {
+            kanjiRepository.getVocabularyForKanji(kanji.id).take(3)
+        } catch (_: Exception) { emptyList() }
+
         return Question(
             kanjiId = kanji.id,
             kanjiLiteral = kanji.literal,
@@ -210,11 +215,15 @@ class QuestionGenerator(
             srsState = entry.srsState,
             kanjiGrade = kanji.grade,
             kanjiFrequency = kanji.frequency,
-            kanjiStrokeCount = kanji.strokeCount
+            kanjiStrokeCount = kanji.strokeCount,
+            kunReadings = kanji.kunReadings,
+            onReadings = kanji.onReadings,
+            exampleWords = exampleWords,
+            kanjiMeaning = kanji.primaryMeaning
         )
     }
 
-    fun generateWritingQuestion(): Question? {
+    suspend fun generateWritingQuestion(): Question? {
         val entry = questionQueue.removeFirstOrNull() ?: return null
         val kanji = entry.kanji
 
@@ -246,6 +255,11 @@ class QuestionGenerator(
             }
         }
 
+        // Load example vocabulary for this kanji
+        val exampleWords = try {
+            kanjiRepository.getVocabularyForKanji(kanji.id).take(3)
+        } catch (_: Exception) { emptyList() }
+
         return Question(
             kanjiId = kanji.id,
             kanjiLiteral = kanji.literal,
@@ -257,7 +271,11 @@ class QuestionGenerator(
             srsState = entry.srsState,
             kanjiGrade = kanji.grade,
             kanjiFrequency = kanji.frequency,
-            kanjiStrokeCount = kanji.strokeCount
+            kanjiStrokeCount = kanji.strokeCount,
+            kunReadings = kanji.kunReadings,
+            onReadings = kanji.onReadings,
+            exampleWords = exampleWords,
+            kanjiMeaning = kanji.primaryMeaning
         )
     }
 

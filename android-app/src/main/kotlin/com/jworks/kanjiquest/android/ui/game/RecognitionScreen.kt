@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.core.domain.model.Vocabulary
+import com.jworks.kanjiquest.core.engine.DiscoveredKanjiInfo
 import com.jworks.kanjiquest.core.engine.GameState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,7 +109,8 @@ fun RecognitionScreen(
                         sessionXp = state.sessionXp,
                         selectedAnswer = null,
                         correctAnswer = null,
-                        onAnswerClick = { viewModel.submitAnswer(it) }
+                        onAnswerClick = { viewModel.submitAnswer(it) },
+                        isNewCard = state.question.isNewCard
                     )
                 }
                 is GameState.ShowingResult -> {
@@ -129,7 +132,12 @@ fun RecognitionScreen(
                         onAnswerClick = {},
                         xpGained = state.xpGained,
                         isCorrect = state.isCorrect,
-                        onNext = { viewModel.nextQuestion() }
+                        onNext = { viewModel.nextQuestion() },
+                        isNewCard = state.question.isNewCard,
+                        kunReadings = state.question.kunReadings,
+                        onReadings = state.question.onReadings,
+                        exampleWords = state.question.exampleWords,
+                        kanjiMeaning = state.question.kanjiMeaning
                     )
                     // Discovery overlay
                     val discovered = state.discoveredItem
@@ -190,7 +198,12 @@ private fun QuestionContent(
     onAnswerClick: (String) -> Unit,
     xpGained: Int = 0,
     isCorrect: Boolean? = null,
-    onNext: (() -> Unit)? = null
+    onNext: (() -> Unit)? = null,
+    isNewCard: Boolean = false,
+    kunReadings: List<String> = emptyList(),
+    onReadings: List<String> = emptyList(),
+    exampleWords: List<Vocabulary> = emptyList(),
+    kanjiMeaning: String? = null
 ) {
     Column(
         modifier = Modifier
@@ -242,25 +255,44 @@ private fun QuestionContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Large kanji display
-        Card(
-            modifier = Modifier.size(200.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        // Large kanji display with NEW badge
+        Box {
+            Card(
+                modifier = Modifier.size(200.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                com.jworks.kanjiquest.android.ui.theme.KanjiText(
-                    text = kanjiLiteral,
-                    fontSize = 96.sp,
-                    textAlign = TextAlign.Center
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    com.jworks.kanjiquest.android.ui.theme.KanjiText(
+                        text = kanjiLiteral,
+                        fontSize = 96.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+            // NEW badge
+            if (isNewCard) {
+                Text(
+                    text = "NEW",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(4.dp)
+                        .background(
+                            color = Color(0xFF00BFA5),
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // XP popup on result
         if (isCorrect != null) {
@@ -275,7 +307,47 @@ private fun QuestionContent(
                     color = if (isCorrect) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Meaning
+            if (kanjiMeaning != null) {
+                Text(
+                    text = kanjiMeaning,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Kun'yomi & On'yomi readings
+            if (kunReadings.isNotEmpty()) {
+                Text(
+                    text = "訓: ${kunReadings.joinToString("、")}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            if (onReadings.isNotEmpty()) {
+                Text(
+                    text = "音: ${onReadings.joinToString("、")}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Example words
+            if (exampleWords.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                exampleWords.forEach { vocab ->
+                    Text(
+                        text = "${vocab.kanjiForm} (${vocab.reading}) ${vocab.primaryMeaning}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         // 4 answer choices (2x2 grid)
@@ -403,6 +475,53 @@ private fun SessionCompleteContent(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.secondary
                         )
+                    }
+                }
+            }
+        }
+
+        // New Discoveries section
+        if (stats.newlyCollectedKanji.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF00BFA5).copy(alpha = 0.1f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "New Discoveries",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00BFA5)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        stats.newlyCollectedKanji.forEach { discovered ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                com.jworks.kanjiquest.android.ui.theme.KanjiText(
+                                    text = discovered.literal,
+                                    fontSize = 36.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = discovered.meaning,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
                 }
             }

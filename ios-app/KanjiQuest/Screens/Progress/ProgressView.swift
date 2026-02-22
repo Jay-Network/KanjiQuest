@@ -1,120 +1,218 @@
 import SwiftUI
 import SharedCore
 
-struct ProgressView: View {
+/// Progress & Stats screen. Mirrors Android's ProgressScreen.kt.
+/// Level/XP, Streak, Kanji Mastery, Grade Breakdown, Overall Stats, Recent Sessions.
+struct KQProgressView: View {
     @EnvironmentObject var container: AppContainer
-    @State private var totalKanji = 0
-    @State private var masteredKanji = 0
-    @State private var currentStreak = 0
-    @State private var totalXP = 0
-    @State private var gradeMasteries: [GradeMastery] = []
+    @StateObject private var viewModel = ProgressViewModel()
+    var onBack: () -> Void = {}
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: KanjiQuestTheme.spacingL) {
-                Text("Your Progress")
-                    .font(KanjiQuestTheme.titleMedium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack {
+            KanjiQuestTheme.background.ignoresSafeArea()
 
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: KanjiQuestTheme.spacingM) {
-                    StatCard(title: "Total XP", value: "\(totalXP)", icon: "star.fill", color: KanjiQuestTheme.xpGold)
-                    StatCard(title: "Streak", value: "\(currentStreak)", icon: "flame.fill", color: KanjiQuestTheme.success)
-                    StatCard(title: "Kanji Seen", value: "\(totalKanji)", icon: "character.ja", color: KanjiQuestTheme.primary)
-                    StatCard(title: "Mastered", value: "\(masteredKanji)", icon: "trophy.fill", color: KanjiQuestTheme.coinGold)
+            if viewModel.isLoading {
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text("Loading your stats...").font(KanjiQuestTheme.bodyLarge)
                 }
-
-                // Grade Mastery Badges
-                if !gradeMasteries.isEmpty {
-                    VStack(alignment: .leading, spacing: KanjiQuestTheme.spacingS) {
-                        Text("Grade Mastery")
-                            .font(KanjiQuestTheme.titleMedium)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: KanjiQuestTheme.spacingM) {
-                            ForEach(gradeMasteries, id: \.grade) { mastery in
-                                VStack(spacing: 6) {
-                                    #if IPAD_TARGET
-                                    MasteryBadgeView(level: mastery.masteryLevel, size: 56)
-                                    #endif
-                                    Text("Grade \(mastery.grade)")
-                                        .font(KanjiQuestTheme.labelSmall)
-                                    Text("\(Int(mastery.masteryScore * 100))%")
-                                        .font(KanjiQuestTheme.labelSmall)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(KanjiQuestTheme.surface)
-                                .cornerRadius(KanjiQuestTheme.radiusM)
-                                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-                            }
-                        }
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        levelCard
+                        streakCard
+                        kanjiMasteryCard
+                        if !viewModel.gradeMasteryList.isEmpty { gradeMasteryBreakdownCard }
+                        overallStatsCard
+                        if !viewModel.recentSessions.isEmpty { recentSessionsCard }
                     }
+                    .padding(16)
                 }
             }
-            .padding()
         }
-        .background(KanjiQuestTheme.background)
-        .navigationTitle("Progress")
-        .task {
-            await loadStats()
-            await loadGradeMasteries()
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left"); Text("Back")
+                }.foregroundColor(.white)
+            }
+            ToolbarItem(placement: .principal) {
+                Text("Progress & Stats").font(.headline).foregroundColor(.white)
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { viewModel.refresh(container: container) }) {
+                    Image(systemName: "arrow.clockwise")
+                }.foregroundColor(.white)
+            }
         }
+        .toolbarBackground(KanjiQuestTheme.primary, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .task { viewModel.load(container: container) }
     }
 
-    private func loadStats() async {
-        do {
-            let profile = try await container.userRepository.getProfile()
-            totalXP = Int(profile.totalXp)
-            currentStreak = Int(profile.currentStreak)
-        } catch {}
+    // MARK: - Level & XP
+
+    private var levelCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Level \(viewModel.level)")
+                .font(KanjiQuestTheme.headlineMedium).fontWeight(.bold)
+            Text("\(viewModel.totalXp) XP")
+                .font(KanjiQuestTheme.titleLarge)
+            Text("Progress to Level \(viewModel.level + 1)")
+                .font(KanjiQuestTheme.bodyMedium)
+            ProgressView(value: viewModel.xpProgress).tint(KanjiQuestTheme.primary)
+            Text("\(viewModel.xpInCurrentLevel) / \(viewModel.xpForNextLevel) XP")
+                .font(KanjiQuestTheme.bodySmall)
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(KanjiQuestTheme.primary.opacity(0.12))
+        .cornerRadius(KanjiQuestTheme.radiusM)
     }
 
-    private func loadGradeMasteries() async {
-        var masteries: [GradeMastery] = []
-        for grade: Int32 in 1...6 {
-            do {
-                let total = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
-                let mastery = try await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total.int64Value)
-                if mastery.studiedCount > 0 {
-                    masteries.append(mastery)
+    // MARK: - Streak
+
+    private var streakCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Study Streak").font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
+            HStack(spacing: 0) {
+                statItem(icon: "flame.fill", value: "\(viewModel.currentStreak) days", label: "Current")
+                statItem(icon: "star.fill", value: "\(viewModel.longestStreak) days", label: "Longest")
+                statItem(icon: "target", value: "\(viewModel.dailyGoal) XP", label: "Daily Goal")
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(KanjiQuestTheme.secondary.opacity(0.12))
+        .cornerRadius(KanjiQuestTheme.radiusM)
+    }
+
+    // MARK: - Kanji Mastery
+
+    private var kanjiMasteryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Kanji Mastery").font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
+            HStack(spacing: 0) {
+                statItem(icon: "checkmark.circle.fill", value: "\(viewModel.masteredCount)", label: "Mastered")
+                statItem(icon: "book.fill", value: "\(viewModel.totalKanjiInSrs - viewModel.masteredCount)", label: "In Progress")
+                statItem(icon: "character.ja", value: "\(viewModel.totalKanjiInSrs)", label: "Total")
+            }
+            if viewModel.totalKanjiInSrs > 0 {
+                let pct = Int(Float(viewModel.masteredCount) / Float(viewModel.totalKanjiInSrs) * 100)
+                ProgressView(value: Float(viewModel.masteredCount), total: Float(viewModel.totalKanjiInSrs))
+                    .tint(KanjiQuestTheme.tertiary)
+                Text("\(pct)% Mastery Rate").font(KanjiQuestTheme.bodySmall)
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(KanjiQuestTheme.tertiary.opacity(0.12))
+        .cornerRadius(KanjiQuestTheme.radiusM)
+    }
+
+    // MARK: - Grade Mastery Breakdown
+
+    private var gradeMasteryBreakdownCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Grade Mastery").font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
+            ForEach(viewModel.gradeMasteryList, id: \.grade) { mastery in
+                gradeMasteryRow(mastery)
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(KanjiQuestTheme.surface).cornerRadius(KanjiQuestTheme.radiusM)
+    }
+
+    private func gradeMasteryRow(_ mastery: GradeMastery) -> some View {
+        let color = masteryColor(mastery.masteryLevel)
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(color.opacity(0.2)).frame(width: 40, height: 40)
+                Text("G\(mastery.grade)").font(KanjiQuestTheme.labelMedium).fontWeight(.bold).foregroundColor(color)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Grade \(mastery.grade)").font(KanjiQuestTheme.bodyMedium).fontWeight(.bold)
+                    Spacer()
+                    Text(mastery.masteryLevel.label).font(KanjiQuestTheme.labelMedium).fontWeight(.bold).foregroundColor(color)
                 }
-            } catch {}
+                ProgressView(value: mastery.coverage).tint(color)
+                HStack {
+                    Text("\(mastery.studiedCount)/\(mastery.totalKanjiInGrade) studied")
+                    Spacer()
+                    Text("\(mastery.masteredCount) mastered")
+                    Spacer()
+                    Text("\(Int(mastery.averageAccuracy * 100))% acc")
+                }.font(KanjiQuestTheme.bodySmall).foregroundColor(KanjiQuestTheme.onSurfaceVariant)
+            }
         }
-        gradeMasteries = masteries
     }
-}
 
-private struct StatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
+    private func masteryColor(_ level: MasteryLevel) -> Color {
+        switch level {
+        case .beginning: return Color(hex: 0xE57373)
+        case .developing: return Color(hex: 0xFFB74D)
+        case .proficient: return Color(hex: 0x81C784)
+        case .advanced: return Color(hex: 0xFFD700)
+        default: return .gray
+        }
+    }
 
-    var body: some View {
-        VStack(spacing: KanjiQuestTheme.spacingS) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
+    // MARK: - Overall Stats
 
-            Text(value)
-                .font(KanjiQuestTheme.titleMedium)
+    private var overallStatsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Overall Statistics").font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
+            HStack(spacing: 0) {
+                statItem(icon: "gamecontroller.fill", value: "\(viewModel.totalGamesPlayed)", label: "Games")
+                statItem(icon: "square.and.pencil", value: "\(viewModel.totalCardsStudied)", label: "Cards")
+                statItem(icon: "target", value: "\(Int(viewModel.overallAccuracy))%", label: "Accuracy")
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(KanjiQuestTheme.surface).cornerRadius(KanjiQuestTheme.radiusM)
+    }
 
-            Text(title)
-                .font(KanjiQuestTheme.labelSmall)
-                .foregroundColor(.secondary)
+    // MARK: - Recent Sessions
+
+    private var recentSessionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent Sessions").font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
+            ForEach(viewModel.recentSessions.prefix(5), id: \.startedAt) { session in
+                sessionRow(session)
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        .background(KanjiQuestTheme.surfaceVariant).cornerRadius(KanjiQuestTheme.radiusM)
+    }
+
+    private func sessionRow(_ session: StudySession) -> some View {
+        let accuracy = session.cardsStudied > 0
+            ? Int(Float(session.correctCount) / Float(session.cardsStudied) * 100) : 0
+        let date = Date(timeIntervalSince1970: Double(session.startedAt))
+        let fmt = DateFormatter(); fmt.dateFormat = "MMM dd, HH:mm"
+        return HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.gameMode.uppercased()).font(KanjiQuestTheme.bodyMedium).fontWeight(.bold)
+                Text(fmt.string(from: date)).font(KanjiQuestTheme.bodySmall)
+                    .foregroundColor(KanjiQuestTheme.onSurfaceVariant.opacity(0.7))
+            }
+            Spacer()
+            Text("\(session.cardsStudied) cards").font(KanjiQuestTheme.bodySmall)
+            Text("\(accuracy)%").font(KanjiQuestTheme.bodyMedium).fontWeight(.bold)
+                .foregroundColor(accuracy >= 80 ? KanjiQuestTheme.primary : accuracy >= 60 ? KanjiQuestTheme.secondary : KanjiQuestTheme.error)
+            Text("+\(session.xpEarned) XP").font(KanjiQuestTheme.bodyMedium).fontWeight(.bold)
+                .foregroundColor(KanjiQuestTheme.tertiary)
+        }.padding(.vertical, 4)
+    }
+
+    // MARK: - Helpers
+
+    private func statItem(icon: String, value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon).font(.title2).foregroundColor(KanjiQuestTheme.primary)
+            Text(value).font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
+            Text(label).font(KanjiQuestTheme.bodySmall).foregroundColor(KanjiQuestTheme.onSurfaceVariant)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(KanjiQuestTheme.surface)
-        .cornerRadius(KanjiQuestTheme.radiusM)
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jworks.kanjiquest.android.data.PreviewTrialManager
 import com.jworks.kanjiquest.core.domain.UserSessionProvider
+import com.jworks.kanjiquest.core.domain.model.ExampleSentence
 import com.jworks.kanjiquest.core.domain.model.FlashcardDeckGroup
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.Kanji
@@ -28,6 +29,7 @@ data class ModeTrialInfo(
 data class KanjiDetailUiState(
     val kanji: Kanji? = null,
     val vocabulary: List<Vocabulary> = emptyList(),
+    val vocabSentences: Map<Long, ExampleSentence> = emptyMap(),
     val isLoading: Boolean = true,
     val totalPracticeCount: Int = 0,
     val accuracy: Float? = null,
@@ -69,6 +71,15 @@ class KanjiDetailViewModel @Inject constructor(
                 kanjiRepository.getVocabularyForKanji(kanjiId)
             } else emptyList()
 
+            // Load example sentences for each vocab word
+            val vocabSentences = mutableMapOf<Long, ExampleSentence>()
+            for (v in vocab.take(10)) {
+                try {
+                    val sentence = kanjiRepository.getExampleSentence(v.id)
+                    if (sentence != null) vocabSentences[v.id] = sentence
+                } catch (_: Exception) { /* skip */ }
+            }
+
             val srsCard = srsRepository.getCard(kanjiId)
             val totalPractice = srsCard?.totalReviews ?: 0
             val accuracy = if (srsCard != null && srsCard.totalReviews > 0) srsCard.accuracy else null
@@ -107,6 +118,7 @@ class KanjiDetailViewModel @Inject constructor(
             _uiState.value = KanjiDetailUiState(
                 kanji = kanji,
                 vocabulary = vocab,
+                vocabSentences = vocabSentences,
                 isLoading = false,
                 totalPracticeCount = totalPractice,
                 accuracy = accuracy,

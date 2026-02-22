@@ -57,6 +57,7 @@ class GameEngine(
     private var playerLevel: Int = 1
     private val touchedKanjiIds = mutableListOf<Int>()
     private val touchedVocabIds = mutableListOf<Long>()
+    private val newlyCollected = mutableListOf<DiscoveredKanjiInfo>()
 
     suspend fun onEvent(event: GameEvent) {
         try {
@@ -82,6 +83,7 @@ class GameEngine(
         sessionStartTime = timeProvider()
         touchedKanjiIds.clear()
         touchedVocabIds.clear()
+        newlyCollected.clear()
 
         _state.value = GameState.Preparing(gameMode)
 
@@ -280,6 +282,15 @@ class GameEngine(
             }
         }
 
+        // Track newly collected kanji for session-end summary
+        if (discoveredItem != null && question.kanjiId != 0) {
+            newlyCollected.add(DiscoveredKanjiInfo(
+                kanjiId = question.kanjiId,
+                literal = question.kanjiLiteral,
+                meaning = question.kanjiMeaning ?: question.correctAnswer
+            ))
+        }
+
         _state.value = GameState.ShowingResult(
             question = question,
             selectedAnswer = event.answer,
@@ -355,7 +366,8 @@ class GameEngine(
                 xpEarned = sessionXp,
                 durationSec = elapsed,
                 touchedKanjiIds = touchedKanjiIds.toList(),
-                touchedVocabIds = touchedVocabIds.toList()
+                touchedVocabIds = touchedVocabIds.toList(),
+                newlyCollectedKanji = newlyCollected.distinctBy { it.kanjiId }
             )
         )
     }

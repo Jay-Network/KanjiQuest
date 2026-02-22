@@ -3,6 +3,7 @@ import SharedCore
 
 /// Manual dependency injection container wrapping shared-core KMP repositories and engines.
 /// Replaces Hilt/Dagger from Android — SwiftUI uses @EnvironmentObject propagation.
+/// Mirrors Android AppModule.kt with all repositories and engines.
 final class AppContainer: ObservableObject {
 
     // MARK: - Configuration
@@ -12,29 +13,54 @@ final class AppContainer: ObservableObject {
     let databaseDriverFactory: DatabaseDriverFactory
     let database: KanjiQuestDatabase
 
-    // MARK: - Repositories
+    // MARK: - Core Repositories (from Android AppModule)
     let kanjiRepository: KanjiRepositoryImpl
     let srsRepository: SrsRepositoryImpl
     let userRepository: UserRepositoryImpl
     let sessionRepository: SessionRepositoryImpl
     let achievementRepository: AchievementRepositoryImpl
     let vocabSrsRepository: VocabSrsRepositoryImpl
+    let authRepository: AuthRepositoryImpl
+    let jCoinRepository: JCoinRepositoryImpl
+    let flashcardRepository: FlashcardRepositoryImpl
+    let kanaRepository: KanaRepositoryImpl
+    let kanaSrsRepository: KanaSrsRepositoryImpl
+    let radicalRepository: RadicalRepositoryImpl
+    let radicalSrsRepository: RadicalSrsRepositoryImpl
+    let collectionRepository: CollectionRepositoryImpl
+    let devChatRepository: DevChatRepositoryImpl
+    let feedbackRepository: FeedbackRepositoryImpl
+    let fieldJournalRepository: FieldJournalRepositoryImpl
+    let learningSyncRepository: LearningSyncRepositoryImpl
 
-    // MARK: - Engine
+    // MARK: - Algorithms & Engines
     let srsAlgorithm: Sm2Algorithm
     let scoringEngine: ScoringEngine
     let strokeMatcher: StrokeMatcher
 
-    // MARK: - Auth
-    let authRepository: AuthRepositoryImpl
+    // MARK: - Collection Engines
+    let encounterEngine: EncounterEngine
+    let itemLevelEngine: ItemLevelEngine
+
+    // MARK: - User Session
+    let userSessionProvider: UserSessionProviderImpl
+
+    // MARK: - Use Cases
+    let wordOfTheDayUseCase: WordOfTheDayUseCase
+    let completeSessionUseCase: CompleteSessionUseCase
+
+    // MARK: - Preview Trial Manager (UserDefaults-based, like Android SharedPreferences)
+    let previewTrialManager: PreviewTrialManager
+
+    // MARK: - Gemini AI
+    let geminiClient: GeminiClient
+    let handwritingChecker: HandwritingChecker
 
     init() {
         configuration = Configuration()
 
         // Stage the pre-built DB from the app bundle to Documents/ BEFORE
         // Kotlin/Native's DatabaseDriverFactory touches it.
-        // NSBundle.mainBundle from inside an XCFramework may not resolve the
-        // app bundle correctly, so we do this from Swift where Bundle.main is reliable.
         Self.stageBundleDatabase()
 
         // Database
@@ -42,33 +68,97 @@ final class AppContainer: ObservableObject {
         let driver = databaseDriverFactory.createDriver()
         database = databaseDriverFactory.createDatabase(driver: driver)
 
-        // Repositories (param is `db:` except AchievementRepositoryImpl which uses `database:`)
+        // Core Repositories
         kanjiRepository = KanjiRepositoryImpl(db: database)
         srsRepository = SrsRepositoryImpl(db: database)
         userRepository = UserRepositoryImpl(db: database)
         sessionRepository = SessionRepositoryImpl(db: database)
         achievementRepository = AchievementRepositoryImpl(database: database)
         vocabSrsRepository = VocabSrsRepositoryImpl(db: database)
-
-        // Auth (no constructor params — uses internal AuthSupabaseClientFactory)
         authRepository = AuthRepositoryImpl()
+        jCoinRepository = JCoinRepositoryImpl(db: database)
+        flashcardRepository = FlashcardRepositoryImpl(db: database)
+        kanaRepository = KanaRepositoryImpl(db: database)
+        kanaSrsRepository = KanaSrsRepositoryImpl(db: database)
+        radicalRepository = RadicalRepositoryImpl(db: database)
+        radicalSrsRepository = RadicalSrsRepositoryImpl(db: database)
+        collectionRepository = CollectionRepositoryImpl(db: database)
+        devChatRepository = DevChatRepositoryImpl()
+        feedbackRepository = FeedbackRepositoryImpl()
+        fieldJournalRepository = FieldJournalRepositoryImpl(db: database)
+        learningSyncRepository = LearningSyncRepositoryImpl(db: database)
 
         // Algorithms
         srsAlgorithm = Sm2Algorithm()
         scoringEngine = ScoringEngine()
         strokeMatcher = StrokeMatcher.shared
+
+        // Collection Engines
+        encounterEngine = EncounterEngine(
+            collectionRepository: collectionRepository,
+            kanjiRepository: kanjiRepository
+        )
+        itemLevelEngine = ItemLevelEngine(
+            collectionRepository: collectionRepository
+        )
+
+        // User Session
+        userSessionProvider = UserSessionProviderImpl(authRepository: authRepository)
+
+        // Use Cases
+        wordOfTheDayUseCase = WordOfTheDayUseCase(kanjiRepository: kanjiRepository)
+        completeSessionUseCase = CompleteSessionUseCase(
+            userRepository: userRepository,
+            sessionRepository: sessionRepository,
+            scoringEngine: scoringEngine,
+            jCoinRepository: jCoinRepository,
+            userSessionProvider: userSessionProvider,
+            learningSyncRepository: learningSyncRepository,
+            achievementRepository: achievementRepository,
+            srsRepository: srsRepository,
+            kanjiRepository: kanjiRepository
+        )
+
+        // Preview Trial Manager
+        previewTrialManager = PreviewTrialManager()
+
+        // Gemini AI
+        geminiClient = GeminiClient(apiKey: configuration.geminiApiKey)
+        handwritingChecker = HandwritingChecker(geminiClient: geminiClient)
     }
 
     // MARK: - Factory methods for scoped dependencies
 
-    func makeGameEngine() -> GameEngine {
-        let questionGenerator = QuestionGenerator(
+    func makeQuestionGenerator() -> QuestionGenerator {
+        let masteryProvider = GradeMasteryProvider { [kanjiRepository, srsRepository] grade in
+            let total = kanjiRepository.getKanjiCountByGrade(grade: grade)
+            return srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total)
+        }
+        return QuestionGenerator(
             kanjiRepository: kanjiRepository,
             srsRepository: srsRepository,
             vocabSrsRepository: vocabSrsRepository,
-            gradeMasteryProvider: nil
+            gradeMasteryProvider: masteryProvider
         )
-        let sessionProvider = UserSessionProviderImpl(authRepository: authRepository)
+    }
+
+    func makeKanaQuestionGenerator() -> KanaQuestionGenerator {
+        return KanaQuestionGenerator(
+            kanaRepository: kanaRepository,
+            kanaSrsRepository: kanaSrsRepository
+        )
+    }
+
+    func makeRadicalQuestionGenerator() -> RadicalQuestionGenerator {
+        return RadicalQuestionGenerator(
+            radicalRepository: radicalRepository,
+            radicalSrsRepository: radicalSrsRepository,
+            kanjiRepository: kanjiRepository
+        )
+    }
+
+    func makeGameEngine() -> GameEngine {
+        let questionGenerator = makeQuestionGenerator()
         return GameEngine(
             questionGenerator: questionGenerator,
             srsAlgorithm: srsAlgorithm,
@@ -77,16 +167,24 @@ final class AppContainer: ObservableObject {
             vocabSrsRepository: vocabSrsRepository,
             userRepository: userRepository,
             wordOfTheDayVocabId: nil,
-            userSessionProvider: sessionProvider,
-            kanaQuestionGenerator: nil,
-            kanaSrsRepository: nil,
-            radicalQuestionGenerator: nil,
-            radicalSrsRepository: nil,
-            collectionRepository: nil,
-            encounterEngine: nil,
-            itemLevelEngine: nil,
+            userSessionProvider: userSessionProvider,
+            kanaQuestionGenerator: makeKanaQuestionGenerator(),
+            kanaSrsRepository: kanaSrsRepository,
+            radicalQuestionGenerator: makeRadicalQuestionGenerator(),
+            radicalSrsRepository: radicalSrsRepository,
+            collectionRepository: collectionRepository,
+            encounterEngine: encounterEngine,
+            itemLevelEngine: itemLevelEngine,
             timeProvider: { KotlinLong(value: Int64(Date().timeIntervalSince1970)) }
         )
+    }
+
+    func makeCompleteSessionUseCase() -> CompleteSessionUseCase {
+        completeSessionUseCase
+    }
+
+    func makeHandwritingChecker() -> HandwritingChecker {
+        handwritingChecker
     }
 
     #if IPAD_TARGET
@@ -101,8 +199,6 @@ final class AppContainer: ObservableObject {
     private static let dbVersionKey = "kanjiquest_swift_db_version"
     private static let dbVersion = 2
 
-    /// Copy the pre-built kanji database from the app bundle into Documents/
-    /// so that NativeSqliteDriver (which opens Documents/<name>) finds it.
     private static func stageBundleDatabase() {
         let fm = FileManager.default
         guard let docsURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first else {
@@ -112,7 +208,6 @@ final class AppContainer: ObservableObject {
         let dest = docsURL.appendingPathComponent(dbName)
         let installedVersion = UserDefaults.standard.integer(forKey: dbVersionKey)
 
-        // Skip if correct version AND file is large enough (pre-built DB is ~24 MB)
         if fm.fileExists(atPath: dest.path) && installedVersion >= dbVersion {
             if let attrs = try? fm.attributesOfItem(atPath: dest.path),
                let size = attrs[.size] as? UInt64, size > 1_000_000 {
@@ -124,7 +219,6 @@ final class AppContainer: ObservableObject {
 
         guard let bundleURL = Bundle.main.url(forResource: "kanjiquest", withExtension: "db") else {
             NSLog("KanjiQuest [Swift]: DB NOT FOUND in app bundle!")
-            // Log what IS in the bundle for debugging
             if let resourcePath = Bundle.main.resourcePath {
                 let contents = (try? fm.contentsOfDirectory(atPath: resourcePath)) ?? []
                 NSLog("KanjiQuest [Swift]: Bundle contains %d items: %@",
@@ -136,7 +230,6 @@ final class AppContainer: ObservableObject {
 
         NSLog("KanjiQuest [Swift]: Found bundle DB at %@", bundleURL.path)
 
-        // Remove stale file
         if fm.fileExists(atPath: dest.path) {
             do {
                 try fm.removeItem(at: dest)

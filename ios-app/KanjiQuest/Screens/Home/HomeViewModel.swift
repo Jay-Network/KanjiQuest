@@ -1,108 +1,432 @@
 import Foundation
 import SharedCore
+import Combine
+
+// MARK: - Enums matching Android
+
+enum MainTab: String, CaseIterable {
+    case hiragana = "Hiragana"
+    case katakana = "Katakana"
+    case radicals = "部首"
+    case kanji = "Kanji"
+}
+
+enum KanjiSortMode: String, CaseIterable {
+    case schoolGrade = "School Grade"
+    case jlptLevel = "JLPT Level"
+    case strokes = "Strokes"
+    case frequency = "Frequency"
+}
+
+struct PreviewTrialInfo {
+    let remaining: Int
+    let limit: Int
+}
+
+// MARK: - UI State matching Android HomeUiState (58 properties)
+
+struct HomeUiState {
+    var profile: UserProfile?
+    var gradeOneKanji: [Kanji] = []
+    var kanjiCount: Int64 = 0
+    var coinBalance: CoinBalance?
+    var wordOfTheDay: Vocabulary?
+    var isLoading: Bool = true
+    var isPremium: Bool = false
+    var isAdmin: Bool = false
+    var effectiveLevel: UserLevel = .free
+    var previewTrials: [String: PreviewTrialInfo] = [:]
+    var tierName: String = "Beginner"
+    var tierNameJp: String = "入門"
+    var tierProgress: Float = 0
+    var nextTierName: String?
+    var nextTierLevel: Int32?
+    var highestUnlockedGrade: Int32 = 1
+    var gradeMasteryList: [GradeMastery] = []
+    var displayLevel: Int32 = 1
+    var kanjiPracticeCounts: [Int32: Int32] = [:]
+    var kanjiModeStats: [Int32: [String: Int32]] = [:]
+    var flashcardDeckCount: Int64 = 0
+    var unlockedGrades: [Int32] = [1]
+    var allGrades: [Int32] = [1, 2, 3, 4, 5, 6, 8]
+    var gradesWithCollection: Set<Int32> = []
+    var selectedGrade: Int32 = 1
+    var hiraganaProgress: Float = 0
+    var katakanaProgress: Float = 0
+    var radicalProgress: Float = 0
+    var selectedMainTab: MainTab = .kanji
+    var radicals: [Radical] = []
+    var kanjiSortMode: KanjiSortMode = .schoolGrade
+    var selectedJlptLevel: Int32 = 5
+    var selectedStrokeCount: Int32 = 1
+    var selectedFrequencyRange: Int = 0
+    var availableStrokeCounts: [Int32] = []
+    var collectedKanjiCount: Int = 0
+    var totalKanjiInGrades: Int = 0
+    var collectedItems: [Int32: CollectedItem] = [:]
+    var hiraganaList: [Kana] = []
+    var katakanaList: [Kana] = []
+    var collectedHiraganaIds: Set<Int32> = []
+    var collectedKatakanaIds: Set<Int32> = []
+    var collectedRadicalIds: Set<Int32> = []
+    var collectedHiraganaItems: [Int32: CollectedItem] = [:]
+    var collectedKatakanaItems: [Int32: CollectedItem] = [:]
+    var collectedRadicalItems: [Int32: CollectedItem] = [:]
+    var perGradeCollectedCounts: [Int32: Int] = [:]
+    var perGradeTotalCounts: [Int32: Int] = [:]
+    var perJlptCollectedCounts: [Int32: Int] = [:]
+    var perJlptTotalCounts: [Int32: Int] = [:]
+}
+
+// MARK: - ViewModel
 
 @MainActor
-final class HomeViewModel: ObservableObject {
+class HomeViewModel: ObservableObject {
+    @Published var uiState = HomeUiState()
 
-    struct UserProfileData {
-        let level: Int
-        let xp: Int
-        let xpToNext: Int
-        let xpProgress: CGFloat  // 0.0-1.0
+    private let container: AppContainer
+    private var isFirstLoad = true
+
+    static let frequencyRanges: [(Int32, Int32)] = [
+        (1, 500), (501, 1000), (1001, 2000), (2001, 5000)
+    ]
+    static let frequencyLabels = ["Top 500", "501-1K", "1K-2K", "2K-5K"]
+
+    init(container: AppContainer) {
+        self.container = container
+        Task { await loadData() }
+        Task { await observeCoinBalance() }
     }
 
-    struct KanjiData {
-        let literal: String
-        let strokePaths: [String]
+    // MARK: - Main data load (mirrors Android loadData())
+
+    func loadData() async {
+        let prev = uiState
+        let preserveMainTab = prev.selectedMainTab
+        let preserveSortMode = prev.kanjiSortMode
+        let preserveGrade = prev.selectedGrade
+        let preserveJlpt = prev.selectedJlptLevel
+        let preserveStroke = prev.selectedStrokeCount
+        let preserveFreq = prev.selectedFrequencyRange
+        let preserveStrokeCounts = prev.availableStrokeCounts
+
+        // Sync email for admin detection
+        if let email = try? await container.authRepository.getCurrentUserEmail?() {
+            container.userSessionProvider.updateEmail(email: email)
+        }
+
+        let userId = container.userSessionProvider.getUserId()
+        let profile = try? await container.userRepository.getProfile()
+        let totalCount = (try? await container.kanjiRepository.getKanjiCount()) ?? 0
+        let coinBalance = try? await container.jCoinRepository.getBalance(userId: userId)
+        let wotd = try? await container.wordOfTheDayUseCase.getWordOfTheDay()
+        let effectiveLevel = container.userSessionProvider.getEffectiveLevel()
+        let isPremium = effectiveLevel == .premium || effectiveLevel == .admin
+
+        // Tier progression
+        let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride() ?? (profile?.level ?? 1)
+        let tier = LevelProgression.companion.getTierForLevel(level: playerLevel)
+        let nextTier = LevelProgression.companion.getNextTier(level: playerLevel)
+        let unlockedGrades = tier.unlockedGrades as? [Int32] ?? [1]
+        let highestGrade = unlockedGrades.max() ?? 1
+
+        let activeGrade = isFirstLoad ? highestGrade : preserveGrade
+        let gradeKanji = (try? await container.kanjiRepository.getKanjiByGrade(grade: activeGrade)) ?? []
+
+        // Grade mastery for all unlocked grades
+        var gradeMasteryList: [GradeMastery] = []
+        for grade in unlockedGrades {
+            let total = (try? await container.kanjiRepository.getKanjiCountByGrade(grade: grade)) ?? 0
+            if let mastery = try? await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total) {
+                gradeMasteryList.append(mastery)
+            }
+        }
+
+        // Practice counts for displayed kanji
+        let kanjiIds = gradeKanji.map { Int64($0.id) }
+        let practiceCounts = await loadPracticeCounts(kanjiIds: kanjiIds)
+        let modeStats = await loadModeStats(kanjiIds: kanjiIds)
+
+        let deckCount = (try? await container.flashcardRepository.getDeckCount()) ?? 0
+
+        // Collection data — kanji
+        let collectedKanjiItems = (try? await container.collectionRepository.getCollectedByType(type: .kanji)) ?? []
+        let collectedItemsMap = Dictionary(uniqueKeysWithValues: collectedKanjiItems.map { ($0.itemId, $0) })
+        let collectedKanjiIds = Set(collectedKanjiItems.map { $0.itemId })
+
+        // Grades with collection
+        var gradesWithCollection: Set<Int32> = []
+        var perGradeCollected: [Int32: Int] = [:]
+        var perGradeTotal: [Int32: Int] = [:]
+        var totalKanjiInGrades = 0
+        for grade: Int32 in [1, 2, 3, 4, 5, 6, 8] {
+            let gradeList = (try? await container.kanjiRepository.getKanjiByGrade(grade: grade)) ?? []
+            perGradeTotal[grade] = gradeList.count
+            totalKanjiInGrades += gradeList.count
+            let collected = gradeList.filter { collectedKanjiIds.contains($0.id) }.count
+            perGradeCollected[grade] = collected
+            if collected > 0 { gradesWithCollection.insert(grade) }
+        }
+
+        // Per-JLPT counts
+        var perJlptCollected: [Int32: Int] = [:]
+        var perJlptTotal: [Int32: Int] = [:]
+        for level: Int32 in [5, 4, 3, 2, 1] {
+            let jlptList = (try? await container.kanjiRepository.getKanjiByJlptLevel(level: level)) ?? []
+            perJlptTotal[level] = jlptList.count
+            perJlptCollected[level] = jlptList.filter { collectedKanjiIds.contains($0.id) }.count
+        }
+
+        // Collection data — kana + radicals
+        let collectedHiragana = (try? await container.collectionRepository.getCollectedByType(type: .hiragana)) ?? []
+        let collectedKatakana = (try? await container.collectionRepository.getCollectedByType(type: .katakana)) ?? []
+        let collectedRadicals = (try? await container.collectionRepository.getCollectedByType(type: .radical)) ?? []
+
+        // Kana lists
+        let hiraganaList = (try? await container.kanaRepository.getKanaByType(type: .hiragana)) ?? []
+        let katakanaList = (try? await container.kanaRepository.getKanaByType(type: .katakana)) ?? []
+
+        // Radicals
+        let radicals = (try? await container.radicalRepository.getAllRadicals()) ?? []
+
+        // Progress
+        let hiraganaTotal = Float(hiraganaList.count)
+        let hiraganaStudied = Float((try? await container.kanaSrsRepository.getTypeStudiedCount(kanaType: "HIRAGANA")) ?? 0)
+        let katakanaTotal = Float(katakanaList.count)
+        let katakanaStudied = Float((try? await container.kanaSrsRepository.getTypeStudiedCount(kanaType: "KATAKANA")) ?? 0)
+        let radicalTotal = Float(radicals.count)
+        let radicalStudied = Float((try? await container.radicalSrsRepository.getStudiedCount()) ?? 0)
+
+        // Stroke counts
+        let strokeCounts: [Int32]
+        if !isFirstLoad && !preserveStrokeCounts.isEmpty {
+            strokeCounts = preserveStrokeCounts
+        } else {
+            strokeCounts = ((try? await container.kanjiRepository.getDistinctStrokeCounts()) ?? []).map { Int32(truncating: $0 as! NSNumber) }
+        }
+
+        uiState = HomeUiState(
+            profile: profile,
+            gradeOneKanji: gradeKanji,
+            kanjiCount: totalCount,
+            coinBalance: coinBalance,
+            wordOfTheDay: wotd,
+            isLoading: false,
+            isPremium: isPremium,
+            isAdmin: container.userSessionProvider.isAdmin(),
+            effectiveLevel: effectiveLevel,
+            previewTrials: loadPreviewTrials(),
+            tierName: tier.nameEn,
+            tierNameJp: tier.nameJp,
+            tierProgress: LevelProgression.companion.getTierProgress(level: playerLevel),
+            nextTierName: nextTier?.nameEn,
+            nextTierLevel: nextTier?.levelRange?.first as? Int32,
+            highestUnlockedGrade: highestGrade,
+            gradeMasteryList: gradeMasteryList,
+            displayLevel: playerLevel,
+            kanjiPracticeCounts: practiceCounts,
+            kanjiModeStats: modeStats,
+            flashcardDeckCount: deckCount,
+            unlockedGrades: unlockedGrades,
+            allGrades: [1, 2, 3, 4, 5, 6, 8],
+            gradesWithCollection: gradesWithCollection,
+            selectedGrade: activeGrade,
+            hiraganaProgress: hiraganaTotal > 0 ? hiraganaStudied / hiraganaTotal : 0,
+            katakanaProgress: katakanaTotal > 0 ? katakanaStudied / katakanaTotal : 0,
+            radicalProgress: radicalTotal > 0 ? radicalStudied / radicalTotal : 0,
+            selectedMainTab: isFirstLoad ? .kanji : preserveMainTab,
+            radicals: radicals,
+            kanjiSortMode: isFirstLoad ? .schoolGrade : preserveSortMode,
+            selectedJlptLevel: isFirstLoad ? 5 : preserveJlpt,
+            selectedStrokeCount: isFirstLoad ? (strokeCounts.first ?? 1) : preserveStroke,
+            selectedFrequencyRange: isFirstLoad ? 0 : preserveFreq,
+            availableStrokeCounts: strokeCounts,
+            collectedKanjiCount: collectedKanjiItems.count,
+            totalKanjiInGrades: totalKanjiInGrades,
+            collectedItems: collectedItemsMap,
+            hiraganaList: hiraganaList,
+            katakanaList: katakanaList,
+            collectedHiraganaIds: Set(collectedHiragana.map { $0.itemId }),
+            collectedKatakanaIds: Set(collectedKatakana.map { $0.itemId }),
+            collectedRadicalIds: Set(collectedRadicals.map { $0.itemId }),
+            collectedHiraganaItems: Dictionary(uniqueKeysWithValues: collectedHiragana.map { ($0.itemId, $0) }),
+            collectedKatakanaItems: Dictionary(uniqueKeysWithValues: collectedKatakana.map { ($0.itemId, $0) }),
+            collectedRadicalItems: Dictionary(uniqueKeysWithValues: collectedRadicals.map { ($0.itemId, $0) }),
+            perGradeCollectedCounts: perGradeCollected,
+            perGradeTotalCounts: perGradeTotal,
+            perJlptCollectedCounts: perJlptCollected,
+            perJlptTotalCounts: perJlptTotal
+        )
+        isFirstLoad = false
     }
 
-    @Published var userProfile: UserProfileData?
-    @Published var nextKanji: KanjiData?
-    @Published var isLoadingKanji = true
-    @Published var kanjiLoadError: String?
+    // MARK: - Preview Trials
 
-    func load(container: AppContainer) async {
-        // Load user profile from shared-core
-        do {
-            let profile = try await container.userRepository.getProfile()
-            let level = Int(profile.level)
-            let xp = Int(profile.totalXp)
-            let threshold = level * level * 50  // level²×50
-            let prevThreshold = max(0, (level - 1) * (level - 1) * 50)
-            let xpInLevel = xp - prevThreshold
-            let xpNeeded = threshold - prevThreshold
-
-            userProfile = UserProfileData(
-                level: level,
-                xp: xp,
-                xpToNext: max(0, threshold - xp),
-                xpProgress: xpNeeded > 0 ? CGFloat(xpInLevel) / CGFloat(xpNeeded) : 0
+    private func loadPreviewTrials() -> [String: PreviewTrialInfo] {
+        return [
+            "WRITING": PreviewTrialInfo(
+                remaining: container.previewTrialManager.getRemainingTrials(mode: "WRITING"),
+                limit: container.previewTrialManager.getTrialLimit(mode: "WRITING")
+            ),
+            "VOCABULARY": PreviewTrialInfo(
+                remaining: container.previewTrialManager.getRemainingTrials(mode: "VOCABULARY"),
+                limit: container.previewTrialManager.getTrialLimit(mode: "VOCABULARY")
+            ),
+            "CAMERA_CHALLENGE": PreviewTrialInfo(
+                remaining: container.previewTrialManager.getRemainingTrials(mode: "CAMERA_CHALLENGE"),
+                limit: container.previewTrialManager.getTrialLimit(mode: "CAMERA_CHALLENGE")
             )
-        } catch {
-            userProfile = UserProfileData(level: 1, xp: 0, xpToNext: 50, xpProgress: 0)
-        }
-
-        // Load a kanji for the practice button preview
-        isLoadingKanji = true
-        do {
-            let kanjiList = try await container.kanjiRepository.getKanjiByGrade(grade: 1)
-            if let first = kanjiList.first {
-                nextKanji = KanjiData(
-                    literal: first.literal,
-                    strokePaths: first.strokeSvg?.components(separatedBy: "|||") ?? []
-                )
-            } else {
-                // Show diagnostics so we can see exactly what went wrong
-                let diag = Self.dbDiagnostics(factory: container.databaseDriverFactory)
-                kanjiLoadError = "No kanji (grade=1) found.\n\n\(diag)"
-            }
-        } catch {
-            let diag = Self.dbDiagnostics(factory: container.databaseDriverFactory)
-            kanjiLoadError = "Failed to load kanji: \(error.localizedDescription)\n\n\(diag)"
-        }
-        isLoadingKanji = false
+        ]
     }
 
-    private static func dbDiagnostics(factory: DatabaseDriverFactory) -> String {
-        let fm = FileManager.default
-        var lines: [String] = []
-
-        // 1. Where Kotlin opens the DB
-        let kotlinPath = factory.resolvedDbPath
-        lines.append("KN path: \(kotlinPath)")
-
-        // 2. Does that file exist? How big?
-        if fm.fileExists(atPath: kotlinPath) {
-            let size = (try? fm.attributesOfItem(atPath: kotlinPath))?[.size] as? UInt64 ?? 0
-            lines.append("KN file: \(size) bytes")
-        } else {
-            lines.append("KN file: MISSING")
+    func usePreviewTrial(mode: String) -> Bool {
+        let success = container.previewTrialManager.usePreviewTrial(mode: mode)
+        if success {
+            uiState.previewTrials = loadPreviewTrials()
         }
+        return success
+    }
 
-        // 3. Bundle resource check
-        if let bundleURL = Bundle.main.url(forResource: "kanjiquest", withExtension: "db") {
-            let bSize = (try? fm.attributesOfItem(atPath: bundleURL.path))?[.size] as? UInt64 ?? 0
-            lines.append("Bundle DB: \(bSize) bytes at \(bundleURL.lastPathComponent)")
-        } else {
-            lines.append("Bundle DB: NOT FOUND")
+    // MARK: - Tab / Sort / Filter Selection
+
+    func selectMainTab(_ tab: MainTab) {
+        uiState.selectedMainTab = tab
+    }
+
+    func selectGrade(_ grade: Int32) {
+        Task {
+            let gradeKanji = (try? await container.kanjiRepository.getKanjiByGrade(grade: grade)) ?? []
+            let kanjiIds = gradeKanji.map { Int64($0.id) }
+            let practiceCounts = await loadPracticeCounts(kanjiIds: kanjiIds)
+            let modeStats = await loadModeStats(kanjiIds: kanjiIds)
+            uiState.gradeOneKanji = gradeKanji
+            uiState.selectedGrade = grade
+            uiState.kanjiPracticeCounts = practiceCounts
+            uiState.kanjiModeStats = modeStats
+            uiState.kanjiSortMode = .schoolGrade
         }
+    }
 
-        // 4. Documents dir check
-        if let docsURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let docsPath = docsURL.appendingPathComponent("kanjiquest.db").path
-            if fm.fileExists(atPath: docsPath) {
-                let dSize = (try? fm.attributesOfItem(atPath: docsPath))?[.size] as? UInt64 ?? 0
-                lines.append("Docs DB: \(dSize) bytes")
-            } else {
-                lines.append("Docs DB: MISSING")
+    func selectSortMode(_ mode: KanjiSortMode) {
+        Task {
+            switch mode {
+            case .schoolGrade:
+                let grade = uiState.selectedGrade
+                let kanji = (try? await container.kanjiRepository.getKanjiByGrade(grade: grade)) ?? []
+                let ids = kanji.map { Int64($0.id) }
+                uiState.kanjiSortMode = mode
+                uiState.gradeOneKanji = kanji
+                uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+                uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+                uiState.selectedMainTab = .kanji
+
+            case .jlptLevel:
+                let level = uiState.selectedJlptLevel
+                let kanji = (try? await container.kanjiRepository.getKanjiByJlptLevel(level: level)) ?? []
+                let ids = kanji.map { Int64($0.id) }
+                uiState.kanjiSortMode = mode
+                uiState.gradeOneKanji = kanji
+                uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+                uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+                uiState.selectedMainTab = .kanji
+
+            case .strokes:
+                let counts = ((try? await container.kanjiRepository.getDistinctStrokeCounts()) ?? []).map { Int32(truncating: $0 as! NSNumber) }
+                let first = counts.first ?? 1
+                let kanji = (try? await container.kanjiRepository.getKanjiByStrokeCount(strokeCount: first)) ?? []
+                let ids = kanji.map { Int64($0.id) }
+                uiState.kanjiSortMode = mode
+                uiState.gradeOneKanji = kanji
+                uiState.availableStrokeCounts = counts
+                uiState.selectedStrokeCount = first
+                uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+                uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+                uiState.selectedMainTab = .kanji
+
+            case .frequency:
+                let rangeIndex = uiState.selectedFrequencyRange
+                let (from, to) = Self.frequencyRanges[rangeIndex]
+                let kanji = (try? await container.kanjiRepository.getKanjiByFrequencyRange(from: from, to: to)) ?? []
+                let ids = kanji.map { Int64($0.id) }
+                uiState.kanjiSortMode = mode
+                uiState.gradeOneKanji = kanji
+                uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+                uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+                uiState.selectedMainTab = .kanji
             }
-            lines.append("Docs dir: \(docsURL.path)")
         }
+    }
 
-        // 5. Swift staging version
-        let ver = UserDefaults.standard.integer(forKey: "kanjiquest_swift_db_version")
-        lines.append("Swift DB ver: \(ver)")
+    func selectJlptLevel(_ level: Int32) {
+        Task {
+            let kanji = (try? await container.kanjiRepository.getKanjiByJlptLevel(level: level)) ?? []
+            let ids = kanji.map { Int64($0.id) }
+            uiState.gradeOneKanji = kanji
+            uiState.selectedJlptLevel = level
+            uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+            uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+        }
+    }
 
-        return lines.joined(separator: "\n")
+    func selectStrokeCount(_ count: Int32) {
+        Task {
+            let kanji = (try? await container.kanjiRepository.getKanjiByStrokeCount(strokeCount: count)) ?? []
+            let ids = kanji.map { Int64($0.id) }
+            uiState.gradeOneKanji = kanji
+            uiState.selectedStrokeCount = count
+            uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+            uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+        }
+    }
+
+    func selectFrequencyRange(_ rangeIndex: Int) {
+        Task {
+            let (from, to) = Self.frequencyRanges[rangeIndex]
+            let kanji = (try? await container.kanjiRepository.getKanjiByFrequencyRange(from: from, to: to)) ?? []
+            let ids = kanji.map { Int64($0.id) }
+            uiState.gradeOneKanji = kanji
+            uiState.selectedFrequencyRange = rangeIndex
+            uiState.kanjiPracticeCounts = await loadPracticeCounts(kanjiIds: ids)
+            uiState.kanjiModeStats = await loadModeStats(kanjiIds: ids)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func loadPracticeCounts(kanjiIds: [Int64]) async -> [Int32: Int32] {
+        guard !kanjiIds.isEmpty else { return [:] }
+        guard let cards = try? await container.srsRepository.getCardsByIds(kanjiIds: kanjiIds) else { return [:] }
+        var result: [Int32: Int32] = [:]
+        for card in cards { result[card.kanjiId] = card.totalReviews }
+        return result
+    }
+
+    private func loadModeStats(kanjiIds: [Int64]) async -> [Int32: [String: Int32]] {
+        guard !kanjiIds.isEmpty else { return [:] }
+        guard let stats = try? await container.srsRepository.getModeStatsByIds(kanjiIds: kanjiIds) else { return [:] }
+        // Convert from KMP type to Swift dictionary
+        var result: [Int32: [String: Int32]] = [:]
+        for (key, value) in stats {
+            if let k = key as? Int32, let v = value as? [String: Int32] {
+                result[k] = v
+            }
+        }
+        return result
+    }
+
+    func refresh() {
+        Task { await loadData() }
+    }
+
+    private func observeCoinBalance() async {
+        let userId = container.userSessionProvider.getUserId()
+        // Observe coin balance flow — SKIE converts Flow to AsyncSequence
+        do {
+            for try await balance in container.jCoinRepository.observeBalance(userId: userId) {
+                uiState.coinBalance = balance
+            }
+        } catch {
+            // Flow collection ended
+        }
     }
 }

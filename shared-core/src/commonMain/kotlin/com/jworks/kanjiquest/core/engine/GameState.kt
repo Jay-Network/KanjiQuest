@@ -3,6 +3,7 @@ package com.jworks.kanjiquest.core.engine
 import com.jworks.kanjiquest.core.domain.model.CollectedItem
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.KanaType
+import com.jworks.kanjiquest.core.domain.model.Vocabulary
 
 data class Question(
     val kanjiId: Int,
@@ -22,7 +23,17 @@ data class Question(
     val radicalNameJp: String? = null,
     val kanjiGrade: Int? = null,
     val kanjiFrequency: Int? = null,
-    val kanjiStrokeCount: Int = 0
+    val kanjiStrokeCount: Int = 0,
+    val kunReadings: List<String> = emptyList(),
+    val onReadings: List<String> = emptyList(),
+    val exampleWords: List<Vocabulary> = emptyList(),
+    val kanjiMeaning: String? = null
+)
+
+data class DiscoveredKanjiInfo(
+    val kanjiId: Int,
+    val literal: String,
+    val meaning: String
 )
 
 data class SessionStats(
@@ -33,7 +44,8 @@ data class SessionStats(
     val xpEarned: Int,
     val durationSec: Int,
     val touchedKanjiIds: List<Int> = emptyList(),
-    val touchedVocabIds: List<Long> = emptyList()
+    val touchedVocabIds: List<Long> = emptyList(),
+    val newlyCollectedKanji: List<DiscoveredKanjiInfo> = emptyList()
 )
 
 sealed class GameState {

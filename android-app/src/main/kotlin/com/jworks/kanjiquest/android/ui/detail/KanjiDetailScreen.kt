@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.core.domain.model.ExampleSentence
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.Kanji
 import com.jworks.kanjiquest.core.domain.model.Vocabulary
@@ -283,12 +284,15 @@ fun KanjiDetailScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Related vocabulary
+                // Related vocabulary with example sentences
                 if (uiState.vocabulary.isNotEmpty()) {
                     SectionCard(title = "Related Vocabulary") {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             uiState.vocabulary.take(10).forEach { vocab ->
-                                VocabItem(vocab)
+                                VocabItem(
+                                    vocab = vocab,
+                                    sentence = uiState.vocabSentences[vocab.id]
+                                )
                             }
                         }
                     }
@@ -377,7 +381,7 @@ private fun SectionCard(
 }
 
 @Composable
-private fun VocabItem(vocab: Vocabulary) {
+private fun VocabItem(vocab: Vocabulary, sentence: ExampleSentence? = null) {
     Column {
         Text(
             text = "${vocab.kanjiForm}  (${vocab.reading})",
@@ -389,5 +393,18 @@ private fun VocabItem(vocab: Vocabulary) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (sentence != null) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = sentence.japanese,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = sentence.english,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
     }
 }
