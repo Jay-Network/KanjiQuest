@@ -52,11 +52,57 @@ final class HomeViewModel: ObservableObject {
                     strokePaths: first.strokeSvg?.components(separatedBy: "|||") ?? []
                 )
             } else {
-                kanjiLoadError = "No kanji data in database. The database may not be bundled correctly."
+                // Show diagnostics so we can see exactly what went wrong
+                let diag = Self.dbDiagnostics(factory: container.databaseDriverFactory)
+                kanjiLoadError = "No kanji (grade=1) found.\n\n\(diag)"
             }
         } catch {
-            kanjiLoadError = "Failed to load kanji: \(error.localizedDescription)"
+            let diag = Self.dbDiagnostics(factory: container.databaseDriverFactory)
+            kanjiLoadError = "Failed to load kanji: \(error.localizedDescription)\n\n\(diag)"
         }
         isLoadingKanji = false
+    }
+
+    private static func dbDiagnostics(factory: DatabaseDriverFactory) -> String {
+        let fm = FileManager.default
+        var lines: [String] = []
+
+        // 1. Where Kotlin opens the DB
+        let kotlinPath = factory.resolvedDbPath
+        lines.append("KN path: \(kotlinPath)")
+
+        // 2. Does that file exist? How big?
+        if fm.fileExists(atPath: kotlinPath) {
+            let size = (try? fm.attributesOfItem(atPath: kotlinPath))?[.size] as? UInt64 ?? 0
+            lines.append("KN file: \(size) bytes")
+        } else {
+            lines.append("KN file: MISSING")
+        }
+
+        // 3. Bundle resource check
+        if let bundleURL = Bundle.main.url(forResource: "kanjiquest", withExtension: "db") {
+            let bSize = (try? fm.attributesOfItem(atPath: bundleURL.path))?[.size] as? UInt64 ?? 0
+            lines.append("Bundle DB: \(bSize) bytes at \(bundleURL.lastPathComponent)")
+        } else {
+            lines.append("Bundle DB: NOT FOUND")
+        }
+
+        // 4. Documents dir check
+        if let docsURL = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let docsPath = docsURL.appendingPathComponent("kanjiquest.db").path
+            if fm.fileExists(atPath: docsPath) {
+                let dSize = (try? fm.attributesOfItem(atPath: docsPath))?[.size] as? UInt64 ?? 0
+                lines.append("Docs DB: \(dSize) bytes")
+            } else {
+                lines.append("Docs DB: MISSING")
+            }
+            lines.append("Docs dir: \(docsURL.path)")
+        }
+
+        // 5. Swift staging version
+        let ver = UserDefaults.standard.integer(forKey: "kanjiquest_swift_db_version")
+        lines.append("Swift DB ver: \(ver)")
+
+        return lines.joined(separator: "\n")
     }
 }

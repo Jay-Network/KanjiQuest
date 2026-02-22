@@ -4,32 +4,48 @@ package com.jworks.kanjiquest.core.data
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import com.jworks.kanjiquest.db.KanjiQuestDatabase
-import platform.Foundation.NSBundle
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSLog
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
-import platform.Foundation.NSUserDefaults
 import platform.Foundation.NSUserDomainMask
 
 actual class DatabaseDriverFactory {
-    actual fun createDriver(): SqlDriver {
-        copyDatabaseIfNeeded()
+    // Expose the full DB path so Swift can verify it
+    val resolvedDbPath: String = run {
+        val paths = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, true
+        )
+        val docs = paths.firstOrNull() as? String ?: ""
+        "$docs/$DB_NAME"
+    }
 
-        // Pre-built DB has user_version=1 (set in repo), so NativeSqliteDriver
-        // will skip Schema.create() (version matches). This preserves kanji data.
+    actual fun createDriver(): SqlDriver {
+        NSLog("KanjiQuest [KN]: Opening DB at FULL PATH: %s", resolvedDbPath)
+
+        val fm = NSFileManager.defaultManager
+        val exists = fm.fileExistsAtPath(resolvedDbPath)
+        val size = if (exists) {
+            (fm.attributesOfItemAtPath(resolvedDbPath, error = null)
+                ?.get("NSFileSize") as? Long) ?: 0L
+        } else 0L
+        NSLog("KanjiQuest [KN]: DB exists=%s, size=%d bytes", exists.toString(), size)
+
+        // Use FULL PATH so NativeSqliteDriver opens exactly where Swift copied the DB.
+        // When name contains "/", sqliter uses it as-is (no path resolution).
         val driver = NativeSqliteDriver(
             schema = KanjiQuestDatabase.Schema,
-            name = DB_NAME
+            name = resolvedDbPath
         )
 
-        // Create tables that the pre-built DB doesn't have.
-        // The pre-built DB has: kanji, vocabulary, kanji_vocabulary, example_sentence,
-        // srs_card, user_profile, study_session, daily_stats, achievement, kana,
-        // kana_srs_card, radical, radical_srs_card, kanji_radical, flashcard_deck_group.
-        // These tables were added later and need CREATE IF NOT EXISTS.
-        ensureNewTables(driver)
+        // Verify kanji count right after opening
+        val cursor = driver.executeQuery(null, "SELECT COUNT(*) FROM kanji", { cursor ->
+            cursor.next()
+            cursor.getLong(0) ?: 0L
+        }, 0)
+        NSLog("KanjiQuest [KN]: Kanji count after open = %d", cursor)
 
+        ensureNewTables(driver)
         return driver
     }
 
@@ -154,63 +170,6 @@ actual class DatabaseDriverFactory {
         for (sql in statements) {
             driver.execute(null, sql.trimIndent(), 0)
         }
-    }
-
-    /**
-     * Fallback DB copy from Kotlin/Native.
-     * The primary copy happens in Swift (AppContainer.stageBundleDatabase) before
-     * this class is even instantiated — NSBundle.mainBundle from an XCFramework
-     * may not resolve the app bundle reliably.
-     */
-    private fun copyDatabaseIfNeeded() {
-        val fileManager = NSFileManager.defaultManager
-        val documentsPath = NSSearchPathForDirectoriesInDomains(
-            NSDocumentDirectory, NSUserDomainMask, true
-        ).firstOrNull() as? String ?: return
-
-        val dbDestination = "$documentsPath/$DB_NAME"
-
-        // If the Swift side already staged the DB, skip.
-        if (fileManager.fileExistsAtPath(dbDestination)) {
-            val attrs = fileManager.attributesOfItemAtPath(dbDestination, error = null)
-            val size = (attrs?.get("NSFileSize") as? Long) ?: 0L
-            if (size > 1_000_000L) {
-                NSLog("KanjiQuest [KN]: DB already present (%d bytes), skipping copy", size)
-                return
-            }
-            NSLog("KanjiQuest [KN]: DB file too small (%d bytes), attempting fallback copy", size)
-        }
-
-        // Attempt copy from bundle (may fail from XCFramework context)
-        var bundlePath = NSBundle.mainBundle.pathForResource(
-            name = DB_NAME.removeSuffix(".db"),
-            ofType = "db"
-        )
-        NSLog("KanjiQuest [KN]: pathForResource result = %s", bundlePath ?: "null")
-
-        if (bundlePath == null) {
-            val resourcePath = NSBundle.mainBundle.resourcePath
-            NSLog("KanjiQuest [KN]: resourcePath = %s", resourcePath ?: "null")
-            if (resourcePath != null) {
-                val directPath = "$resourcePath/$DB_NAME"
-                if (fileManager.fileExistsAtPath(directPath)) {
-                    bundlePath = directPath
-                    NSLog("KanjiQuest [KN]: Found DB via direct path: %s", directPath)
-                }
-            }
-        }
-
-        if (bundlePath == null) {
-            NSLog("KanjiQuest [KN]: DB not found in bundle (Swift side should have handled this)")
-            return
-        }
-
-        if (fileManager.fileExistsAtPath(dbDestination)) {
-            fileManager.removeItemAtPath(dbDestination, error = null)
-        }
-
-        val success = fileManager.copyItemAtPath(bundlePath, toPath = dbDestination, error = null)
-        NSLog("KanjiQuest [KN]: Copy result = %s", if (success) "success" else "FAILED")
     }
 
     companion object {
