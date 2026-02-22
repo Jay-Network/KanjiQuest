@@ -12,7 +12,10 @@ on:
 
 env:
   JAVA_VERSION: '17'
+  BUNDLE_ID: 'com.jworks.kanjiquest.ipad'
+  SCHEME: 'KanjiQuest'
   TEAM_ID: '27943BGKL7'
+  PROFILE_NAME: 'KanjiQuest iPad App Store'
 
 jobs:
   build-xcframework:
@@ -51,26 +54,9 @@ jobs:
             shared-japanese/build/XCFrameworks/release/
 
   build-ios:
-    name: Build ${{ matrix.variant.name }}
+    name: Build & Upload to TestFlight
     runs-on: macos-14
     needs: build-xcframework
-    strategy:
-      matrix:
-        variant:
-          - name: iPad
-            scheme: KanjiQuest
-            bundle_id: com.jworks.kanjiquest.ipad
-            xcconfig: KanjiQuest.xcconfig
-            profile_secret: APPLE_PROVISIONING_PROFILE_BASE64
-            archive_name: KanjiQuest
-            ipa_artifact: KanjiQuest-iPad
-          - name: iPhone
-            scheme: KanjiQuestPhone
-            bundle_id: com.jworks.kanjiquest.iphone
-            xcconfig: KanjiQuestPhone.xcconfig
-            profile_secret: APPLE_PROVISIONING_PROFILE_IPHONE_BASE64
-            archive_name: KanjiQuestPhone
-            ipa_artifact: KanjiQuest-iPhone
     steps:
       - uses: actions/checkout@v4
 
@@ -106,7 +92,7 @@ jobs:
         env:
           CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          PROVISIONING_PROFILE_BASE64: ${{ secrets[matrix.variant.profile_secret] }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
@@ -137,23 +123,19 @@ jobs:
           echo "Profile UUID: $PP_UUID"
           echo "Profile Name: $PP_NAME"
 
-      - name: Create xcconfig files
+      - name: Create xcconfig
         working-directory: ios-app
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          XCCONFIG_FILE: ${{ matrix.variant.xcconfig }}
         run: |
-          # Create the active variant's xcconfig with real secrets
-          cat > "$XCCONFIG_FILE" << EOF
+          cat > KanjiQuest.xcconfig << EOF
           SUPABASE_URL = ${SUPABASE_URL}
           SUPABASE_ANON_KEY = ${SUPABASE_ANON_KEY}
           GEMINI_API_KEY = ${GEMINI_API_KEY}
           DEVELOPMENT_TEAM = 27943BGKL7
           EOF
-          # xcodegen validates ALL targets, so create stubs for any missing xcconfigs
-          touch KanjiQuest.xcconfig KanjiQuestPhone.xcconfig
 
       - name: Generate Xcode project
         working-directory: ios-app
@@ -161,8 +143,6 @@ jobs:
 
       - name: Create ExportOptions.plist
         working-directory: ios-app
-        env:
-          VARIANT_BUNDLE_ID: ${{ matrix.variant.bundle_id }}
         run: |
           cat > ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -179,27 +159,24 @@ jobs:
             <string>Apple Distribution</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>${VARIANT_BUNDLE_ID}</key>
+              <key>com.jworks.kanjiquest.ipad</key>
               <string>${PP_NAME}</string>
             </dict>
           </dict>
           </plist>
           EOF
-          echo "ExportOptions.plist bundle: ${VARIANT_BUNDLE_ID}, profile: $PP_NAME"
+          echo "ExportOptions.plist profile name: $PP_NAME"
 
       - name: Archive
         working-directory: ios-app
-        env:
-          VARIANT_SCHEME: ${{ matrix.variant.scheme }}
-          VARIANT_ARCHIVE: ${{ matrix.variant.archive_name }}
         run: |
           set -o pipefail
           xcodebuild archive \
             -project KanjiQuest.xcodeproj \
-            -scheme "$VARIANT_SCHEME" \
+            -scheme KanjiQuest \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath "build/${VARIANT_ARCHIVE}.xcarchive" \
+            -archivePath build/KanjiQuest.xcarchive \
             DEVELOPMENT_TEAM=27943BGKL7 \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
@@ -216,19 +193,15 @@ jobs:
 
       - name: Verify archive
         working-directory: ios-app
-        env:
-          VARIANT_ARCHIVE: ${{ matrix.variant.archive_name }}
         run: |
-          ls -la "build/${VARIANT_ARCHIVE}.xcarchive/Products/Applications/" || { echo "Archive failed - no .app found"; exit 1; }
+          ls -la build/KanjiQuest.xcarchive/Products/Applications/ || { echo "Archive failed - no .app found"; exit 1; }
 
       - name: Export IPA
         working-directory: ios-app
-        env:
-          VARIANT_ARCHIVE: ${{ matrix.variant.archive_name }}
         run: |
           set -o pipefail
           xcodebuild -exportArchive \
-            -archivePath "build/${VARIANT_ARCHIVE}.xcarchive" \
+            -archivePath build/KanjiQuest.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath build/export \
             | xcpretty
@@ -248,10 +221,9 @@ jobs:
           API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         working-directory: ios-app
         run: |
-          IPA_FILE=$(ls build/export/*.ipa | head -1)
           xcrun altool --upload-app \
             --type ios \
-            --file "$IPA_FILE" \
+            --file build/export/KanjiQuest.ipa \
             --apiKey "$API_KEY_ID" \
             --apiIssuer "$API_ISSUER_ID"
 
@@ -259,8 +231,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ matrix.variant.ipa_artifact }}.ipa
-          path: ios-app/build/export/*.ipa
+          name: KanjiQuest-iPad.ipa
+          path: ios-app/build/export/KanjiQuest.ipa
 
       - name: Cleanup keychain
         if: always()
