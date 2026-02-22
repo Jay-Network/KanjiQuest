@@ -11,7 +11,7 @@ settings:
   base:
     DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "5"
+    CURRENT_PROJECT_VERSION: "6"
     SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "2"  # iPad only
 
@@ -31,7 +31,7 @@ targets:
       - path: KanjiQuest
         excludes:
           - "**/.DS_Store"
-      - path: ../android-app/src/main/assets/kanjiquest.db
+      - path: kanjiquest.db
         buildPhase: resources
 
     settings:
@@ -64,6 +64,16 @@ targets:
       - sdk: libsqlite3.tbd
 
     preBuildScripts:
+      - name: "Stage Database"
+        script: |
+          # Copy pre-built kanji database to project dir for resource bundling
+          DB_DEST="${PROJECT_DIR}/kanjiquest.db"
+          DB_SRC="${PROJECT_DIR}/../android-app/src/main/assets/kanjiquest.db"
+          if [ ! -f "$DB_DEST" ] && [ -f "$DB_SRC" ]; then
+            cp "$DB_SRC" "$DB_DEST"
+          fi
+        basedOnDependencyAnalysis: false
+
       - name: "Link SharedCore XCFramework"
         script: |
           # Copy XCFramework to local Frameworks/ if not present
@@ -77,17 +87,6 @@ targets:
             ./gradlew :shared-core:assembleSharedCoreReleaseXCFramework
             mkdir -p "${PROJECT_DIR}/Frameworks"
             cp -R "$SRC" "$DEST"
-          fi
-        basedOnDependencyAnalysis: false
-
-    postCompileScripts:
-      - name: "Copy Database"
-        script: |
-          # Copy pre-built kanji database to app bundle
-          DB_SOURCE="${PROJECT_DIR}/../android-app/src/main/assets/kanjiquest.db"
-          DB_DEST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/kanjiquest.db"
-          if [ -f "$DB_SOURCE" ]; then
-            cp "$DB_SOURCE" "$DB_DEST"
           fi
         basedOnDependencyAnalysis: false
 

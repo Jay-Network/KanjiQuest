@@ -1,4 +1,4 @@
-name: KanjiQuest iOS Build & TestFlight
+name: KanjiQuest iPad Build & TestFlight
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
       - 'shared-core/**'
       - 'shared-japanese/**'
       - 'ios-app/**'
-      - '.github/workflows/kanjiquest-ios.yml'
+      - '.github/workflows/kanjiquest-ipad.yml'
   workflow_dispatch:
 
 env:
@@ -15,7 +15,6 @@ env:
   BUNDLE_ID: 'com.jworks.kanjiquest.ipad'
   SCHEME: 'KanjiQuest'
   TEAM_ID: '27943BGKL7'
-  PROFILE_NAME: 'KanjiQuest iPad App Store'
 
 jobs:
   build-xcframework:
@@ -54,7 +53,7 @@ jobs:
             shared-japanese/build/XCFrameworks/release/
 
   build-ios:
-    name: Build & Upload to TestFlight
+    name: Build iPad & Upload to TestFlight
     runs-on: macos-14
     needs: build-xcframework
     steps:
@@ -92,7 +91,7 @@ jobs:
         env:
           CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_IPAD_BASE64 }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
@@ -128,14 +127,23 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           cat > KanjiQuest.xcconfig << EOF
           SUPABASE_URL = ${SUPABASE_URL}
           SUPABASE_ANON_KEY = ${SUPABASE_ANON_KEY}
+          SUPABASE_SERVICE_ROLE_KEY = ${SUPABASE_SERVICE_ROLE_KEY}
           GEMINI_API_KEY = ${GEMINI_API_KEY}
           DEVELOPMENT_TEAM = 27943BGKL7
           EOF
+
+      - name: Stage database for bundling
+        working-directory: ios-app
+        run: |
+          cp ../android-app/src/main/assets/kanjiquest.db ./kanjiquest.db
+          ls -la kanjiquest.db
+          echo "DB staged for Xcode resource bundling"
 
       - name: Generate Xcode project
         working-directory: ios-app
@@ -195,6 +203,9 @@ jobs:
         working-directory: ios-app
         run: |
           ls -la build/KanjiQuest.xcarchive/Products/Applications/ || { echo "Archive failed - no .app found"; exit 1; }
+          ls -la build/KanjiQuest.xcarchive/Products/Applications/KanjiQuest.app/kanjiquest.db || { echo "WARNING: kanjiquest.db NOT in archive bundle!"; }
+          echo "=== Bundle contents ==="
+          ls build/KanjiQuest.xcarchive/Products/Applications/KanjiQuest.app/ | head -20
 
       - name: Export IPA
         working-directory: ios-app

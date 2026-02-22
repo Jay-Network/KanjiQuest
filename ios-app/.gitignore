@@ -14,5 +14,8 @@ Pods/
 # XCFrameworks (copied at build time)
 Frameworks/
 
+# Database (copied from android-app/src/main/assets/ at build time)
+kanjiquest.db
+
 # OS
 .DS_Store
