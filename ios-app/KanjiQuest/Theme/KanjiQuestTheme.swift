@@ -30,6 +30,12 @@ enum KanjiQuestTheme {
     static let onSurface = Color(hex: 0x1C1B1F)
     static let onSurfaceVariant = Color(hex: 0x49454F)
 
+    // MARK: - Container colors (Material3)
+    static let primaryContainer = Color(hex: 0xFFDDB8)
+    static let onPrimaryContainer = Color(hex: 0x2C1600)
+    static let secondaryContainer = Color(hex: 0xCCE8E4)
+    static let onSecondaryContainer = Color(hex: 0x002019)
+
     // MARK: - Status
     static let success = Color(hex: 0x2E7D32)
     static let error = Color(hex: 0xB00020)
@@ -61,6 +67,7 @@ enum KanjiQuestTheme {
     // MARK: - Typography
     static let headlineLarge = Font.system(size: 36, weight: .bold, design: .rounded)
     static let headlineMedium = Font.system(size: 32, weight: .bold, design: .rounded)
+    static let headlineSmall = Font.system(size: 28, weight: .bold, design: .rounded)
     static let titleLarge = Font.system(size: 28, weight: .bold, design: .rounded)
     static let titleMedium = Font.system(size: 22, weight: .semibold, design: .rounded)
     static let titleSmall = Font.system(size: 18, weight: .semibold, design: .rounded)

@@ -40,8 +40,14 @@ final class CollectionViewModel: ObservableObject {
     private func loadItems() {
         Task {
             isLoading = true
-            let type = selectedTab.rawValue.lowercased()
-            items = (try? await collectionRepository?.getItemsByType(type: type)) ?? []
+            let itemType: CollectionItemType
+            switch selectedTab {
+            case .kanji: itemType = .kanji
+            case .hiragana: itemType = .hiragana
+            case .katakana: itemType = .katakana
+            case .radical: itemType = .radical
+            }
+            items = (try? await collectionRepository?.getCollectedByType(type: itemType)) ?? []
             totalCollected = items.count
 
             // Load kanji literals for kanji tab

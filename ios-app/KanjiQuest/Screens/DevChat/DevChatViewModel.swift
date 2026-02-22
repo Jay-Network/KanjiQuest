@@ -17,7 +17,7 @@ final class DevChatViewModel: ObservableObject {
         devChatRepository = container.devChatRepository
 
         Task {
-            cachedEmail = container.authRepository.getUserEmail()
+            cachedEmail = try? await container.userSessionProvider.getUserEmail()
             await loadMessages()
             startPolling()
         }

@@ -57,11 +57,11 @@ class RecognitionViewModel: ObservableObject {
         Task {
             do {
                 if let targetId = targetKanjiId {
-                    engine.startTargetedSession(mode: .recognition, targetKanjiId: targetId)
+                    try await engine.startTargetedSession(mode: .recognition, targetKanjiId: targetId)
                 } else {
-                    engine.startSession(mode: .recognition, questionCount: Int32(count))
+                    try await engine.startSession(mode: .recognition, questionCount: Int32(count))
                 }
-                loadQuestion()
+                await loadQuestion()
             } catch {
                 errorMessage = "Failed to start session: \(error.localizedDescription)"
             }
@@ -71,35 +71,38 @@ class RecognitionViewModel: ObservableObject {
     func submitAnswer(_ answer: String) {
         guard let engine = gameEngine, let question = currentQuestion else { return }
         selectedAnswer = answer
-        let correct = engine.submitAnswer(answer: answer)
-        isCorrect = correct
-        showResult = true
 
-        if correct {
-            correctCount += 1
-            currentCombo += 1
-            if currentCombo > comboMax { comboMax = currentCombo }
-            let baseXp = 10
-            let comboMultiplier = min(currentCombo, 5)
-            let earned = baseXp + (comboMultiplier - 1) * 2
-            xpGained = earned
-            sessionXp += earned
-        } else {
-            xpGained = 0
-            currentCombo = 0
-        }
+        Task {
+            let correct = try await engine.submitAnswer(answer: answer)
+            isCorrect = correct
+            showResult = true
 
-        // Check for discovered collection item
-        if let discovered = engine.lastDiscoveredItem {
-            discoveredItem = discovered
-            discoveredKanjiLiteral = question.kanjiLiteral
-            showDiscovery = true
-            allDiscoveries.append((literal: question.kanjiLiteral, meaning: question.kanjiMeaning ?? question.kanjiLiteral))
+            if correct {
+                correctCount += 1
+                currentCombo += 1
+                if currentCombo > comboMax { comboMax = currentCombo }
+                let baseXp = 10
+                let comboMultiplier = min(currentCombo, 5)
+                let earned = baseXp + (comboMultiplier - 1) * 2
+                xpGained = earned
+                sessionXp += earned
+            } else {
+                xpGained = 0
+                currentCombo = 0
+            }
+
+            // Check for discovered collection item
+            if let discovered = engine.lastDiscoveredItem {
+                discoveredItem = discovered
+                discoveredKanjiLiteral = question.kanjiLiteral
+                showDiscovery = true
+                allDiscoveries.append((literal: question.kanjiLiteral, meaning: question.kanjiMeaning ?? question.kanjiLiteral))
+            }
         }
     }
 
     func next() {
-        loadQuestion()
+        Task { await loadQuestion() }
     }
 
     func reset() {
@@ -123,32 +126,33 @@ class RecognitionViewModel: ObservableObject {
         showDiscovery = false
     }
 
-    private func loadQuestion() {
+    private func loadQuestion() async {
         guard let engine = gameEngine else { return }
         selectedAnswer = nil
         isCorrect = nil
         showResult = false
         xpGained = 0
 
-        if let question = engine.nextQuestion() {
+        if let question = try? await engine.nextQuestion() {
             currentQuestion = question
             questionNumber += 1
         } else {
-            endSession()
+            await endSession()
         }
     }
 
-    private func endSession() {
+    private func endSession() async {
         guard let engine = gameEngine else { return }
-        let result = engine.endSession()
-        sessionXp = Int(result?.xpEarned ?? Int32(sessionXp))
+        let stats = try? await engine.endSession()
+        sessionXp = Int(stats?.xpEarned ?? Int32(sessionXp))
         durationSec = Int(Date().timeIntervalSince(startTime ?? Date()))
         newDiscoveries = allDiscoveries
         sessionComplete = true
 
-        Task {
+        if let stats = stats {
+            let result = try? await completeSessionUseCase?.execute(stats: stats)
             if let result = result {
-                try? await completeSessionUseCase?.execute(result: result)
+                sessionResult = SessionResultData(from: result)
             }
         }
     }

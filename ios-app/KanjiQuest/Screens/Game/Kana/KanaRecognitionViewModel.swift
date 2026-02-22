@@ -33,8 +33,8 @@ class KanaRecognitionViewModel: ObservableObject {
 
         Task {
             do {
-                engine.startKanaSession(kanaType: kanaType, questionCount: Int32(count))
-                loadQuestion()
+                try await engine.startKanaSession(kanaType: kanaType, questionCount: Int32(count))
+                await loadQuestion()
             } catch {
                 errorMessage = "Failed to start session: \(error.localizedDescription)"
             }
@@ -44,26 +44,29 @@ class KanaRecognitionViewModel: ObservableObject {
     func submitAnswer(_ answer: String) {
         guard let engine = gameEngine else { return }
         selectedAnswer = answer
-        let correct = engine.submitAnswer(answer: answer)
-        isCorrect = correct
-        showResult = true
 
-        if correct {
-            correctCount += 1
-            currentCombo += 1
-            if currentCombo > comboMax { comboMax = currentCombo }
-            let baseXp = 10
-            let comboMultiplier = min(currentCombo, 5)
-            xpGained = baseXp + (comboMultiplier - 1) * 2
-            sessionXp += xpGained
-        } else {
-            xpGained = 0
-            currentCombo = 0
+        Task {
+            let correct = try await engine.submitAnswer(answer: answer)
+            isCorrect = correct
+            showResult = true
+
+            if correct {
+                correctCount += 1
+                currentCombo += 1
+                if currentCombo > comboMax { comboMax = currentCombo }
+                let baseXp = 10
+                let comboMultiplier = min(currentCombo, 5)
+                xpGained = baseXp + (comboMultiplier - 1) * 2
+                sessionXp += xpGained
+            } else {
+                xpGained = 0
+                currentCombo = 0
+            }
         }
     }
 
     func next() {
-        loadQuestion()
+        Task { await loadQuestion() }
     }
 
     func reset() {
@@ -83,30 +86,31 @@ class KanaRecognitionViewModel: ObservableObject {
         sessionResult = nil
     }
 
-    private func loadQuestion() {
+    private func loadQuestion() async {
         guard let engine = gameEngine else { return }
         selectedAnswer = nil
         isCorrect = nil
         showResult = false
         xpGained = 0
 
-        if let question = engine.nextQuestion() {
+        if let question = try? await engine.nextQuestion() {
             currentQuestion = question
             questionNumber += 1
         } else {
-            endSession()
+            await endSession()
         }
     }
 
-    private func endSession() {
+    private func endSession() async {
         guard let engine = gameEngine else { return }
-        let result = engine.endSession()
-        sessionXp = Int(result?.xpEarned ?? Int32(sessionXp))
+        let stats = try? await engine.endSession()
+        sessionXp = Int(stats?.xpEarned ?? Int32(sessionXp))
         sessionComplete = true
 
-        Task {
+        if let stats = stats {
+            let result = try? await completeSessionUseCase?.execute(stats: stats)
             if let result = result {
-                try? await completeSessionUseCase?.execute(result: result)
+                sessionResult = SessionResultData(from: result)
             }
         }
     }

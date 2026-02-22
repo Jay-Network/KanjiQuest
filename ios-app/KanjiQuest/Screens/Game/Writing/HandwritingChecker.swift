@@ -51,7 +51,8 @@ class HandwritingChecker {
         )
 
         do {
-            let response = try await geminiClient.generateWithImage(prompt: prompt, imageBase64: imageBase64)
+            let imageData = Data(base64Encoded: imageBase64)
+            let response = try await geminiClient.generateContent(prompt: prompt, imageData: imageData)
             return parseResponse(response, imageBase64: imageBase64)
         } catch {
             return .unavailable(imageBase64: imageBase64)

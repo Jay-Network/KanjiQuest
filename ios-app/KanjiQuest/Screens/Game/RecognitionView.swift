@@ -175,19 +175,22 @@ struct RecognitionView: View {
                     .foregroundColor(KanjiQuestTheme.onSurface)
             }
 
-            if let kunReadings = question.kunReadings, !kunReadings.isEmpty {
+            let kunReadings = question.kunReadings as? [String] ?? []
+            if !kunReadings.isEmpty {
                 Text("訓: \(kunReadings.joined(separator: "、"))")
                     .font(KanjiQuestTheme.bodyLarge).fontWeight(.bold)
                     .foregroundColor(KanjiQuestTheme.primary)
             }
 
-            if let onReadings = question.onReadings, !onReadings.isEmpty {
+            let onReadings = question.onReadings as? [String] ?? []
+            if !onReadings.isEmpty {
                 Text("音: \(onReadings.joined(separator: "、"))")
                     .font(KanjiQuestTheme.bodyMedium)
                     .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
             }
 
-            if let words = question.exampleWords, !words.isEmpty {
+            let words = question.exampleWords as? [Vocabulary] ?? []
+            if !words.isEmpty {
                 ForEach(Array(words.prefix(3).enumerated()), id: \.offset) { _, vocab in
                     Text("\(vocab.kanjiForm) (\(vocab.reading)) \(vocab.primaryMeaning)")
                         .font(KanjiQuestTheme.bodySmall)

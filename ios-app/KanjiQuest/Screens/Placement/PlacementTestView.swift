@@ -13,16 +13,17 @@ struct PlacementTestView: View {
         ZStack {
             KanjiQuestTheme.background.ignoresSafeArea()
 
-            if viewModel.showIntro {
+            switch viewModel.phase {
+            case .intro:
                 introContent
-            } else if viewModel.isLoading {
+            case .loading:
                 VStack(spacing: 16) {
                     ProgressView()
                     Text("Preparing assessment...").font(KanjiQuestTheme.bodyLarge)
                 }
-            } else if viewModel.isComplete {
+            case .complete:
                 resultContent
-            } else {
+            case .question:
                 questionContent
             }
         }
@@ -39,7 +40,7 @@ struct PlacementTestView: View {
         }
         .toolbarBackground(KanjiQuestTheme.primary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .task { viewModel.preloadData(container: container) }
+        .task { viewModel.configure(container: container) }
     }
 
     // MARK: - Intro
@@ -78,9 +79,9 @@ struct PlacementTestView: View {
                 Spacer().frame(height: 16)
 
                 Button {
-                    viewModel.beginAssessment(container: container)
+                    viewModel.beginAssessment()
                 } label: {
-                    if viewModel.isLoading {
+                    if viewModel.phase == .loading {
                         ProgressView()
                             .tint(.white)
                             .frame(maxWidth: .infinity)
@@ -95,7 +96,7 @@ struct PlacementTestView: View {
                 }
                 .background(KanjiQuestTheme.primary)
                 .cornerRadius(12)
-                .disabled(viewModel.isLoading)
+                .disabled(viewModel.phase == .loading)
             }
             .padding(24)
         }
@@ -104,7 +105,7 @@ struct PlacementTestView: View {
     // MARK: - Question
 
     private var questionContent: some View {
-        guard let question = viewModel.question else { return AnyView(EmptyView()) }
+        guard let question = viewModel.currentQuestion else { return AnyView(EmptyView()) }
 
         return AnyView(ScrollView {
             VStack(spacing: 0) {
@@ -117,10 +118,10 @@ struct PlacementTestView: View {
 
                     Spacer()
 
-                    Text(formatTime(viewModel.remainingSeconds))
+                    Text(formatTime(viewModel.timeRemaining))
                         .font(KanjiQuestTheme.titleMedium)
                         .fontWeight(.bold)
-                        .foregroundColor(viewModel.remainingSeconds <= 30 ? Color(hex: 0xF44336) : KanjiQuestTheme.onSurfaceVariant)
+                        .foregroundColor(viewModel.timeRemaining <= 30 ? Color(hex: 0xF44336) : KanjiQuestTheme.onSurfaceVariant)
 
                     Spacer()
 
@@ -139,7 +140,7 @@ struct PlacementTestView: View {
                 VStack(spacing: 8) {
                     KanjiText(text: question.displayCharacter)
                         .font(.system(size: 96))
-                    Text(question.questionPrompt)
+                    Text(question.prompt)
                         .font(KanjiQuestTheme.bodyMedium)
                         .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
                 }
@@ -162,7 +163,7 @@ struct PlacementTestView: View {
                     Spacer().frame(height: 16)
 
                     Button {
-                        viewModel.nextQuestion(container: container)
+                        viewModel.nextQuestion()
                     } label: {
                         Text(viewModel.questionIndex == 4 ? "Finish Stage" : "Next")
                             .font(.system(size: 16, weight: .bold))
@@ -175,7 +176,7 @@ struct PlacementTestView: View {
 
                     Spacer().frame(height: 8)
 
-                    Text("\(viewModel.currentStage.displayName): \(viewModel.stageCorrectCount) / \(viewModel.questionIndex + 1) correct")
+                    Text("\(viewModel.currentStage.displayName): \(viewModel.stageCorrect) / \(viewModel.questionIndex + 1) correct")
                         .font(KanjiQuestTheme.bodySmall)
                         .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
                 }
@@ -233,11 +234,11 @@ struct PlacementTestView: View {
             VStack(spacing: 24) {
                 Spacer().frame(height: 16)
 
-                Text(viewModel.timedOut ? "Time's Up!" : "Assessment Complete!")
+                Text(viewModel.timeRemaining <= 0 ? "Time's Up!" : "Assessment Complete!")
                     .font(KanjiQuestTheme.headlineMedium)
                     .fontWeight(.bold)
 
-                if viewModel.timedOut {
+                if viewModel.timeRemaining <= 0 {
                     Text("We used your answers so far to find your level.")
                         .font(KanjiQuestTheme.bodyMedium)
                         .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
@@ -254,20 +255,6 @@ struct PlacementTestView: View {
                         .font(KanjiQuestTheme.headlineLarge)
                         .fontWeight(.bold)
                         .foregroundColor(KanjiQuestTheme.primary)
-
-                    Text(viewModel.assignedTierName)
-                        .font(KanjiQuestTheme.titleLarge)
-                        .foregroundColor(KanjiQuestTheme.primary.opacity(0.8))
-
-                    if let grade = viewModel.highestPassedGrade {
-                        Text("You passed up to Grade \(grade)")
-                            .font(KanjiQuestTheme.bodyMedium)
-                            .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
-                    } else if let stage = viewModel.highestPassedStage {
-                        Text("You passed: \(stage.displayName)")
-                            .font(KanjiQuestTheme.bodyMedium)
-                            .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
-                    }
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity)
@@ -280,13 +267,13 @@ struct PlacementTestView: View {
                         .font(KanjiQuestTheme.titleSmall)
                         .fontWeight(.bold)
 
-                    ForEach(viewModel.stageResults, id: \.0) { stageName, correct, total in
-                        let passed = correct >= 4
+                    ForEach(Array(viewModel.stageResults.enumerated()), id: \.offset) { _, result in
+                        let passed = result.passed
                         HStack {
-                            Text(stageName)
+                            Text(result.stage.displayName)
                                 .font(KanjiQuestTheme.bodyLarge)
                             Spacer()
-                            Text("\(correct)/\(total)")
+                            Text("\(result.correct)/\(result.total)")
                                 .font(KanjiQuestTheme.bodyLarge)
                                 .fontWeight(.bold)
                                 .foregroundColor(passed ? Color(hex: 0x4CAF50) : Color(hex: 0xF44336))

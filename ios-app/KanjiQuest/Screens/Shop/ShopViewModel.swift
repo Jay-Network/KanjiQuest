@@ -23,7 +23,7 @@ final class ShopViewModel: ObservableObject {
     }
 
     private var jCoinRepository: JCoinRepository?
-    private var userSessionProvider: UserSessionProvider?
+    private var userSessionProvider: UserSessionProviderImpl?
 
     func load(container: AppContainer) {
         jCoinRepository = container.jCoinRepository

@@ -107,7 +107,8 @@ struct VocabularyView: View {
                     Spacer().frame(height: KanjiQuestTheme.spacingM)
 
                     // Kanji decomposition
-                    if let breakdown = question.kanjiBreakdown, !breakdown.isEmpty {
+                    let breakdown = question.kanjiBreakdown as? [String] ?? []
+                    if !breakdown.isEmpty {
                         decompositionCard(breakdown)
                             .padding(.horizontal, KanjiQuestTheme.spacingM)
                     }

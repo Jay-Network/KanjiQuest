@@ -40,7 +40,7 @@ class WritingViewModel: ObservableObject {
     private var completeSessionUseCase: CompleteSessionUseCase?
     private var handwritingChecker: HandwritingChecker?
     private var aiFeedbackReporter: AiFeedbackReporter?
-    private var userSessionProvider: UserSessionProvider?
+    private var userSessionProvider: UserSessionProviderImpl?
 
     func start(container: AppContainer, targetKanjiId: Int32? = nil) {
         let engine = container.makeGameEngine()
@@ -55,15 +55,19 @@ class WritingViewModel: ObservableObject {
         if let targetId = targetKanjiId {
             gameState = .preparing
             Task {
-                engine.onEvent(event: GameEvent.StartSession(
-                    gameMode: GameMode.writing,
-                    questionCount: 5,
-                    targetKanjiId: KotlinInt(value: targetId)
-                ))
-                observeState(engine)
+                do {
+                    try await engine.onEvent(event: GameEvent.StartSession(
+                        gameMode: GameMode.writing,
+                        questionCount: 5,
+                        targetKanjiId: KotlinInt(int: targetId),
+                        kanaType: nil
+                    ))
+                    observeState(engine)
+                } catch {
+                    gameState = .error(error.localizedDescription)
+                }
             }
         }
-        // Otherwise wait for user to press Start (setup screen shown)
     }
 
     func startGame(questionCount: Int = 10) {
@@ -71,25 +75,30 @@ class WritingViewModel: ObservableObject {
         gameState = .preparing
 
         Task {
-            engine.onEvent(event: GameEvent.StartSession(
-                gameMode: GameMode.writing,
-                questionCount: Int32(questionCount)
-            ))
-            observeState(engine)
+            do {
+                try await engine.onEvent(event: GameEvent.StartSession(
+                    gameMode: GameMode.writing,
+                    questionCount: Int32(questionCount),
+                    targetKanjiId: nil,
+                    kanaType: nil
+                ))
+                observeState(engine)
+            } catch {
+                gameState = .error(error.localizedDescription)
+            }
         }
     }
 
     private func observeState(_ engine: GameEngine) {
         Task {
             for await state in engine.state {
-                await MainActor.run { self.updateState(state) }
+                await MainActor.run { self.updateState(state as! GameState) }
             }
         }
     }
 
     private func updateState(_ state: GameState) {
-        switch state {
-        case let awaiting as GameState.AwaitingAnswer:
+        if let awaiting = state as? GameState.AwaitingAnswer {
             gameState = .awaitingAnswer(GameQuestionState(from: awaiting))
             // Clear drawing state for new question
             completedStrokes = []
@@ -112,7 +121,7 @@ class WritingViewModel: ObservableObject {
                 writingDifficulty = .guided
             }
 
-        case let result as GameState.ShowingResult:
+        } else if let result = state as? GameState.ShowingResult {
             gameState = .showingResult(GameResultState(from: result))
             if result.isCorrect {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -120,22 +129,22 @@ class WritingViewModel: ObservableObject {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
 
-        case let complete as GameState.SessionComplete:
+        } else if let complete = state as? GameState.SessionComplete {
             gameState = .sessionComplete(GameSessionStats(from: complete.stats))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             Task {
                 if let useCase = completeSessionUseCase {
                     let result = try? await useCase.execute(stats: complete.stats)
                     await MainActor.run {
-                        self.sessionResult = result.map { SessionResultData(from: $0) }
+                        if let result = result {
+                            self.sessionResult = SessionResultData(from: result)
+                        }
                     }
                 }
             }
 
-        case let error as GameState.Error:
+        } else if let error = state as? GameState.Error {
             gameState = .error(error.message)
-
-        default: break
         }
     }
 
@@ -208,16 +217,16 @@ class WritingViewModel: ObservableObject {
             stroke.map { p in SharedCore.Point(x: Float(p.x), y: Float(p.y)) }
         }
         let referenceStrokes = strokePaths.map { pathData -> [SharedCore.Point] in
-            let rawPoints = SvgPathParser.parseSvgPath(pathData: pathData)
+            let rawPoints = SvgPathParser.shared.parseSvgPath(pathData: pathData)
             if canvasSize > 0 {
                 let scale = Float(canvasSize) / 109.0
-                return rawPoints.map { p in SharedCore.Point(x: p.x * scale, y: p.y * scale) }
+                return (rawPoints as! [SharedCore.Point]).map { p in SharedCore.Point(x: p.x * scale, y: p.y * scale) }
             }
-            return rawPoints
+            return rawPoints as! [SharedCore.Point]
         }
 
         let srsState = q.srsState ?? ""
-        let result = StrokeMatcher.validateWriting(
+        let result = StrokeMatcher.shared.validateWriting(
             drawnStrokes: drawnPoints,
             referenceStrokes: referenceStrokes,
             srsState: srsState
@@ -232,7 +241,7 @@ class WritingViewModel: ObservableObject {
         )
 
         Task {
-            gameEngine?.onEvent(event: GameEvent.SubmitAnswer(answer: answer))
+            try? await gameEngine?.onEvent(event: GameEvent.SubmitAnswer(answer: answer))
         }
 
         // Fire-and-forget AI check
@@ -255,7 +264,7 @@ class WritingViewModel: ObservableObject {
     }
 
     func nextQuestion() {
-        Task { gameEngine?.onEvent(event: GameEvent.NextQuestion()) }
+        Task { try? await gameEngine?.onEvent(event: GameEvent.NextQuestion()) }
     }
 
     func reset() {

@@ -111,7 +111,7 @@ class HomeViewModel: ObservableObject {
         let preserveStrokeCounts = prev.availableStrokeCounts
 
         // Sync email for admin detection
-        if let email = try? await container.authRepository.getCurrentUserEmail?() {
+        if let email = try? await container.userSessionProvider.getUserEmail() {
             container.userSessionProvider.updateEmail(email: email)
         }
 
@@ -275,6 +275,10 @@ class HomeViewModel: ObservableObject {
             "CAMERA_CHALLENGE": PreviewTrialInfo(
                 remaining: container.previewTrialManager.getRemainingTrials(mode: "CAMERA_CHALLENGE"),
                 limit: container.previewTrialManager.getTrialLimit(mode: "CAMERA_CHALLENGE")
+            ),
+            "RADICAL_BUILDER": PreviewTrialInfo(
+                remaining: container.previewTrialManager.getRemainingTrials(mode: "RADICAL_BUILDER"),
+                limit: container.previewTrialManager.getTrialLimit(mode: "RADICAL_BUILDER")
             )
         ]
     }

@@ -30,7 +30,7 @@ class ProgressViewModel: ObservableObject {
     // MARK: - Computed Convenience Properties
 
     var level: Int { Int(profile.level) }
-    var totalXp: Int64 { profile.totalXp }
+    var totalXp: Int64 { Int64(profile.totalXp) }
     var currentStreak: Int { Int(profile.currentStreak) }
     var longestStreak: Int { Int(profile.longestStreak) }
     var dailyGoal: Int {
@@ -74,12 +74,12 @@ class ProgressViewModel: ObservableObject {
 
                 // Compute per-grade mastery
                 let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride()?.intValue ?? Int(profile.level)
-                let unlockedGrades = LevelProgression.companion.getUnlockedGrades(level: Int32(playerLevel))
+                let tier = LevelProgression.companion.getTierForLevel(level: Int32(playerLevel))
+                let unlockedGrades = tier.unlockedGrades as? [Int32] ?? [1]
                 var masteries: [GradeMastery] = []
                 for grade in unlockedGrades {
-                    let gradeInt = grade.int32Value
-                    let totalInGrade = try await container.kanjiRepository.getKanjiCountByGrade(grade: gradeInt)
-                    let mastery = try await container.srsRepository.getGradeMastery(grade: gradeInt, totalKanjiInGrade: totalInGrade.int64Value)
+                    let totalInGrade = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
+                    let mastery = try await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: totalInGrade)
                     masteries.append(mastery)
                 }
 

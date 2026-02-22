@@ -98,13 +98,14 @@ struct RadicalBuilderView: View {
                             .font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
                             .foregroundColor(correct ? radicalColor : KanjiQuestTheme.error)
 
-                        if !correct, let correctKanji = question.correctAnswer {
-                            Text("Answer: \(correctKanji)")
+                        if !correct {
+                            Text("Answer: \(question.correctAnswer)")
                                 .font(KanjiQuestTheme.bodyLarge)
                                 .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
                         }
 
-                        if let breakdown = question.kanjiBreakdown, !breakdown.isEmpty {
+                        let breakdown = question.kanjiBreakdown as? [String] ?? []
+                        if !breakdown.isEmpty {
                             ForEach(Array(breakdown.enumerated()), id: \.offset) { _, line in
                                 Text(line)
                                     .font(KanjiQuestTheme.bodySmall)

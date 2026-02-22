@@ -82,7 +82,7 @@ struct RadicalRecognitionView: View {
                     .frame(width: 200, height: 200)
                     .overlay(
                         RadicalImage(
-                            radicalId: Int(question.kanjiId),
+                            radicalId: question.kanjiId,
                             contentDescription: question.kanjiLiteral,
                             size: 160
                         )
@@ -104,8 +104,8 @@ struct RadicalRecognitionView: View {
                                 .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
                         }
 
-                        if !(correct), let correctAnswer = question.correctAnswer {
-                            Text("Answer: \(correctAnswer)")
+                        if !(correct) {
+                            Text("Answer: \(question.correctAnswer)")
                                 .font(KanjiQuestTheme.bodyMedium)
                                 .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
                         }

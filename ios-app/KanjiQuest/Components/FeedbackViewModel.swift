@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import SharedCore
 
 @MainActor
@@ -23,7 +24,7 @@ final class FeedbackViewModel: ObservableObject {
     func configure(container: AppContainer) {
         feedbackRepository = container.feedbackRepository
         Task {
-            cachedEmail = container.authRepository.getUserEmail()
+            cachedEmail = try? await container.userSessionProvider.getUserEmail()
         }
     }
 

@@ -1,10 +1,23 @@
 import Foundation
 import SharedCore
-import UIKit
 
 @MainActor
 class RadicalRecognitionViewModel: ObservableObject {
-    @Published var gameState: GameStateWrapper = .idle
+    @Published var currentQuestion: Question? = nil
+    @Published var selectedAnswer: String? = nil
+    @Published var isCorrect: Bool? = nil
+    @Published var showResult: Bool = false
+    @Published var sessionComplete: Bool = false
+    @Published var errorMessage: String? = nil
+
+    @Published var questionNumber: Int = 0
+    @Published var totalQuestions: Int = 10
+    @Published var correctCount: Int = 0
+    @Published var currentCombo: Int = 0
+    @Published var comboMax: Int = 0
+    @Published var sessionXp: Int = 0
+    @Published var xpGained: Int = 0
+
     @Published var sessionResult: SessionResultData? = nil
 
     private var gameEngine: GameEngine?
@@ -17,64 +30,89 @@ class RadicalRecognitionViewModel: ObservableObject {
 
         var sessionLength = UserDefaults.standard.integer(forKey: "session_length")
         if sessionLength == 0 { sessionLength = 10 }
-        gameState = .preparing
+        totalQuestions = sessionLength
 
         Task {
-            engine.onEvent(event: GameEvent.StartSession(
-                gameMode: GameMode.radicalRecognition,
-                questionCount: Int32(sessionLength)
-            ))
-            observeState(engine)
-        }
-    }
-
-    private func observeState(_ engine: GameEngine) {
-        Task {
-            for await state in engine.state {
-                await MainActor.run { self.updateState(state) }
+            do {
+                try await engine.startSession(mode: .radicalRecognition, questionCount: Int32(sessionLength))
+                await loadQuestion()
+            } catch {
+                errorMessage = "Failed to start session: \(error.localizedDescription)"
             }
-        }
-    }
-
-    private func updateState(_ state: GameState) {
-        switch state {
-        case let awaiting as GameState.AwaitingAnswer:
-            gameState = .awaitingAnswer(GameQuestionState(from: awaiting))
-        case let result as GameState.ShowingResult:
-            gameState = .showingResult(GameResultState(from: result))
-            if result.isCorrect {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            } else {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-            }
-        case let complete as GameState.SessionComplete:
-            gameState = .sessionComplete(GameSessionStats(from: complete.stats))
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            Task {
-                if let useCase = completeSessionUseCase {
-                    let result = try? await useCase.execute(stats: complete.stats)
-                    await MainActor.run {
-                        self.sessionResult = result.map { SessionResultData(from: $0) }
-                    }
-                }
-            }
-        case let error as GameState.Error:
-            gameState = .error(error.message)
-        default: break
         }
     }
 
     func submitAnswer(_ answer: String) {
-        Task { gameEngine?.onEvent(event: GameEvent.SubmitAnswer(answer: answer)) }
+        guard let engine = gameEngine else { return }
+        selectedAnswer = answer
+
+        Task {
+            let correct = try await engine.submitAnswer(answer: answer)
+            isCorrect = correct
+            showResult = true
+
+            if correct {
+                correctCount += 1
+                currentCombo += 1
+                if currentCombo > comboMax { comboMax = currentCombo }
+                let baseXp = 10
+                let comboMultiplier = min(currentCombo, 5)
+                xpGained = baseXp + (comboMultiplier - 1) * 2
+                sessionXp += xpGained
+            } else {
+                xpGained = 0
+                currentCombo = 0
+            }
+        }
     }
 
-    func nextQuestion() {
-        Task { gameEngine?.onEvent(event: GameEvent.NextQuestion()) }
+    func next() {
+        Task { await loadQuestion() }
     }
 
     func reset() {
         gameEngine?.reset()
-        gameState = .idle
+        currentQuestion = nil
+        selectedAnswer = nil
+        isCorrect = nil
+        showResult = false
+        sessionComplete = false
+        errorMessage = nil
+        questionNumber = 0
+        correctCount = 0
+        currentCombo = 0
+        comboMax = 0
+        sessionXp = 0
+        xpGained = 0
         sessionResult = nil
+    }
+
+    private func loadQuestion() async {
+        guard let engine = gameEngine else { return }
+        selectedAnswer = nil
+        isCorrect = nil
+        showResult = false
+        xpGained = 0
+
+        if let question = try? await engine.nextQuestion() {
+            currentQuestion = question
+            questionNumber += 1
+        } else {
+            await endSession()
+        }
+    }
+
+    private func endSession() async {
+        guard let engine = gameEngine else { return }
+        let stats = try? await engine.endSession()
+        sessionXp = Int(stats?.xpEarned ?? Int32(sessionXp))
+        sessionComplete = true
+
+        if let stats = stats {
+            let result = try? await completeSessionUseCase?.execute(stats: stats)
+            if let result = result {
+                sessionResult = SessionResultData(from: result)
+            }
+        }
     }
 }
