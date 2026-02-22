@@ -156,6 +156,12 @@ actual class DatabaseDriverFactory {
         }
     }
 
+    /**
+     * Fallback DB copy from Kotlin/Native.
+     * The primary copy happens in Swift (AppContainer.stageBundleDatabase) before
+     * this class is even instantiated — NSBundle.mainBundle from an XCFramework
+     * may not resolve the app bundle reliably.
+     */
     private fun copyDatabaseIfNeeded() {
         val fileManager = NSFileManager.defaultManager
         val documentsPath = NSSearchPathForDirectoriesInDomains(
@@ -164,50 +170,50 @@ actual class DatabaseDriverFactory {
 
         val dbDestination = "$documentsPath/$DB_NAME"
 
-        val defaults = NSUserDefaults.standardUserDefaults
-        val installedVersion = defaults.integerForKey(DB_VERSION_KEY)
-
-        if (fileManager.fileExistsAtPath(dbDestination) && installedVersion >= DB_VERSION) {
-            return
+        // If the Swift side already staged the DB, skip.
+        if (fileManager.fileExistsAtPath(dbDestination)) {
+            val attrs = fileManager.attributesOfItemAtPath(dbDestination, error = null)
+            val size = (attrs?.get("NSFileSize") as? Long) ?: 0L
+            if (size > 1_000_000L) {
+                NSLog("KanjiQuest [KN]: DB already present (%d bytes), skipping copy", size)
+                return
+            }
+            NSLog("KanjiQuest [KN]: DB file too small (%d bytes), attempting fallback copy", size)
         }
 
-        // Try pathForResource first
+        // Attempt copy from bundle (may fail from XCFramework context)
         var bundlePath = NSBundle.mainBundle.pathForResource(
             name = DB_NAME.removeSuffix(".db"),
             ofType = "db"
         )
+        NSLog("KanjiQuest [KN]: pathForResource result = %s", bundlePath ?: "null")
 
-        // Fallback: check bundle root directly
         if (bundlePath == null) {
             val resourcePath = NSBundle.mainBundle.resourcePath
+            NSLog("KanjiQuest [KN]: resourcePath = %s", resourcePath ?: "null")
             if (resourcePath != null) {
                 val directPath = "$resourcePath/$DB_NAME"
                 if (fileManager.fileExistsAtPath(directPath)) {
                     bundlePath = directPath
+                    NSLog("KanjiQuest [KN]: Found DB via direct path: %s", directPath)
                 }
             }
         }
 
         if (bundlePath == null) {
-            NSLog("KanjiQuest: DB not found in bundle")
+            NSLog("KanjiQuest [KN]: DB not found in bundle (Swift side should have handled this)")
             return
         }
 
-        // Remove stale DB if present
         if (fileManager.fileExistsAtPath(dbDestination)) {
             fileManager.removeItemAtPath(dbDestination, error = null)
         }
 
         val success = fileManager.copyItemAtPath(bundlePath, toPath = dbDestination, error = null)
-        if (success) {
-            defaults.setInteger(DB_VERSION.toLong(), forKey = DB_VERSION_KEY)
-            NSLog("KanjiQuest: DB copied from bundle")
-        }
+        NSLog("KanjiQuest [KN]: Copy result = %s", if (success) "success" else "FAILED")
     }
 
     companion object {
         private const val DB_NAME = "kanjiquest.db"
-        private const val DB_VERSION_KEY = "kanjiquest_db_version"
-        private const val DB_VERSION = 1
     }
 }
