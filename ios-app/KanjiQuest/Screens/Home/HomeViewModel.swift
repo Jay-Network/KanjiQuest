@@ -18,6 +18,8 @@ final class HomeViewModel: ObservableObject {
 
     @Published var userProfile: UserProfileData?
     @Published var nextKanji: KanjiData?
+    @Published var isLoadingKanji = true
+    @Published var kanjiLoadError: String?
 
     func load(container: AppContainer) async {
         // Load user profile from shared-core
@@ -41,6 +43,7 @@ final class HomeViewModel: ObservableObject {
         }
 
         // Load a kanji for the practice button preview
+        isLoadingKanji = true
         do {
             let kanjiList = try await container.kanjiRepository.getKanjiByGrade(grade: 1)
             if let first = kanjiList.first {
@@ -48,9 +51,12 @@ final class HomeViewModel: ObservableObject {
                     literal: first.literal,
                     strokePaths: first.strokeSvg?.components(separatedBy: "|||") ?? []
                 )
+            } else {
+                kanjiLoadError = "No kanji data in database. The database may not be bundled correctly."
             }
         } catch {
-            // Will show disabled practice button
+            kanjiLoadError = "Failed to load kanji: \(error.localizedDescription)"
         }
+        isLoadingKanji = false
     }
 }

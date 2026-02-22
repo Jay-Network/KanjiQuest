@@ -4,6 +4,7 @@ import SharedCore
 struct HomeView: View {
     @EnvironmentObject var container: AppContainer
     @StateObject private var viewModel = HomeViewModel()
+    @State private var showCalligraphyError = false
     let navigateTo: (Route) -> Void
 
     var body: some View {
@@ -58,6 +59,8 @@ struct HomeView: View {
                                 kanjiLiteral: kanji.literal,
                                 strokePaths: kanji.strokePaths
                             ))
+                        } else if !viewModel.isLoadingKanji {
+                            showCalligraphyError = true
                         }
                     } label: {
                         HStack {
@@ -71,13 +74,20 @@ struct HomeView: View {
                                     .foregroundColor(.white.opacity(0.8))
                             }
                             Spacer()
-                            Image(systemName: "chevron.right")
+                            if viewModel.isLoadingKanji {
+                                SwiftUI.ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "chevron.right")
+                            }
                         }
                         .padding()
-                        .background(KanjiQuestTheme.primary)
+                        .background(viewModel.isLoadingKanji ? KanjiQuestTheme.primary.opacity(0.6) : KanjiQuestTheme.primary)
                         .foregroundColor(.white)
                         .cornerRadius(KanjiQuestTheme.radiusM)
                     }
+                    .disabled(viewModel.isLoadingKanji)
                 }
 
                 // Navigation links
@@ -96,6 +106,11 @@ struct HomeView: View {
             .padding(.horizontal)
         }
         .background(KanjiQuestTheme.background)
+        .alert("Calligraphy Unavailable", isPresented: $showCalligraphyError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.kanjiLoadError ?? "Kanji data could not be loaded. Please restart the app.")
+        }
         .task {
             await viewModel.load(container: container)
         }
