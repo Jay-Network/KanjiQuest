@@ -6,7 +6,7 @@ import SharedCore
 struct FlashcardStudyView: View {
     @EnvironmentObject var container: AppContainer
     @StateObject private var viewModel = FlashcardStudyViewModel()
-    let deckId: String
+    let deckId: Int64
     var onBack: () -> Void = {}
 
     var body: some View {

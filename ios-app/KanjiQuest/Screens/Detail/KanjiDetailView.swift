@@ -46,22 +46,22 @@ struct KanjiDetailView: View {
 
                         // Meanings
                         sectionCard(title: "Meanings") {
-                            Text(kanji.meanings.joined(separator: ", "))
+                            Text(kanji.meaningsEn.joined(separator: ", "))
                                 .font(KanjiQuestTheme.bodyLarge)
                         }
 
                         // On'yomi
-                        if let onReadings = kanji.onReadings, !onReadings.isEmpty {
+                        if !kanji.onReadings.isEmpty {
                             sectionCard(title: "On'yomi (Chinese readings)") {
-                                Text(onReadings.joined(separator: "   "))
+                                Text(kanji.onReadings.joined(separator: "   "))
                                     .font(KanjiQuestTheme.bodyLarge)
                             }
                         }
 
                         // Kun'yomi
-                        if let kunReadings = kanji.kunReadings, !kunReadings.isEmpty {
+                        if !kanji.kunReadings.isEmpty {
                             sectionCard(title: "Kun'yomi (Japanese readings)") {
-                                Text(kunReadings.joined(separator: "   "))
+                                Text(kanji.kunReadings.joined(separator: "   "))
                                     .font(KanjiQuestTheme.bodyLarge)
                             }
                         }
@@ -224,9 +224,9 @@ struct KanjiDetailView: View {
     private func vocabItem(_ vocab: Vocabulary) -> some View {
         let sentence = viewModel.vocabSentences[vocab.id]
         return VStack(alignment: .leading, spacing: 2) {
-            Text("\(vocab.word)  (\(vocab.reading))")
+            Text("\(vocab.kanjiForm)  (\(vocab.reading))")
                 .font(KanjiQuestTheme.bodyMedium).fontWeight(.medium)
-            Text(vocab.meaning)
+            Text(vocab.primaryMeaning)
                 .font(KanjiQuestTheme.bodySmall)
                 .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
             if let s = sentence {

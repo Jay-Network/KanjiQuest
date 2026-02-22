@@ -2,7 +2,7 @@ import Foundation
 import SharedCore
 
 struct FlashcardItem: Identifiable {
-    let id: String
+    var id: Int32 { entry.kanjiId }
     let entry: FlashcardEntry
     let kanji: Kanji?
 }
@@ -10,11 +10,11 @@ struct FlashcardItem: Identifiable {
 @MainActor
 final class FlashcardViewModel: ObservableObject {
     @Published var items: [FlashcardItem] = []
-    @Published var deckGroups: [FlashcardDeck] = []
-    @Published var selectedDeckId: String? = nil
+    @Published var deckGroups: [FlashcardDeckGroup] = []
+    @Published var selectedDeckId: Int64 = 1
     @Published var isLoading = true
     @Published var showCreateDeckDialog = false
-    @Published var editingDeck: FlashcardDeck? = nil
+    @Published var editingDeck: FlashcardDeckGroup? = nil
 
     private var flashcardRepository: FlashcardRepository?
     private var kanjiRepository: KanjiRepository?
@@ -28,61 +28,60 @@ final class FlashcardViewModel: ObservableObject {
     func loadDecks() {
         Task {
             isLoading = true
-            deckGroups = (try? await flashcardRepository?.getAllDecks()) ?? []
+            try? await flashcardRepository?.ensureDefaultDeck()
+            deckGroups = (try? await flashcardRepository?.getAllDeckGroups()) ?? []
 
-            // Select first deck if none selected
-            if selectedDeckId == nil, let first = deckGroups.first {
+            // Select first deck if current not in list
+            if !deckGroups.contains(where: { $0.id == selectedDeckId }), let first = deckGroups.first {
                 selectedDeckId = first.id
             }
 
-            // Create default deck if none exist
-            if deckGroups.isEmpty {
-                try? await flashcardRepository?.createDeck(name: "My Kanji")
-                deckGroups = (try? await flashcardRepository?.getAllDecks()) ?? []
-                selectedDeckId = deckGroups.first?.id
-            }
-
-            await loadDeck()
+            await loadDeck(selectedDeckId)
             isLoading = false
         }
     }
 
-    func loadDeck() async {
-        guard let deckId = selectedDeckId else { items = []; return }
-        let entries = (try? await flashcardRepository?.getCardsInDeck(deckId: deckId)) ?? []
+    func loadDeck(_ deckId: Int64) async {
+        let entries = (try? await flashcardRepository?.getFlashcardsByDeck(deckId: deckId)) ?? []
         var newItems: [FlashcardItem] = []
         for entry in entries {
             let kanji = try? await kanjiRepository?.getKanjiById(id: entry.kanjiId)
-            newItems.append(FlashcardItem(id: entry.id, entry: entry, kanji: kanji))
+            newItems.append(FlashcardItem(entry: entry, kanji: kanji))
         }
         items = newItems
     }
 
-    func selectDeck(_ deck: FlashcardDeck) {
+    func selectDeck(_ deck: FlashcardDeckGroup) {
         selectedDeckId = deck.id
-        Task { await loadDeck() }
+        isLoading = true
+        Task {
+            await loadDeck(deck.id)
+            isLoading = false
+        }
     }
 
     func createDeck(name: String) {
         Task {
-            try? await flashcardRepository?.createDeck(name: name)
+            let _ = try? await flashcardRepository?.createDeckGroup(name: name)
             loadDecks()
             showCreateDeckDialog = false
         }
     }
 
-    func renameDeck(_ deck: FlashcardDeck, to name: String) {
+    func renameDeck(_ deck: FlashcardDeckGroup, to name: String) {
         Task {
-            try? await flashcardRepository?.renameDeck(deckId: deck.id, name: name)
+            try? await flashcardRepository?.renameDeckGroup(id: deck.id, name: name)
             loadDecks()
             editingDeck = nil
         }
     }
 
-    func deleteDeck(_ deck: FlashcardDeck) {
+    func deleteDeck(_ deck: FlashcardDeckGroup) {
         Task {
-            try? await flashcardRepository?.deleteDeck(deckId: deck.id)
-            if selectedDeckId == deck.id { selectedDeckId = nil }
+            try? await flashcardRepository?.deleteDeckGroup(id: deck.id)
+            if selectedDeckId == deck.id, let first = deckGroups.first(where: { $0.id != deck.id }) {
+                selectedDeckId = first.id
+            }
             loadDecks()
             editingDeck = nil
         }
@@ -90,8 +89,8 @@ final class FlashcardViewModel: ObservableObject {
 
     func removeFromDeck(_ item: FlashcardItem) {
         Task {
-            try? await flashcardRepository?.removeFromDeck(entryId: item.entry.id)
-            await loadDeck()
+            try? await flashcardRepository?.removeFromDeck(deckId: selectedDeckId, kanjiId: item.entry.kanjiId)
+            await loadDeck(selectedDeckId)
         }
     }
 

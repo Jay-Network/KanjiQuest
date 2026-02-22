@@ -165,7 +165,7 @@ struct ShopView: View {
             if !isOwned { viewModel.showPurchaseDialog(item) }
         } label: {
             VStack(alignment: .leading, spacing: 8) {
-                AssetImage(filename: categoryImageAsset(item.category))
+                AssetImage(filename: categoryImageAsset(item.category), contentDescription: item.category.name)
                     .frame(width: 40, height: 40)
 
                 Text(item.name)
@@ -228,7 +228,7 @@ struct ShopView: View {
                             .cornerRadius(8)
                             .disabled(viewModel.balance < item.cost)
                     }
-                } else if case .success = viewModel.purchaseResult {
+                } else if viewModel.purchaseResult is PurchaseResult.Success {
                     let isTJ = item.category == .crossBusiness && item.id.hasPrefix("tutoringjay_")
                     Text(isTJ ? "Lesson Redeemed!" : "Purchased!")
                         .font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
@@ -257,9 +257,9 @@ struct ShopView: View {
                 } else {
                     Text("Purchase Failed")
                         .font(KanjiQuestTheme.titleLarge).fontWeight(.bold)
-                    if case .insufficientFunds = viewModel.purchaseResult {
+                    if viewModel.purchaseResult is PurchaseResult.InsufficientFunds {
                         Text("Not enough coins. Keep studying to earn more J Coins!")
-                    } else if case .alreadyOwned = viewModel.purchaseResult {
+                    } else if viewModel.purchaseResult is PurchaseResult.AlreadyOwned {
                         Text("You already own \(item.name).")
                     } else {
                         Text("Something went wrong. Please try again.")

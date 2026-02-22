@@ -7,7 +7,7 @@ struct FlashcardView: View {
     @EnvironmentObject var container: AppContainer
     @StateObject private var viewModel = FlashcardViewModel()
     var onBack: () -> Void = {}
-    var onStudy: ((String) -> Void)? = nil
+    var onStudy: ((Int64) -> Void)? = nil
     var onKanjiClick: ((Int32) -> Void)? = nil
 
     @State private var showCreateSheet = false
@@ -77,19 +77,17 @@ struct FlashcardView: View {
                         .padding(24)
                     } else {
                         // Study button
-                        if let deckId = viewModel.selectedDeckId {
-                            Button {
-                                onStudy?(deckId)
-                            } label: {
-                                Text("Study (\(viewModel.items.count) cards)")
-                                    .font(KanjiQuestTheme.labelLarge).fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity).frame(height: 48)
-                                    .background(KanjiQuestTheme.primary)
-                                    .cornerRadius(12)
-                            }
-                            .padding(.horizontal, 16).padding(.vertical, 8)
+                        Button {
+                            onStudy?(viewModel.selectedDeckId)
+                        } label: {
+                            Text("Study (\(viewModel.items.count) cards)")
+                                .font(KanjiQuestTheme.labelLarge).fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity).frame(height: 48)
+                                .background(KanjiQuestTheme.primary)
+                                .cornerRadius(12)
                         }
+                        .padding(.horizontal, 16).padding(.vertical, 8)
 
                         // Card list
                         ScrollView {
@@ -154,9 +152,9 @@ struct FlashcardView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.kanji?.meanings.first ?? "Unknown")
+                Text(item.kanji?.meaningsEn.first ?? "Unknown")
                     .font(KanjiQuestTheme.bodyLarge).fontWeight(.medium)
-                Text(item.kanji?.readings.joined(separator: ", ") ?? "")
+                Text(item.kanji?.onReadings.joined(separator: ", ") ?? "")
                     .font(KanjiQuestTheme.bodySmall)
                     .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
             }

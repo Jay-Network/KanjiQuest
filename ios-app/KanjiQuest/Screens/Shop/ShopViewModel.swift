@@ -30,7 +30,7 @@ final class ShopViewModel: ObservableObject {
         userSessionProvider = container.userSessionProvider
 
         Task {
-            let userId = userSessionProvider?.getUserId() ?? ""
+            let userId = (try? await userSessionProvider?.getUserId()) ?? ""
 
             // Load catalog
             catalog = (try? await jCoinRepository?.getShopCatalog()) ?? []
@@ -40,8 +40,9 @@ final class ShopViewModel: ObservableObject {
 
             // Load owned items
             var owned = Set<String>()
-            for cat in ShopCategory.allCases {
-                let unlocked = (try? await jCoinRepository?.getUnlockedContent(userId: userId, category: cat.name.lowercased())) ?? []
+            let shopCategories: [ShopCategory] = [.theme, .booster, .utility, .content, .crossBusiness]
+            for cat in shopCategories {
+                let unlocked = (try? await jCoinRepository?.getUnlockedContent(userId: userId, contentType: cat.name.lowercased())) ?? []
                 owned.formUnion(unlocked)
             }
             ownedContentIds = owned
@@ -69,15 +70,16 @@ final class ShopViewModel: ObservableObject {
 
     func confirmPurchase(_ item: ShopItem) {
         Task {
-            let userId = userSessionProvider?.getUserId() ?? ""
+            let userId = (try? await userSessionProvider?.getUserId()) ?? ""
             let result = try? await jCoinRepository?.purchaseItem(userId: userId, item: item)
             purchaseResult = result
 
-            if case .success = result {
+            if result is PurchaseResult.Success {
                 // Refresh owned
                 var owned = Set<String>()
-                for cat in ShopCategory.allCases {
-                    let unlocked = (try? await jCoinRepository?.getUnlockedContent(userId: userId, category: cat.name.lowercased())) ?? []
+                let shopCategories: [ShopCategory] = [.theme, .booster, .utility, .content, .crossBusiness]
+                for cat in shopCategories {
+                    let unlocked = (try? await jCoinRepository?.getUnlockedContent(userId: userId, contentType: cat.name.lowercased())) ?? []
                     owned.formUnion(unlocked)
                 }
                 ownedContentIds = owned

@@ -9,30 +9,7 @@ import SwiftUI
 // AiFeedbackReporter is in Writing/AiFeedbackReporter.swift.
 // WritingDrawingCanvas is in Writing/DrawingCanvas.swift.
 
-// MARK: - RadicalImage view
-// Loads radical SVG/PNG from assets by radical ID.
-
-struct RadicalImage: View {
-    let radicalId: Int32
-    var contentDescription: String = ""
-    var size: CGFloat = 80
-
-    var body: some View {
-        // Try loading from assets, fall back to text
-        if let image = UIImage(named: "radical_\(radicalId)") {
-            Image(uiImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: size, height: size)
-                .accessibilityLabel(contentDescription)
-        } else {
-            Text(contentDescription)
-                .font(.system(size: size * 0.25))
-                .frame(width: size, height: size)
-                .accessibilityLabel(contentDescription)
-        }
-    }
-}
+// NOTE: RadicalImage is defined in Components/AssetImage.swift
 
 // MARK: - UserProfile convenience extensions
 

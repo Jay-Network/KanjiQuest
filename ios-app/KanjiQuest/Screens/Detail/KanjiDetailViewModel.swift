@@ -56,13 +56,13 @@ final class KanjiDetailViewModel: ObservableObject {
             let inDeck = (try? await flashcardRepository?.isInDeck(kanjiId: kanjiId)) ?? false
 
             // Premium/admin check
-            let premium = container.authRepository.isPremium()
-            let admin = container.authRepository.isAdmin()
+            let premium = container.userSessionProvider.isPremium()
+            let admin = container.userSessionProvider.isAdmin()
 
             // Mode trials
-            let writingTrials = previewTrialManager?.getRemainingTrials(mode: "writing") ?? 0
-            let vocabTrials = previewTrialManager?.getRemainingTrials(mode: "vocabulary") ?? 0
-            let cameraTrials = previewTrialManager?.getRemainingTrials(mode: "camera_challenge") ?? 0
+            let writingTrials = previewTrialManager?.getRemainingTrials(mode: "WRITING") ?? 0
+            let vocabTrials = previewTrialManager?.getRemainingTrials(mode: "VOCABULARY") ?? 0
+            let cameraTrials = previewTrialManager?.getRemainingTrials(mode: "CAMERA_CHALLENGE") ?? 0
 
             let trials: [String: ModeTrialInfo] = [
                 "recognition": ModeTrialInfo(canPractice: true, trialsRemaining: -1),

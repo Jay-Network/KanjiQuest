@@ -131,8 +131,8 @@ final class AppContainer: ObservableObject {
 
     func makeQuestionGenerator() -> QuestionGenerator {
         let masteryProvider = GradeMasteryProvider { [kanjiRepository, srsRepository] grade in
-            let total = kanjiRepository.getKanjiCountByGrade(grade: grade)
-            return srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total)
+            let total = try await kanjiRepository.getKanjiCountByGrade(grade: grade)
+            return try await srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total)
         }
         return QuestionGenerator(
             kanjiRepository: kanjiRepository,

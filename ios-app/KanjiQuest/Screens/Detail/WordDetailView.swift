@@ -24,7 +24,7 @@ struct WordDetailView: View {
                     VStack(spacing: 12) {
                         // Large kanji form
                         KanjiText(
-                            text: vocab.word,
+                            text: vocab.kanjiForm,
                             font: .system(size: 80, weight: .regular, design: .serif)
                         )
                         .padding(.vertical, 16)
@@ -49,7 +49,7 @@ struct WordDetailView: View {
                         // Meanings
                         sectionCard(title: "Meanings") {
                             VStack(alignment: .leading, spacing: 4) {
-                                ForEach(Array(vocab.meanings.enumerated()), id: \.offset) { index, meaning in
+                                ForEach(Array(vocab.meaningsEn.enumerated()), id: \.offset) { index, meaning in
                                     Text("\(index + 1). \(meaning)")
                                         .font(KanjiQuestTheme.bodyLarge)
                                 }
@@ -70,7 +70,7 @@ struct WordDetailView: View {
                                                     font: .system(size: 32, weight: .bold, design: .serif)
                                                 )
                                                 VStack(alignment: .leading) {
-                                                    Text(kanji.meanings.joined(separator: ", "))
+                                                    Text(kanji.meaningsEn.joined(separator: ", "))
                                                         .font(KanjiQuestTheme.bodyMedium).fontWeight(.medium)
                                                         .foregroundColor(KanjiQuestTheme.onSurface)
                                                     if let grade = kanji.grade {

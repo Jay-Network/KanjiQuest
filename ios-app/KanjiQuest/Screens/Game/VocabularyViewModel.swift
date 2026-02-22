@@ -136,6 +136,6 @@ class VocabularyViewModel: ObservableObject {
 
 private extension Int {
     func clamped(to range: ClosedRange<Int>, default defaultValue: Int) -> Int {
-        self == 0 ? defaultValue : min(max(self, range.lowerBound), range.upperBound)
+        self == 0 ? defaultValue : Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }

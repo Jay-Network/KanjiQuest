@@ -121,7 +121,7 @@ final class CameraChallengeViewModel: ObservableObject {
                     let profile = try await userRepository?.getProfile()
                     if let p = profile {
                         let newXp = p.totalXp + Int32(sessionXp)
-                        try await userRepository?.updateXpAndLevel(xp: newXp, level: p.level)
+                        try await userRepository?.updateXpAndLevel(totalXp: newXp, level: p.level)
                     }
                 }
 

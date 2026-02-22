@@ -2,9 +2,10 @@ import Foundation
 import SharedCore
 
 struct StudyCard: Identifiable {
-    let id: String
+    var id: Int32 { kanji.id }
     let kanji: Kanji
     let vocabulary: [Vocabulary]
+    let srsCard: SrsCard?
 }
 
 enum StudyGrade: Int, CaseIterable {
@@ -36,19 +37,24 @@ final class FlashcardStudyViewModel: ObservableObject {
     private var flashcardRepository: FlashcardRepository?
     private var kanjiRepository: KanjiRepository?
     private var srsRepository: SrsRepository?
+    private var srsAlgorithm: Sm2Algorithm?
+    private var deckId: Int64 = 1
 
-    func load(container: AppContainer, deckId: String) {
+    func load(container: AppContainer, deckId: Int64) {
         flashcardRepository = container.flashcardRepository
         kanjiRepository = container.kanjiRepository
         srsRepository = container.srsRepository
+        srsAlgorithm = container.srsAlgorithm
+        self.deckId = deckId
 
         Task {
-            let entries = (try? await flashcardRepository?.getCardsInDeck(deckId: deckId)) ?? []
+            let kanjiIds = (try? await flashcardRepository?.getKanjiIdsByDeck(deckId: deckId)) ?? []
             var studyCards: [StudyCard] = []
-            for entry in entries {
-                if let kanji = try? await kanjiRepository?.getKanjiById(id: entry.kanjiId) {
-                    let vocab = (try? await kanjiRepository?.getVocabularyForKanji(kanjiId: entry.kanjiId)) ?? []
-                    studyCards.append(StudyCard(id: entry.id, kanji: kanji, vocabulary: Array(vocab.prefix(3))))
+            for kanjiId in kanjiIds {
+                if let kanji = try? await kanjiRepository?.getKanjiById(id: Int32(kanjiId)) {
+                    let vocab = (try? await kanjiRepository?.getVocabularyForKanji(kanjiId: Int32(kanjiId))) ?? []
+                    let srsCard = try? await srsRepository?.getCard(kanjiId: Int32(kanjiId))
+                    studyCards.append(StudyCard(kanji: kanji, vocabulary: Array(vocab.prefix(3)), srsCard: srsCard))
                 }
             }
             cards = studyCards.shuffled()
@@ -64,14 +70,19 @@ final class FlashcardStudyViewModel: ObservableObject {
         gradeResults[grade, default: 0] += 1
         totalStudied += 1
 
-        // Update SRS card
         if currentIndex < cards.count {
             let card = cards[currentIndex]
             Task {
-                try? await srsRepository?.updateReview(
-                    kanjiId: card.kanji.id,
-                    quality: Int32(grade.rawValue)
-                )
+                // Update SRS card via algorithm
+                if let existingCard = try? await srsRepository?.getCard(kanjiId: card.kanji.id) {
+                    let currentTime = Int64(Date().timeIntervalSince1970)
+                    if let updated = srsAlgorithm?.review(card: existingCard, quality: Int32(grade.rawValue), currentTime: currentTime) {
+                        try? await srsRepository?.saveCard(card: updated)
+                    }
+                }
+
+                // Mark studied in flashcard deck
+                try? await flashcardRepository?.markStudied(deckId: deckId, kanjiId: card.kanji.id)
             }
         }
 

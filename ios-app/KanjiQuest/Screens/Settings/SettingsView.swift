@@ -18,100 +18,7 @@ struct SettingsView: View {
     var body: some View {
         ZStack {
             KanjiQuestTheme.background.ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Audio
-                    settingsSection(title: "Audio", icon: "speaker.wave.3") {
-                        switchSetting("Sound Effects", "Button clicks, correct/incorrect feedback", viewModel.soundEnabled) { viewModel.toggleSound() }
-                        switchSetting("Background Music", "Ambient music during gameplay", viewModel.musicEnabled) { viewModel.toggleMusic() }
-                        switchSetting("Auto-Play Audio", "Automatically play kanji pronunciation", viewModel.autoPlayAudio) { viewModel.toggleAutoPlayAudio() }
-                    }
-
-                    // Gameplay
-                    settingsSection(title: "Gameplay", icon: "gamecontroller") {
-                        // Session Length
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Session Length").font(KanjiQuestTheme.bodyLarge)
-                            Text("Cards per session").font(KanjiQuestTheme.bodySmall).foregroundColor(KanjiQuestTheme.onSurfaceVariant)
-                            HStack(spacing: 4) {
-                                ForEach([10, 15, 20, 30], id: \.self) { length in
-                                    let isSelected = viewModel.sessionLength == length
-                                    Text("\(length)")
-                                        .font(KanjiQuestTheme.bodyLarge)
-                                        .fontWeight(isSelected ? .bold : .regular)
-                                        .foregroundColor(isSelected ? .white : KanjiQuestTheme.onSurfaceVariant)
-                                        .frame(maxWidth: .infinity).padding(.vertical, 10)
-                                        .background(isSelected ? KanjiQuestTheme.primary : Color.clear)
-                                        .cornerRadius(6)
-                                        .onTapGesture { viewModel.setSessionLength(length) }
-                                }
-                            }
-                            .padding(4)
-                            .background(KanjiQuestTheme.surfaceVariant)
-                            .cornerRadius(8)
-                        }
-                        .padding(.vertical, 8)
-
-                        Divider()
-
-                        clickableSetting("Difficulty Level", viewModel.difficulty.rawValue) { showDifficultyDialog = true }
-                        clickableSetting("Daily XP Goal", "\(viewModel.dailyGoal) XP per day") { showDailyGoalDialog = true }
-                        switchSetting("Show Hints", "Display helpful hints during games", viewModel.showHints) { viewModel.toggleShowHints() }
-
-                        Divider().padding(.vertical, 8)
-
-                        clickableSetting("Retake Assessment", "Re-test your kanji proficiency level") { onRetakeAssessment() }
-                    }
-
-                    // Notifications
-                    settingsSection(title: "Notifications", icon: "bell") {
-                        switchSetting("Study Reminders", "Daily reminders to practice", viewModel.notificationsEnabled) { viewModel.toggleNotifications() }
-                        switchSetting("Vibrations", "Haptic feedback for interactions", viewModel.vibrationsEnabled) { viewModel.toggleVibrations() }
-                    }
-
-                    // Appearance
-                    settingsSection(title: "Appearance", icon: "paintbrush") {
-                        clickableSetting("Theme", viewModel.theme.rawValue) { showThemeDialog = true }
-                    }
-
-                    // Developer
-                    if viewModel.isDeveloper {
-                        settingsSection(title: "Developer", icon: "wrench.and.screwdriver") {
-                            clickableSetting("Dev Chat", "Chat with the KanjiQuest dev agent") { onDevChat() }
-                        }
-                    }
-
-                    // About
-                    settingsSection(title: "About", icon: "info.circle") {
-                        HStack {
-                            Text("Version").font(KanjiQuestTheme.bodyLarge)
-                            Spacer()
-                            Text("1.0.0 (\(KanjiQuestTheme.isPhone ? "iPhone" : "iPad"))").font(KanjiQuestTheme.bodyMedium).foregroundColor(KanjiQuestTheme.onSurfaceVariant)
-                        }
-                        .padding(.vertical, 4)
-
-                        Button(action: {
-                            Task { try? await container.authRepository.signOut() }
-                        }) {
-                            Text("Sign Out").foregroundColor(KanjiQuestTheme.error).fontWeight(.bold)
-                                .frame(maxWidth: .infinity).padding(.vertical, 12)
-                        }
-                    }
-
-                    Spacer().frame(height: 8)
-
-                    // Reset
-                    Button(action: { showResetDialog = true }) {
-                        Text("Reset to Defaults")
-                            .foregroundColor(KanjiQuestTheme.error).fontWeight(.bold)
-                            .frame(maxWidth: .infinity)
-                    }
-
-                    Spacer().frame(height: 16)
-                }
-                .padding(16)
-            }
+            settingsContent
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -146,6 +53,119 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will reset all settings to their default values.")
+        }
+    }
+
+    // MARK: - Content
+
+    private var settingsContent: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                audioSection
+                gameplaySection
+                notificationsSection
+                appearanceSection
+                developerSection
+                aboutSection
+                resetButton
+                Spacer().frame(height: 16)
+            }
+            .padding(16)
+        }
+    }
+
+    private var audioSection: some View {
+        settingsSection(title: "Audio", icon: "speaker.wave.3") {
+            switchSetting("Sound Effects", "Button clicks, correct/incorrect feedback", viewModel.soundEnabled) { viewModel.toggleSound() }
+            switchSetting("Background Music", "Ambient music during gameplay", viewModel.musicEnabled) { viewModel.toggleMusic() }
+            switchSetting("Auto-Play Audio", "Automatically play kanji pronunciation", viewModel.autoPlayAudio) { viewModel.toggleAutoPlayAudio() }
+        }
+    }
+
+    private var gameplaySection: some View {
+        settingsSection(title: "Gameplay", icon: "gamecontroller") {
+            sessionLengthPicker
+            Divider()
+            clickableSetting("Difficulty Level", viewModel.difficulty.rawValue) { showDifficultyDialog = true }
+            clickableSetting("Daily XP Goal", "\(viewModel.dailyGoal) XP per day") { showDailyGoalDialog = true }
+            switchSetting("Show Hints", "Display helpful hints during games", viewModel.showHints) { viewModel.toggleShowHints() }
+            Divider().padding(.vertical, 8)
+            clickableSetting("Retake Assessment", "Re-test your kanji proficiency level") { onRetakeAssessment() }
+        }
+    }
+
+    private var sessionLengthPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Session Length").font(KanjiQuestTheme.bodyLarge)
+            Text("Cards per session").font(KanjiQuestTheme.bodySmall).foregroundColor(KanjiQuestTheme.onSurfaceVariant)
+            HStack(spacing: 4) {
+                ForEach([10, 15, 20, 30], id: \.self) { length in
+                    let isSelected = viewModel.sessionLength == length
+                    Text("\(length)")
+                        .font(KanjiQuestTheme.bodyLarge)
+                        .fontWeight(isSelected ? .bold : .regular)
+                        .foregroundColor(isSelected ? .white : KanjiQuestTheme.onSurfaceVariant)
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .background(isSelected ? KanjiQuestTheme.primary : Color.clear)
+                        .cornerRadius(6)
+                        .onTapGesture { viewModel.setSessionLength(length) }
+                }
+            }
+            .padding(4)
+            .background(KanjiQuestTheme.surfaceVariant)
+            .cornerRadius(8)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var notificationsSection: some View {
+        settingsSection(title: "Notifications", icon: "bell") {
+            switchSetting("Study Reminders", "Daily reminders to practice", viewModel.notificationsEnabled) { viewModel.toggleNotifications() }
+            switchSetting("Vibrations", "Haptic feedback for interactions", viewModel.vibrationsEnabled) { viewModel.toggleVibrations() }
+        }
+    }
+
+    private var appearanceSection: some View {
+        settingsSection(title: "Appearance", icon: "paintbrush") {
+            clickableSetting("Theme", viewModel.theme.rawValue) { showThemeDialog = true }
+        }
+    }
+
+    @ViewBuilder
+    private var developerSection: some View {
+        if viewModel.isDeveloper {
+            settingsSection(title: "Developer", icon: "wrench.and.screwdriver") {
+                clickableSetting("Dev Chat", "Chat with the KanjiQuest dev agent") { onDevChat() }
+            }
+        }
+    }
+
+    private var aboutSection: some View {
+        settingsSection(title: "About", icon: "info.circle") {
+            HStack {
+                Text("Version").font(KanjiQuestTheme.bodyLarge)
+                Spacer()
+                Text("1.0.0 (\(KanjiQuestTheme.isPhone ? "iPhone" : "iPad"))").font(KanjiQuestTheme.bodyMedium).foregroundColor(KanjiQuestTheme.onSurfaceVariant)
+            }
+            .padding(.vertical, 4)
+
+            Button(action: {
+                Task { try? await container.authRepository.signOut() }
+            }) {
+                Text("Sign Out").foregroundColor(KanjiQuestTheme.error).fontWeight(.bold)
+                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+            }
+        }
+    }
+
+    private var resetButton: some View {
+        VStack {
+            Spacer().frame(height: 8)
+            Button(action: { showResetDialog = true }) {
+                Text("Reset to Defaults")
+                    .foregroundColor(KanjiQuestTheme.error).fontWeight(.bold)
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
 

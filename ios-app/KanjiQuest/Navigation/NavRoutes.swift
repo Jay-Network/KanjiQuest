@@ -34,7 +34,7 @@ enum NavRoute: Hashable {
     // Collection & Flashcards
     case collection
     case flashcards
-    case flashcardStudy(deckId: String)
+    case flashcardStudy(deckId: Int64)
 
     // Progress & Achievements
     case progress

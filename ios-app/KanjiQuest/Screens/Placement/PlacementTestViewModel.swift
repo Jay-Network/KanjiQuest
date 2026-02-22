@@ -116,17 +116,18 @@ final class PlacementTestViewModel: ObservableObject {
     }
 
     private func generateKanaQuestions(isHiragana: Bool) async -> [PlacementQuestion] {
-        let allKana = (try? await (isHiragana ? kanaRepository?.getHiragana() : kanaRepository?.getKatakana())) ?? []
+        let type: KanaType = isHiragana ? .hiragana : .katakana
+        let allKana = (try? await kanaRepository?.getKanaByType(type: type)) ?? []
         guard allKana.count >= 4 else { return [] }
         let selected = Array(allKana.shuffled().prefix(questionsPerStage))
         return selected.map { kana in
-            var options = [kana.reading]
+            var options = [kana.romanization]
             let distractors = allKana.filter { $0.id != kana.id }.shuffled().prefix(3).map { $0.reading }
             options.append(contentsOf: distractors)
             options.shuffle()
-            let correctIdx = options.firstIndex(of: kana.reading) ?? 0
+            let correctIdx = options.firstIndex(of: kana.romanization) ?? 0
             return PlacementQuestion(
-                displayCharacter: kana.character,
+                displayCharacter: kana.literal,
                 prompt: "What is the reading?",
                 options: options,
                 correctIndex: correctIdx
@@ -139,13 +140,13 @@ final class PlacementTestViewModel: ObservableObject {
         guard allRadicals.count >= 4 else { return [] }
         let selected = Array(allRadicals.shuffled().prefix(questionsPerStage))
         return selected.map { radical in
-            var options = [radical.meaning]
+            var options = [radical.meaningEn]
             let distractors = allRadicals.filter { $0.id != radical.id }.shuffled().prefix(3).map { $0.meaning }
             options.append(contentsOf: distractors)
             options.shuffle()
-            let correctIdx = options.firstIndex(of: radical.meaning) ?? 0
+            let correctIdx = options.firstIndex(of: radical.meaningEn) ?? 0
             return PlacementQuestion(
-                displayCharacter: radical.character,
+                displayCharacter: radical.literal,
                 prompt: "What does this radical mean?",
                 options: options,
                 correctIndex: correctIdx
@@ -158,9 +159,9 @@ final class PlacementTestViewModel: ObservableObject {
         guard kanjiList.count >= 4 else { return [] }
         let selected = Array(kanjiList.shuffled().prefix(questionsPerStage))
         return selected.map { kanji in
-            let meaning = kanji.meanings.first ?? "unknown"
+            let meaning = kanji.meaningsEn.first ?? "unknown"
             var options = [meaning]
-            let distractors = kanjiList.filter { $0.id != kanji.id }.shuffled().prefix(3).compactMap { $0.meanings.first }
+            let distractors = kanjiList.filter { $0.id != kanji.id }.shuffled().prefix(3).compactMap { $0.meaningsEn.first }
             options.append(contentsOf: distractors)
             options.shuffle()
             let correctIdx = options.firstIndex(of: meaning) ?? 0
@@ -223,7 +224,9 @@ final class PlacementTestViewModel: ObservableObject {
 
         // Save result
         Task {
-            try? await userRepository?.updateLevel(level: Int32(assignedLevel))
+            let profile = try? await userRepository?.getProfile()
+            let currentXp = profile?.totalXp ?? 0
+            try? await userRepository?.updateXpAndLevel(totalXp: currentXp, level: Int32(assignedLevel))
             UserDefaults.standard.set(true, forKey: "placement_completed")
         }
 

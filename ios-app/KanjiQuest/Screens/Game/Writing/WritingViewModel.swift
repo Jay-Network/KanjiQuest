@@ -92,7 +92,7 @@ class WritingViewModel: ObservableObject {
     private func observeState(_ engine: GameEngine) {
         Task {
             for await state in engine.state {
-                await MainActor.run { self.updateState(state as! GameState) }
+                await MainActor.run { self.updateState(state) }
             }
         }
     }
@@ -110,7 +110,7 @@ class WritingViewModel: ObservableObject {
 
             // Auto-select difficulty based on SRS
             let srsState = awaiting.question.srsState
-            let playerLevel = userSessionProvider?.getAdminPlayerLevelOverride() ?? 1
+            let playerLevel = userSessionProvider?.getAdminPlayerLevelOverride()?.intValue ?? 1
             if srsState == "graduated" {
                 writingDifficulty = .blank
             } else if srsState == "review" {
@@ -220,9 +220,9 @@ class WritingViewModel: ObservableObject {
             let rawPoints = SvgPathParser.shared.parseSvgPath(pathData: pathData)
             if canvasSize > 0 {
                 let scale = Float(canvasSize) / 109.0
-                return (rawPoints as! [SharedCore.Point]).map { p in SharedCore.Point(x: p.x * scale, y: p.y * scale) }
+                return rawPoints.map { p in SharedCore.Point(x: p.x * scale, y: p.y * scale) }
             }
-            return rawPoints as! [SharedCore.Point]
+            return rawPoints
         }
 
         let srsState = q.srsState ?? ""

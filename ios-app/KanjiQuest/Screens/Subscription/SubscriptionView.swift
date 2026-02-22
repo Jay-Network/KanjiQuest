@@ -112,7 +112,7 @@ struct SubscriptionView: View {
         }
         .toolbarBackground(KanjiQuestTheme.primary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .task { viewModel.loadSubscription(container: container) }
+        .task { viewModel.load(container: container) }
     }
 
     private func featureRow(_ feature: String, free: Bool = false, premium: Bool = false, freeText: String? = nil, premiumText: String? = nil) -> some View {

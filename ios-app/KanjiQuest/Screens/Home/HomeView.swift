@@ -158,18 +158,18 @@ struct HomeView: View {
                     Text("\(state.tierName) - Lv.\(state.displayLevel)")
                         .font(KanjiQuestTheme.titleLarge)
                         .fontWeight(.bold)
-                    Text("\(state.profile.totalXp) XP")
+                    Text("\((state.profile?.totalXp ?? 0)) XP")
                         .font(KanjiQuestTheme.bodyMedium)
                         .foregroundColor(KanjiQuestTheme.tertiary)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(state.coinBalance.displayBalance) J Coins")
+                    Text("\((state.coinBalance?.displayBalance ?? 0)) J Coins")
                         .font(KanjiQuestTheme.bodyMedium)
                         .fontWeight(.bold)
                         .foregroundColor(KanjiQuestTheme.coinGold)
                         .onTapGesture { navigateTo(.shop) }
-                    if state.coinBalance.needsSync {
+                    if (state.coinBalance?.needsSync ?? false) {
                         Text("Pending sync...")
                             .font(KanjiQuestTheme.labelSmall)
                             .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
@@ -180,7 +180,7 @@ struct HomeView: View {
                 }
             }
 
-            ProgressView(value: Double(state.profile.xpProgress))
+            ProgressView(value: Double((state.profile?.xpProgress ?? 0)))
                 .tint(KanjiQuestTheme.primary)
 
             if let nextName = state.nextTierName, let nextLevel = state.nextTierLevel {
@@ -345,11 +345,11 @@ struct HomeView: View {
             PreviewableGameModeButtonView(
                 label: "Radical Builder",
                 isPremium: state.isPremium,
-                trialInfo: state.previewTrials[.radicalBuilder],
+                trialInfo: state.previewTrials["RADICAL_BUILDER"],
                 modeColor: Color(hex: 0x795548), imageAsset: "mode-radical-builder.png",
                 onPremiumClick: { navigateTo(.radicalBuilder) },
                 onPreviewClick: {
-                    if viewModel.usePreviewTrial(mode: .radicalBuilder) {
+                    if viewModel.usePreviewTrial(mode: "RADICAL_BUILDER") {
                         navigateTo(.radicalBuilder)
                     }
                 },
@@ -375,11 +375,11 @@ struct HomeView: View {
                 PreviewableGameModeButtonView(
                     label: "Writing",
                     isPremium: state.isPremium,
-                    trialInfo: state.previewTrials[.writing],
+                    trialInfo: state.previewTrials["WRITING"],
                     modeColor: Color(hex: 0x4CAF50), imageAsset: "mode-writing.png",
                     onPremiumClick: { navigateTo(.writing) },
                     onPreviewClick: {
-                        if viewModel.usePreviewTrial(mode: .writing) {
+                        if viewModel.usePreviewTrial(mode: "WRITING") {
                             navigateTo(.writing)
                         }
                     },
@@ -391,11 +391,11 @@ struct HomeView: View {
                 PreviewableGameModeButtonView(
                     label: "Vocabulary",
                     isPremium: state.isPremium,
-                    trialInfo: state.previewTrials[.vocabulary],
+                    trialInfo: state.previewTrials["VOCABULARY"],
                     modeColor: Color(hex: 0xFF9800), imageAsset: "mode-vocabulary.png",
                     onPremiumClick: { navigateTo(.vocabulary) },
                     onPreviewClick: {
-                        if viewModel.usePreviewTrial(mode: .vocabulary) {
+                        if viewModel.usePreviewTrial(mode: "VOCABULARY") {
                             navigateTo(.vocabulary)
                         }
                     },
@@ -404,11 +404,11 @@ struct HomeView: View {
                 PreviewableGameModeButtonView(
                     label: "Camera",
                     isPremium: state.isPremium,
-                    trialInfo: state.previewTrials[.cameraChallenge],
+                    trialInfo: state.previewTrials["CAMERA_CHALLENGE"],
                     modeColor: Color(hex: 0x9C27B0), imageAsset: "mode-camera.png",
                     onPremiumClick: { navigateTo(.camera) },
                     onPreviewClick: {
-                        if viewModel.usePreviewTrial(mode: .cameraChallenge) {
+                        if viewModel.usePreviewTrial(mode: "CAMERA_CHALLENGE") {
                             navigateTo(.camera)
                         }
                     },
@@ -1083,18 +1083,18 @@ private struct HomeViewBody: View {
                     Text("\(state.tierName) - Lv.\(state.displayLevel)")
                         .font(KanjiQuestTheme.titleLarge)
                         .fontWeight(.bold)
-                    Text("\(state.profile.totalXp) XP")
+                    Text("\((state.profile?.totalXp ?? 0)) XP")
                         .font(KanjiQuestTheme.bodyMedium)
                         .foregroundColor(KanjiQuestTheme.tertiary)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(state.coinBalance.displayBalance) J Coins")
+                    Text("\((state.coinBalance?.displayBalance ?? 0)) J Coins")
                         .font(KanjiQuestTheme.bodyMedium)
                         .fontWeight(.bold)
                         .foregroundColor(KanjiQuestTheme.coinGold)
                         .onTapGesture { navigateTo(.shop) }
-                    if state.coinBalance.needsSync {
+                    if (state.coinBalance?.needsSync ?? false) {
                         Text("Pending sync...")
                             .font(KanjiQuestTheme.labelSmall)
                             .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
@@ -1104,7 +1104,7 @@ private struct HomeViewBody: View {
                         .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
                 }
             }
-            ProgressView(value: Double(state.profile.xpProgress))
+            ProgressView(value: Double((state.profile?.xpProgress ?? 0)))
                 .tint(KanjiQuestTheme.primary)
             if let nextName = state.nextTierName, let nextLevel = state.nextTierLevel {
                 Text("Next: \(nextName) at Lv.\(nextLevel)")
@@ -1207,7 +1207,7 @@ private struct HomeViewBody: View {
     private func radicalModesSection(state: HomeUiState) -> some View {
         HStack(spacing: 12) {
             GameModeButtonView(label: "Radicals", subtitle: "Free", modeColor: Color(hex: 0x795548), imageAsset: "mode-radical-recognition.png", action: { navigateTo(.radicalRecognition) })
-            PreviewableGameModeButtonView(label: "Radical Builder", isPremium: state.isPremium, trialInfo: state.previewTrials[.radicalBuilder], modeColor: Color(hex: 0x795548), imageAsset: "mode-radical-builder.png", onPremiumClick: { navigateTo(.radicalBuilder) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: .radicalBuilder) { navigateTo(.radicalBuilder) } }, onUpgradeClick: { navigateTo(.subscription) })
+            PreviewableGameModeButtonView(label: "Radical Builder", isPremium: state.isPremium, trialInfo: state.previewTrials["RADICAL_BUILDER"], modeColor: Color(hex: 0x795548), imageAsset: "mode-radical-builder.png", onPremiumClick: { navigateTo(.radicalBuilder) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: "RADICAL_BUILDER") { navigateTo(.radicalBuilder) } }, onUpgradeClick: { navigateTo(.subscription) })
         }
     }
 
@@ -1216,11 +1216,11 @@ private struct HomeViewBody: View {
             Text("Kanji Study Modes").font(KanjiQuestTheme.titleMedium).fontWeight(.bold)
             HStack(spacing: 12) {
                 GameModeButtonView(label: "Recognition", subtitle: "Free", modeColor: Color(hex: 0x2196F3), imageAsset: "mode-recognition.png", action: { navigateTo(.recognition) })
-                PreviewableGameModeButtonView(label: "Writing", isPremium: state.isPremium, trialInfo: state.previewTrials[.writing], modeColor: Color(hex: 0x4CAF50), imageAsset: "mode-writing.png", onPremiumClick: { navigateTo(.writing) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: .writing) { navigateTo(.writing) } }, onUpgradeClick: { navigateTo(.subscription) })
+                PreviewableGameModeButtonView(label: "Writing", isPremium: state.isPremium, trialInfo: state.previewTrials["WRITING"], modeColor: Color(hex: 0x4CAF50), imageAsset: "mode-writing.png", onPremiumClick: { navigateTo(.writing) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: "WRITING") { navigateTo(.writing) } }, onUpgradeClick: { navigateTo(.subscription) })
             }
             HStack(spacing: 12) {
-                PreviewableGameModeButtonView(label: "Vocabulary", isPremium: state.isPremium, trialInfo: state.previewTrials[.vocabulary], modeColor: Color(hex: 0xFF9800), imageAsset: "mode-vocabulary.png", onPremiumClick: { navigateTo(.vocabulary) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: .vocabulary) { navigateTo(.vocabulary) } }, onUpgradeClick: { navigateTo(.subscription) })
-                PreviewableGameModeButtonView(label: "Camera", isPremium: state.isPremium, trialInfo: state.previewTrials[.cameraChallenge], modeColor: Color(hex: 0x9C27B0), imageAsset: "mode-camera.png", onPremiumClick: { navigateTo(.camera) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: .cameraChallenge) { navigateTo(.camera) } }, onUpgradeClick: { navigateTo(.subscription) })
+                PreviewableGameModeButtonView(label: "Vocabulary", isPremium: state.isPremium, trialInfo: state.previewTrials["VOCABULARY"], modeColor: Color(hex: 0xFF9800), imageAsset: "mode-vocabulary.png", onPremiumClick: { navigateTo(.vocabulary) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: "VOCABULARY") { navigateTo(.vocabulary) } }, onUpgradeClick: { navigateTo(.subscription) })
+                PreviewableGameModeButtonView(label: "Camera", isPremium: state.isPremium, trialInfo: state.previewTrials["CAMERA_CHALLENGE"], modeColor: Color(hex: 0x9C27B0), imageAsset: "mode-camera.png", onPremiumClick: { navigateTo(.camera) }, onPreviewClick: { if viewModel.usePreviewTrial(mode: "CAMERA_CHALLENGE") { navigateTo(.camera) } }, onUpgradeClick: { navigateTo(.subscription) })
             }
         }
     }

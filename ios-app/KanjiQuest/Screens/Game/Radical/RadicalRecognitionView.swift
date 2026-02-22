@@ -83,9 +83,9 @@ struct RadicalRecognitionView: View {
                     .overlay(
                         RadicalImage(
                             radicalId: question.kanjiId,
-                            contentDescription: question.kanjiLiteral,
-                            size: 160
+                            contentDescription: question.kanjiLiteral
                         )
+                        .frame(width: 160, height: 160)
                     )
 
                 Spacer().frame(height: 32)
