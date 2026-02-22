@@ -40,7 +40,9 @@ struct ProgressView: View {
                         ], spacing: KanjiQuestTheme.spacingM) {
                             ForEach(gradeMasteries, id: \.grade) { mastery in
                                 VStack(spacing: 6) {
+                                    #if IPAD_TARGET
                                     MasteryBadgeView(level: mastery.masteryLevel, size: 56)
+                                    #endif
                                     Text("Grade \(mastery.grade)")
                                         .font(KanjiQuestTheme.labelSmall)
                                     Text("\(Int(mastery.masteryScore * 100))%")

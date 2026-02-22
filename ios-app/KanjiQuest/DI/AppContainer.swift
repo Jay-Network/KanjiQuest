@@ -89,9 +89,11 @@ final class AppContainer: ObservableObject {
         )
     }
 
+    #if IPAD_TARGET
     func makeCalligraphyFeedbackService() -> CalligraphyFeedbackService {
         CalligraphyFeedbackService(apiKey: configuration.geminiApiKey)
     }
+    #endif
 
     // MARK: - Bundle Database Staging
 
