@@ -105,16 +105,10 @@ extension GameEngine {
 // If CollectedItemRarity doesn't exist in SharedCore, use this:
 typealias CollectedItemRarity = Rarity
 
-// MARK: - KotlinInt convenience
-extension KotlinInt {
-    var intValue: Int { Int(int32Value) }
-}
+// MARK: - KotlinInt convenience (SKIE already provides int32Value)
+// Use .intValue for Swift Int conversion:
+//   KotlinInt already has .int32Value from SKIE.
+//   For Swift Int: Int(kotlinInt.int32Value)
 
-// MARK: - Int64 / KotlinLong bridging
-extension Int64 {
-    var kotlinLong: KotlinLong { KotlinLong(value: self) }
-}
-
-extension KotlinLong {
-    var int64Value: Int64 { Int64(truncating: self) }
-}
+// MARK: - KotlinLong convenience (SKIE already provides int64Value)
+// Use Int64(truncating: kotlinLong) for conversion.

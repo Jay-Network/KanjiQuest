@@ -76,7 +76,7 @@ final class AppContainer: ObservableObject {
         achievementRepository = AchievementRepositoryImpl(database: database)
         vocabSrsRepository = VocabSrsRepositoryImpl(db: database)
         authRepository = AuthRepositoryImpl()
-        jCoinRepository = JCoinRepositoryImpl(db: database)
+        jCoinRepository = JCoinRepositoryImpl(database: database)
         flashcardRepository = FlashcardRepositoryImpl(db: database)
         kanaRepository = KanaRepositoryImpl(db: database)
         kanaSrsRepository = KanaSrsRepositoryImpl(db: database)
@@ -86,7 +86,7 @@ final class AppContainer: ObservableObject {
         devChatRepository = DevChatRepositoryImpl()
         feedbackRepository = FeedbackRepositoryImpl()
         fieldJournalRepository = FieldJournalRepositoryImpl(db: database)
-        learningSyncRepository = LearningSyncRepositoryImpl(db: database)
+        learningSyncRepository = LearningSyncRepositoryImpl(database: database)
 
         // Algorithms
         srsAlgorithm = Sm2Algorithm()
@@ -130,15 +130,11 @@ final class AppContainer: ObservableObject {
     // MARK: - Factory methods for scoped dependencies
 
     func makeQuestionGenerator() -> QuestionGenerator {
-        let masteryProvider = GradeMasteryProvider { [kanjiRepository, srsRepository] grade in
-            let total = try await kanjiRepository.getKanjiCountByGrade(grade: grade)
-            return try await srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total)
-        }
         return QuestionGenerator(
             kanjiRepository: kanjiRepository,
             srsRepository: srsRepository,
             vocabSrsRepository: vocabSrsRepository,
-            gradeMasteryProvider: masteryProvider
+            gradeMasteryProvider: nil
         )
     }
 

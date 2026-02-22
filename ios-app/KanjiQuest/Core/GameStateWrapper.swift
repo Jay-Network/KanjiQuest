@@ -24,12 +24,7 @@ extension UserProfile {
     }
 }
 
-// MARK: - CoinBalance convenience extensions
-
-extension CoinBalance {
-    var displayBalance: Int64 { balance }
-    var needsSync: Bool { false }
-}
+// NOTE: CoinBalance.displayBalance and .needsSync are already in KMP
 
 // MARK: - Rarity color extension
 
@@ -46,11 +41,7 @@ extension Rarity {
     }
 }
 
-// MARK: - GradeMastery convenience
-
-extension GradeMastery {
-    var masteryScore: Float { Float(score) }
-}
+// NOTE: GradeMastery.masteryScore is already computed in KMP
 
 // MARK: - MasteryLevel label
 
@@ -79,21 +70,7 @@ extension UserLevel {
     }
 }
 
-// MARK: - PlacementTestStage display
-
-extension PlacementTestStage {
-    var displayName: String {
-        switch self {
-        case .hiragana: return "Hiragana"
-        case .katakana: return "Katakana"
-        case .radicals: return "Radicals"
-        case .grade1: return "Grade 1"
-        case .grade2: return "Grade 2"
-        case .grade3: return "Grade 3"
-        default: return "\(self)"
-        }
-    }
-}
+// NOTE: PlacementStage display names are in PlacementTestViewModel.swift
 
 // MARK: - GameEngine.reset (no-op, engine resets on new session)
 

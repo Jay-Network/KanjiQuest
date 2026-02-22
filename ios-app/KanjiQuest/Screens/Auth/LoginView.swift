@@ -17,7 +17,7 @@ struct LoginView: View {
                 Spacer(minLength: 16)
 
                 // Hero illustration
-                AssetImage(filename: "login-hero.png")
+                AssetImage(filename: "login-hero.png", contentDescription: "KanjiQuest login")
                     .frame(maxWidth: .infinity)
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -83,9 +83,13 @@ struct LoginView: View {
 
                     Button {
                         if viewModel.isSignUpMode {
-                            viewModel.signUp(email: email, password: password)
+                            viewModel.email = email
+                            viewModel.password = password
+                            viewModel.signUp(authRepository: container.authRepository)
                         } else {
-                            viewModel.signIn(email: email, password: password)
+                            viewModel.email = email
+                            viewModel.password = password
+                            viewModel.signIn(authRepository: container.authRepository)
                         }
                     } label: {
                         Group {
@@ -193,11 +197,8 @@ struct LoginView: View {
             }
         }
         .background(KanjiQuestTheme.background)
-        .onChange(of: viewModel.isLoggedIn) { loggedIn in
+        .onChange(of: viewModel.isLoggedIn) { _, loggedIn in
             if loggedIn { onLoginSuccess() }
-        }
-        .task {
-            viewModel.configure(container: container)
         }
     }
 

@@ -64,7 +64,7 @@ struct FlashcardView: View {
                         // Empty state
                         VStack(spacing: 16) {
                             Spacer()
-                            AssetImage(filename: "empty-flashcards.png")
+                            AssetImage(filename: "empty-flashcards.png", contentDescription: nil)
                                 .frame(width: 120, height: 120)
                             Text("No flashcards yet")
                                 .font(KanjiQuestTheme.titleMedium)

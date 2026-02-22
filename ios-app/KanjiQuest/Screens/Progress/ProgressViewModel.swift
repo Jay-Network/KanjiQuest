@@ -63,7 +63,7 @@ class ProgressViewModel: ObservableObject {
                 let profile = try await container.userRepository.getProfile()
                 let mastered = try await container.srsRepository.getMasteredCount()
                 let newCount = try await container.srsRepository.getNewCount()
-                let dueCount = try await container.srsRepository.getDueCount(now: Int64(Date().timeIntervalSince1970 * 1000))
+                let dueCount = try await container.srsRepository.getDueCount(currentTime: Int64(Date().timeIntervalSince1970 * 1000))
                 let total = mastered + newCount + dueCount
                 let sessions = try await container.sessionRepository.getRecentSessions(limit: 10)
 
@@ -73,9 +73,9 @@ class ProgressViewModel: ObservableObject {
                 let accuracy: Float = cardsStudied > 0 ? Float(totalCorrect) / Float(cardsStudied) * 100 : 0
 
                 // Compute per-grade mastery
-                let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride()?.intValue ?? Int(profile.level)
-                let tier = LevelProgression.companion.getTierForLevel(level: Int32(playerLevel))
-                let unlockedGrades = tier.unlockedGrades as? [Int32] ?? [1]
+                let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride()?.int32Value ?? profile.level
+                let tier = LevelProgression.shared.getTierForLevel(level: playerLevel)
+                let unlockedGrades: [Int32] = (tier.unlockedGrades as? [NSNumber])?.map { $0.int32Value } ?? [1]
                 var masteries: [GradeMastery] = []
                 for grade in unlockedGrades {
                     let totalInGrade = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)

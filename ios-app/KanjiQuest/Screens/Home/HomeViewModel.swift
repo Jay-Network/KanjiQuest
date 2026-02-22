@@ -115,18 +115,18 @@ class HomeViewModel: ObservableObject {
             container.userSessionProvider.updateEmail(email: email)
         }
 
-        let userId = container.userSessionProvider.getUserId()
+        let userId = (try? await container.userSessionProvider.getUserId()) ?? ""
         let profile = try? await container.userRepository.getProfile()
-        let totalCount = (try? await container.kanjiRepository.getKanjiCount()) ?? 0
+        let totalCount: Int64 = Int64(truncating: (try? await container.kanjiRepository.getKanjiCount()) ?? 0)
         let coinBalance = try? await container.jCoinRepository.getBalance(userId: userId)
         let wotd = try? await container.wordOfTheDayUseCase.getWordOfTheDay()
         let effectiveLevel = container.userSessionProvider.getEffectiveLevel()
         let isPremium = effectiveLevel == .premium || effectiveLevel == .admin
 
         // Tier progression
-        let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride() ?? (profile?.level ?? 1)
-        let tier = LevelProgression.companion.getTierForLevel(level: playerLevel)
-        let nextTier = LevelProgression.companion.getNextTier(level: playerLevel)
+        let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride()?.int32Value ?? (profile?.level ?? 1)
+        let tier = LevelProgression.shared.getTierForLevel(level: playerLevel)
+        let nextTier = LevelProgression.shared.getNextTier(level: playerLevel)
         let unlockedGrades = tier.unlockedGrades as? [Int32] ?? [1]
         let highestGrade = unlockedGrades.max() ?? 1
 
@@ -218,7 +218,7 @@ class HomeViewModel: ObservableObject {
             previewTrials: loadPreviewTrials(),
             tierName: tier.nameEn,
             tierNameJp: tier.nameJp,
-            tierProgress: LevelProgression.companion.getTierProgress(level: playerLevel),
+            tierProgress: LevelProgression.shared.getTierProgress(level: playerLevel),
             nextTierName: nextTier?.nameEn,
             nextTierLevel: nextTier?.levelRange?.first as? Int32,
             highestUnlockedGrade: highestGrade,
@@ -423,7 +423,7 @@ class HomeViewModel: ObservableObject {
     }
 
     private func observeCoinBalance() async {
-        let userId = container.userSessionProvider.getUserId()
+        let userId = (try? await container.userSessionProvider.getUserId()) ?? ""
         // Observe coin balance flow — SKIE converts Flow to AsyncSequence
         do {
             for try await balance in container.jCoinRepository.observeBalance(userId: userId) {

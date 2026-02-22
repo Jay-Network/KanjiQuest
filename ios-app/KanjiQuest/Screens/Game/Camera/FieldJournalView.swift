@@ -221,7 +221,7 @@ struct FieldJournalView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            AssetImage(filename: "empty-journal.png")
+            AssetImage(filename: "empty-journal.png", contentDescription: nil)
                 .frame(width: 160, height: 160)
             Text("No captures yet")
                 .font(KanjiQuestTheme.headlineSmall)

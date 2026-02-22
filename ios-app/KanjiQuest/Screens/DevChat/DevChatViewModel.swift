@@ -59,7 +59,7 @@ final class DevChatViewModel: ObservableObject {
         selectedCategory = nil
 
         Task {
-            guard let result = try? await devChatRepository?.sendMessage(email: email, text: trimmed, category: category) else {
+            guard let result = try? await devChatRepository?.sendMessage(email: email, message: trimmed, category: category) else {
                 messages.removeAll { $0.id == tempId }
                 isSending = false
                 error = "Failed to send message"

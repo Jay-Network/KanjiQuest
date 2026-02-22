@@ -22,7 +22,7 @@ struct AppNavigation: View {
                             showSplash = false
                         })
                     } else if isAuthenticated {
-                        HomeViewWrapper(navigateTo: navigate)
+                        HomeView(navigateTo: navigate)
                     } else {
                         LoginView(
                             onLoginSuccess: { navigateAfterLogin() },
@@ -105,7 +105,7 @@ struct AppNavigation: View {
             )
 
         case .home:
-            HomeViewWrapper(navigateTo: navigate)
+            HomeView(navigateTo: navigate)
 
         case .placementTest:
             PlacementTestView(

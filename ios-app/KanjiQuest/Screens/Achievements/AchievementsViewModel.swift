@@ -35,9 +35,9 @@ class AchievementsViewModel: ObservableObject {
                 let dbAchievements = try await container.achievementRepository.getAllAchievements()
                 var definitions = Self.predefinedAchievements
                 for i in definitions.indices {
-                    if let db = dbAchievements.first(where: { ($0 as AnyObject).id as? String == definitions[i].id }) {
-                        definitions[i].progress = Int((db as AnyObject).progress as? Int32 ?? 0)
-                        definitions[i].unlockedAt = (db as AnyObject).unlockedAt as? Int64
+                    if let db = dbAchievements.first(where: { $0.id == definitions[i].id }) {
+                        definitions[i].progress = Int(db.progress)
+                        definitions[i].unlockedAt = db.unlockedAt?.int64Value
                     }
                 }
 

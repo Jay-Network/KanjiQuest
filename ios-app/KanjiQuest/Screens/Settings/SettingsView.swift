@@ -29,7 +29,7 @@ struct SettingsView: View {
         }
         .toolbarBackground(KanjiQuestTheme.primary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .task { viewModel.loadSettings(container: container) }
+        .task { viewModel.load(container: container) }
         .alert("Set Daily XP Goal", isPresented: $showDailyGoalDialog) {
             ForEach([10, 20, 30, 50, 75, 100], id: \.self) { goal in
                 Button("\(goal) XP") { viewModel.setDailyGoal(goal) }
