@@ -16,7 +16,7 @@ struct HomeView: View {
                         .font(KanjiQuestTheme.titleLarge)
                         .foregroundColor(KanjiQuestTheme.primary)
 
-                    Text("書道 Calligraphy")
+                    Text(KanjiQuestTheme.isPhone ? "漢字 Recognition" : "書道 Calligraphy")
                         .font(KanjiQuestTheme.bodyLarge)
                         .foregroundColor(KanjiQuestTheme.secondary)
                 }
@@ -28,66 +28,16 @@ struct HomeView: View {
                 }
 
                 // Game Mode Buttons
+                // On iPhone: Recognition is primary (hero feature)
+                // On iPad: Calligraphy is primary (Apple Pencil differentiator)
                 VStack(spacing: KanjiQuestTheme.spacingM) {
-                    // Recognition Mode (TestFlight MVP)
-                    Button {
-                        navigateTo(.recognition())
-                    } label: {
-                        HStack {
-                            Image(systemName: "eye.fill")
-                                .font(.title2)
-                            VStack(alignment: .leading) {
-                                Text("Recognition Mode")
-                                    .font(KanjiQuestTheme.labelLarge)
-                                Text("認識モード")
-                                    .font(KanjiQuestTheme.labelSmall)
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                        }
-                        .padding()
-                        .background(KanjiQuestTheme.secondary)
-                        .foregroundColor(.white)
-                        .cornerRadius(KanjiQuestTheme.radiusM)
+                    if KanjiQuestTheme.isPhone {
+                        recognitionButton
+                        calligraphyButton
+                    } else {
+                        calligraphyButton
+                        recognitionButton
                     }
-
-                    // Calligraphy Practice (iPad differentiator)
-                    Button {
-                        if let kanji = viewModel.nextKanji {
-                            navigateTo(.calligraphySession(
-                                kanjiLiteral: kanji.literal,
-                                strokePaths: kanji.strokePaths
-                            ))
-                        } else if !viewModel.isLoadingKanji {
-                            showCalligraphyError = true
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "pencil.tip")
-                                .font(.title2)
-                            VStack(alignment: .leading) {
-                                Text("Calligraphy Practice")
-                                    .font(KanjiQuestTheme.labelLarge)
-                                Text("書道モード")
-                                    .font(KanjiQuestTheme.labelSmall)
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-                            Spacer()
-                            if viewModel.isLoadingKanji {
-                                SwiftUI.ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "chevron.right")
-                            }
-                        }
-                        .padding()
-                        .background(viewModel.isLoadingKanji ? KanjiQuestTheme.primary.opacity(0.6) : KanjiQuestTheme.primary)
-                        .foregroundColor(.white)
-                        .cornerRadius(KanjiQuestTheme.radiusM)
-                    }
-                    .disabled(viewModel.isLoadingKanji)
                 }
 
                 // Navigation links
@@ -114,6 +64,72 @@ struct HomeView: View {
         .task {
             await viewModel.load(container: container)
         }
+    }
+
+    // MARK: - Game Mode Buttons
+
+    private var recognitionButton: some View {
+        Button {
+            navigateTo(.recognition())
+        } label: {
+            HStack {
+                Image(systemName: "eye.fill")
+                    .font(.title2)
+                VStack(alignment: .leading) {
+                    Text("Recognition Mode")
+                        .font(KanjiQuestTheme.labelLarge)
+                    Text("認識モード")
+                        .font(KanjiQuestTheme.labelSmall)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+            }
+            .padding()
+            .background(KanjiQuestTheme.isPhone ? KanjiQuestTheme.primary : KanjiQuestTheme.secondary)
+            .foregroundColor(.white)
+            .cornerRadius(KanjiQuestTheme.radiusM)
+        }
+    }
+
+    private var calligraphyButton: some View {
+        Button {
+            if let kanji = viewModel.nextKanji {
+                navigateTo(.calligraphySession(
+                    kanjiLiteral: kanji.literal,
+                    strokePaths: kanji.strokePaths
+                ))
+            } else if !viewModel.isLoadingKanji {
+                showCalligraphyError = true
+            }
+        } label: {
+            HStack {
+                Image(systemName: "pencil.tip")
+                    .font(.title2)
+                VStack(alignment: .leading) {
+                    Text("Calligraphy Practice")
+                        .font(KanjiQuestTheme.labelLarge)
+                    Text("書道モード")
+                        .font(KanjiQuestTheme.labelSmall)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                Spacer()
+                if viewModel.isLoadingKanji {
+                    SwiftUI.ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                } else {
+                    Image(systemName: "chevron.right")
+                }
+            }
+            .padding()
+            .background(viewModel.isLoadingKanji
+                ? (KanjiQuestTheme.isPhone ? KanjiQuestTheme.secondary : KanjiQuestTheme.primary).opacity(0.6)
+                : (KanjiQuestTheme.isPhone ? KanjiQuestTheme.secondary : KanjiQuestTheme.primary))
+            .foregroundColor(.white)
+            .cornerRadius(KanjiQuestTheme.radiusM)
+        }
+        .disabled(viewModel.isLoadingKanji)
     }
 }
 

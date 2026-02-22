@@ -1,7 +1,11 @@
 import SwiftUI
+import UIKit
 
 /// Design tokens matching the Android KanjiQuest Material3 theme.
 enum KanjiQuestTheme {
+    /// True on iPhone, false on iPad
+    static let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+
     // Primary colors
     static let primary = Color(hex: 0xC62828)        // Deep red (漢字 ink)
     static let onPrimary = Color.white
@@ -42,9 +46,13 @@ enum KanjiQuestTheme {
     static let labelLarge = Font.system(size: 15, weight: .semibold)
     static let labelSmall = Font.system(size: 12, weight: .medium)
 
-    // Kanji display (large center kanji)
-    static let kanjiDisplay = Font.system(size: 96, weight: .regular, design: .serif)
-    static let kanjiMedium = Font.system(size: 48, weight: .regular, design: .serif)
+    // Kanji display (large center kanji) — scaled for iPad vs iPhone
+    static var kanjiDisplay: Font {
+        Font.system(size: isPhone ? 64 : 96, weight: .regular, design: .serif)
+    }
+    static var kanjiMedium: Font {
+        Font.system(size: isPhone ? 36 : 48, weight: .regular, design: .serif)
+    }
 
     // Spacing
     static let spacingXS: CGFloat = 4

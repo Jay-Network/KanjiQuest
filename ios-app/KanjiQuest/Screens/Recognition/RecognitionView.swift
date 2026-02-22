@@ -166,7 +166,7 @@ private struct QuestionContent: View {
                     .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
 
                 Text(question.kanjiLiteral)
-                    .font(.system(size: 96))
+                    .font(KanjiQuestTheme.kanjiDisplay)
                     .minimumScaleFactor(0.6)
                     .foregroundColor(KanjiQuestTheme.onSurface)
             }

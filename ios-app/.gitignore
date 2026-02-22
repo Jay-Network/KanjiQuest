@@ -1,5 +1,6 @@
 # Xcode secrets
 KanjiQuest.xcconfig
+KanjiQuestPhone.xcconfig
 *.xcuserdata/
 *.xcworkspace/xcuserdata/
 DerivedData/

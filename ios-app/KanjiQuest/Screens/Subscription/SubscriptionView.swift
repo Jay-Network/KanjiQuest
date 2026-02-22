@@ -16,7 +16,7 @@ struct SubscriptionView: View {
                     Text("KanjiQuest Premium")
                         .font(KanjiQuestTheme.titleLarge)
 
-                    Text("書道 Calligraphy Edition")
+                    Text(KanjiQuestTheme.isPhone ? "漢字 Learning Edition" : "書道 Calligraphy Edition")
                         .font(KanjiQuestTheme.bodyLarge)
                         .foregroundColor(.secondary)
                 }
@@ -28,7 +28,9 @@ struct SubscriptionView: View {
                         .font(KanjiQuestTheme.titleMedium)
                         .foregroundColor(KanjiQuestTheme.primary)
 
-                    Text("Premium calligraphy features with Apple Pencil")
+                    Text(KanjiQuestTheme.isPhone
+                         ? "Premium recognition & calligraphy features"
+                         : "Premium calligraphy features with Apple Pencil")
                         .font(KanjiQuestTheme.bodyMedium)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
