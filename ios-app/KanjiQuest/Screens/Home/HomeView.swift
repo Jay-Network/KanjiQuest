@@ -4,7 +4,9 @@ import SharedCore
 struct HomeView: View {
     @EnvironmentObject var container: AppContainer
     @StateObject private var viewModel = HomeViewModel()
+    #if IPAD_TARGET
     @State private var showCalligraphyError = false
+    #endif
     let navigateTo: (Route) -> Void
 
     var body: some View {
@@ -16,9 +18,15 @@ struct HomeView: View {
                         .font(KanjiQuestTheme.titleLarge)
                         .foregroundColor(KanjiQuestTheme.primary)
 
-                    Text(KanjiQuestTheme.isPhone ? "漢字 Recognition" : "書道 Calligraphy")
+                    #if IPAD_TARGET
+                    Text("書道 Calligraphy")
                         .font(KanjiQuestTheme.bodyLarge)
                         .foregroundColor(KanjiQuestTheme.secondary)
+                    #else
+                    Text("漢字 Recognition")
+                        .font(KanjiQuestTheme.bodyLarge)
+                        .foregroundColor(KanjiQuestTheme.secondary)
+                    #endif
                 }
                 .padding(.top, KanjiQuestTheme.spacingXL)
 
@@ -28,16 +36,13 @@ struct HomeView: View {
                 }
 
                 // Game Mode Buttons
-                // On iPhone: Recognition is primary (hero feature)
-                // On iPad: Calligraphy is primary (Apple Pencil differentiator)
                 VStack(spacing: KanjiQuestTheme.spacingM) {
-                    if KanjiQuestTheme.isPhone {
-                        recognitionButton
-                        calligraphyButton
-                    } else {
-                        calligraphyButton
-                        recognitionButton
-                    }
+                    #if IPAD_TARGET
+                    calligraphyButton
+                    recognitionButton
+                    #else
+                    recognitionButton
+                    #endif
                 }
 
                 // Navigation links
@@ -56,11 +61,13 @@ struct HomeView: View {
             .padding(.horizontal)
         }
         .background(KanjiQuestTheme.background)
+        #if IPAD_TARGET
         .alert("Calligraphy Unavailable", isPresented: $showCalligraphyError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(viewModel.kanjiLoadError ?? "Kanji data could not be loaded. Please restart the app.")
         }
+        #endif
         .task {
             await viewModel.load(container: container)
         }
@@ -86,12 +93,17 @@ struct HomeView: View {
                 Image(systemName: "chevron.right")
             }
             .padding()
-            .background(KanjiQuestTheme.isPhone ? KanjiQuestTheme.primary : KanjiQuestTheme.secondary)
+            #if IPAD_TARGET
+            .background(KanjiQuestTheme.secondary)
+            #else
+            .background(KanjiQuestTheme.primary)
+            #endif
             .foregroundColor(.white)
             .cornerRadius(KanjiQuestTheme.radiusM)
         }
     }
 
+    #if IPAD_TARGET
     private var calligraphyButton: some View {
         Button {
             if let kanji = viewModel.nextKanji {
@@ -124,13 +136,14 @@ struct HomeView: View {
             }
             .padding()
             .background(viewModel.isLoadingKanji
-                ? (KanjiQuestTheme.isPhone ? KanjiQuestTheme.secondary : KanjiQuestTheme.primary).opacity(0.6)
-                : (KanjiQuestTheme.isPhone ? KanjiQuestTheme.secondary : KanjiQuestTheme.primary))
+                ? KanjiQuestTheme.primary.opacity(0.6)
+                : KanjiQuestTheme.primary)
             .foregroundColor(.white)
             .cornerRadius(KanjiQuestTheme.radiusM)
         }
         .disabled(viewModel.isLoadingKanji)
     }
+    #endif
 }
 
 private struct LevelCard: View {

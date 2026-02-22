@@ -3,7 +3,9 @@ import SwiftUI
 enum Route: Hashable {
     case home
     case recognition(targetKanjiId: Int32? = nil)
+    #if IPAD_TARGET
     case calligraphySession(kanjiLiteral: String, strokePaths: [String])
+    #endif
     case login
     case progress
     case settings
@@ -32,11 +34,13 @@ struct AppNavigation: View {
                     HomeView(navigateTo: navigate)
                 case .recognition(let targetKanjiId):
                     RecognitionView(targetKanjiId: targetKanjiId)
+                #if IPAD_TARGET
                 case .calligraphySession(let kanji, let paths):
                     CalligraphySessionView(
                         kanjiLiteral: kanji,
                         strokePaths: paths
                     )
+                #endif
                 case .login:
                     LoginView(onLoginSuccess: {
                         isAuthenticated = true

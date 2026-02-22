@@ -1,0 +1,128 @@
+name: KanjiQuestPhone
+options:
+  bundleIdPrefix: com.jworks.kanjiquest
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1"  # iPhone only
+
+configs:
+  Debug: debug
+  Release: release
+
+targets:
+  KanjiQuestPhone:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: KanjiQuestPhone.xcconfig
+      Release: KanjiQuestPhone.xcconfig
+
+    sources:
+      - path: KanjiQuest
+        excludes:
+          - "**/.DS_Store"
+          - "Calligraphy/**"
+          - "Screens/Calligraphy/**"
+      - path: ../android-app/src/main/assets/kanjiquest.db
+        buildPhase: resources
+
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jworks.kanjiquest.iphone
+        INFOPLIST_FILE: KanjiQuest/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"  # iPhone only
+        CODE_SIGN_STYLE: Automatic
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: false
+        FRAMEWORK_SEARCH_PATHS: $(PROJECT_DIR)/Frameworks
+        SUPABASE_URL: $(SUPABASE_URL)
+        SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+        SUPABASE_SERVICE_ROLE_KEY: $(SUPABASE_SERVICE_ROLE_KEY)
+        GEMINI_API_KEY: $(GEMINI_API_KEY)
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: -Onone
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: -O
+          SWIFT_COMPILATION_MODE: wholemodule
+
+    dependencies:
+      - framework: $(PROJECT_DIR)/Frameworks/SharedCore.xcframework
+        embed: true
+      - framework: $(PROJECT_DIR)/Frameworks/SharedJapanese.xcframework
+        embed: true
+      - sdk: libsqlite3.tbd
+
+    preBuildScripts:
+      - name: "Link SharedCore XCFramework"
+        script: |
+          # Copy XCFramework to local Frameworks/ if not present
+          DEST="${PROJECT_DIR}/Frameworks/SharedCore.xcframework"
+          SRC="${PROJECT_DIR}/../shared-core/build/XCFrameworks/release/SharedCore.xcframework"
+          if [ ! -d "$DEST" ] && [ -d "$SRC" ]; then
+            mkdir -p "${PROJECT_DIR}/Frameworks"
+            cp -R "$SRC" "$DEST"
+          elif [ ! -d "$DEST" ]; then
+            cd "${PROJECT_DIR}/.."
+            ./gradlew :shared-core:assembleSharedCoreReleaseXCFramework
+            mkdir -p "${PROJECT_DIR}/Frameworks"
+            cp -R "$SRC" "$DEST"
+          fi
+        basedOnDependencyAnalysis: false
+
+    postCompileScripts:
+      - name: "Copy Database"
+        script: |
+          # Copy pre-built kanji database to app bundle
+          DB_SOURCE="${PROJECT_DIR}/../android-app/src/main/assets/kanjiquest.db"
+          DB_DEST="${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/kanjiquest.db"
+          if [ -f "$DB_SOURCE" ]; then
+            cp "$DB_SOURCE" "$DB_DEST"
+          fi
+        basedOnDependencyAnalysis: false
+
+  KanjiQuestPhoneTests:
+    type: bundle.unit-test
+    platform: iOS
+
+    sources:
+      - path: KanjiQuestTests
+
+    dependencies:
+      - target: KanjiQuestPhone
+
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jworks.kanjiquest.iphone.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/KanjiQuestPhone.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/KanjiQuestPhone"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  KanjiQuestPhone:
+    build:
+      targets:
+        KanjiQuestPhone: all
+        KanjiQuestPhoneTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - KanjiQuestPhoneTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
