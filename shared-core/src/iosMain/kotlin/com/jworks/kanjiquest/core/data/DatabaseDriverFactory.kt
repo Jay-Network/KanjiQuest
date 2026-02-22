@@ -39,11 +39,8 @@ actual class DatabaseDriverFactory {
         )
 
         // Verify kanji count right after opening
-        val cursor = driver.executeQuery(null, "SELECT COUNT(*) FROM kanji", { cursor ->
-            cursor.next()
-            cursor.getLong(0) ?: 0L
-        }, 0)
-        NSLog("KanjiQuest [KN]: Kanji count after open = %d", cursor)
+        driver.execute(null, "SELECT COUNT(*) FROM kanji", 0)
+        NSLog("KanjiQuest [KN]: DB opened at %s (exists=%s, size=%d)", resolvedDbPath, exists.toString(), size)
 
         ensureNewTables(driver)
         return driver
