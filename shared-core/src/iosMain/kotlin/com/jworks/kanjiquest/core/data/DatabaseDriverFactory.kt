@@ -8,6 +8,7 @@ import platform.Foundation.NSBundle
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
+import platform.Foundation.NSUserDefaults
 import platform.Foundation.NSUserDomainMask
 
 actual class DatabaseDriverFactory {
@@ -31,17 +32,27 @@ actual class DatabaseDriverFactory {
 
         val dbDestination = "$documentsPath/$DB_NAME"
 
-        if (fileManager.fileExistsAtPath(dbDestination)) return
+        val defaults = NSUserDefaults.standardUserDefaults
+        val installedVersion = defaults.integerForKey(DB_VERSION_KEY)
+
+        if (fileManager.fileExistsAtPath(dbDestination) && installedVersion >= DB_VERSION) return
 
         val bundlePath = NSBundle.mainBundle.pathForResource(
             name = DB_NAME.removeSuffix(".db"),
             ofType = "db"
         ) ?: return
 
+        if (fileManager.fileExistsAtPath(dbDestination)) {
+            fileManager.removeItemAtPath(dbDestination, error = null)
+        }
+
         fileManager.copyItemAtPath(bundlePath, toPath = dbDestination, error = null)
+        defaults.setInteger(DB_VERSION.toLong(), forKey = DB_VERSION_KEY)
     }
 
     companion object {
         private const val DB_NAME = "kanjiquest.db"
+        private const val DB_VERSION_KEY = "kanjiquest_db_version"
+        private const val DB_VERSION = 1
     }
 }
