@@ -88,20 +88,19 @@ final class FeedbackViewModel: ObservableObject {
                 deviceInfo: deviceInfo
             )
 
-            switch result {
-            case .success:
+            if result is SubmitFeedbackResult.Success {
                 isSubmitting = false
                 successMessage = "Thank you for your feedback! We'll keep you updated on progress."
                 feedbackText = ""
                 selectedCategory = .other
                 loadFeedbackHistory()
-            case .rateLimited(let message):
+            } else if let rateLimited = result as? SubmitFeedbackResult.RateLimited {
                 isSubmitting = false
-                error = message
-            case .error(let message):
+                error = rateLimited.message
+            } else if let feedbackError = result as? SubmitFeedbackResult.Error {
                 isSubmitting = false
-                error = message
-            case nil:
+                error = feedbackError.message
+            } else {
                 isSubmitting = false
                 error = "Failed to submit feedback"
             }

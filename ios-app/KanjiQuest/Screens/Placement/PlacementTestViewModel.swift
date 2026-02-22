@@ -122,7 +122,7 @@ final class PlacementTestViewModel: ObservableObject {
         let selected = Array(allKana.shuffled().prefix(questionsPerStage))
         return selected.map { kana in
             var options = [kana.romanization]
-            let distractors = allKana.filter { $0.id != kana.id }.shuffled().prefix(3).map { $0.reading }
+            let distractors = allKana.filter { $0.id != kana.id }.shuffled().prefix(3).map { $0.romanization }
             options.append(contentsOf: distractors)
             options.shuffle()
             let correctIdx = options.firstIndex(of: kana.romanization) ?? 0
@@ -141,7 +141,7 @@ final class PlacementTestViewModel: ObservableObject {
         let selected = Array(allRadicals.shuffled().prefix(questionsPerStage))
         return selected.map { radical in
             var options = [radical.meaningEn]
-            let distractors = allRadicals.filter { $0.id != radical.id }.shuffled().prefix(3).map { $0.meaning }
+            let distractors = allRadicals.filter { $0.id != radical.id }.shuffled().prefix(3).map { $0.meaningEn }
             options.append(contentsOf: distractors)
             options.shuffle()
             let correctIdx = options.firstIndex(of: radical.meaningEn) ?? 0

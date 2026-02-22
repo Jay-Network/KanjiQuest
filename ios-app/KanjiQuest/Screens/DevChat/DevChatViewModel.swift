@@ -66,24 +66,23 @@ final class DevChatViewModel: ObservableObject {
                 return
             }
 
-            switch result {
-            case .success(let messageId, let sentAt):
+            if let success = result as? SendMessageResult.Success {
                 if let idx = messages.firstIndex(where: { $0.id == tempId }) {
                     messages[idx] = DevChatMessage(
-                        id: messageId,
+                        id: success.messageId,
                         messageText: trimmed,
                         direction: .toAgent,
                         category: category,
-                        sentAt: sentAt,
+                        sentAt: success.sentAt,
                         readAt: nil
                     )
                 }
                 isSending = false
-            case .error(let message):
+            } else if let sendError = result as? SendMessageResult.Error {
                 messages.removeAll { $0.id == tempId }
                 isSending = false
-                error = message
-            case .notDeveloper:
+                error = sendError.message
+            } else if result is SendMessageResult.NotDeveloper {
                 messages.removeAll { $0.id == tempId }
                 isSending = false
                 error = "Not registered as a developer"

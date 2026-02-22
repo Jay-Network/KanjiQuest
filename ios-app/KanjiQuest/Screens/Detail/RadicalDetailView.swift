@@ -31,7 +31,7 @@ struct RadicalDetailView: View {
                                 .frame(width: 180, height: 180)
                                 .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
 
-                            Text(radical.character)
+                            Text(radical.literal)
                                 .font(.system(size: 100))
                                 .foregroundColor(.white)
                         }
@@ -44,7 +44,7 @@ struct RadicalDetailView: View {
                         }
 
                         // English meaning
-                        Text(radical.meaning)
+                        Text(radical.meaningEn)
                             .font(KanjiQuestTheme.titleLarge)
                             .foregroundColor(KanjiQuestTheme.onSurfaceVariant)
 
@@ -106,7 +106,7 @@ struct RadicalDetailView: View {
                 }.foregroundColor(.white)
             }
             ToolbarItem(placement: .principal) {
-                let title = viewModel.radical.map { "\($0.character) \($0.meaningJp ?? "")" } ?? "Radical"
+                let title = viewModel.radical.map { "\($0.literal) \($0.meaningJp ?? "")" } ?? "Radical"
                 Text(title).font(.headline).foregroundColor(.white)
             }
         }
