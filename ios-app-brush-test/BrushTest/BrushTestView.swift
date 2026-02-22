@@ -130,20 +130,23 @@ struct BrushTestView: View {
 
     /// Small slider with gray→black gradient indicator for 濃淡 (ink dilution).
     private var inkConcentrationSlider: some View {
-        HStack(spacing: 8) {
-            // Diluted indicator (light gray dot)
-            Circle()
-                .fill(Color(white: 0.6))
-                .frame(width: 6, height: 6)
+        VStack(spacing: 4) {
+            Text("濃淡")
+                .font(.system(size: 10, weight: .light))
+                .foregroundColor(textTertiary)
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color(white: 0.6))
+                    .frame(width: 6, height: 6)
 
-            Slider(value: $inkConcentration, in: 0.2...1.0)
-                .frame(width: 80)
-                .tint(Color(white: Double(inkConcentration) * 0.5))
+                Slider(value: $inkConcentration, in: 0.2...1.0)
+                    .frame(width: 80)
+                    .tint(Color(white: Double(inkConcentration) * 0.5))
 
-            // Dense indicator (black dot)
-            Circle()
-                .fill(Color(white: 0.1))
-                .frame(width: 6, height: 6)
+                Circle()
+                    .fill(Color(white: 0.1))
+                    .frame(width: 6, height: 6)
+            }
         }
     }
 }
