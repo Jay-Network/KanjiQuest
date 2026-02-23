@@ -214,7 +214,7 @@ class HomeViewModel: ObservableObject {
             wordOfTheDay: wotd,
             isLoading: false,
             isPremium: isPremium,
-            isAdmin: container.userSessionProvider.isAdmin().boolValue,
+            isAdmin: container.userSessionProvider.isAdmin(),
             effectiveLevel: effectiveLevel,
             previewTrials: loadPreviewTrials(),
             tierName: tier.nameEn,

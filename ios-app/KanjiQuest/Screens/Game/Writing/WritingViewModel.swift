@@ -49,7 +49,7 @@ class WritingViewModel: ObservableObject {
         self.handwritingChecker = container.makeHandwritingChecker()
         self.aiFeedbackReporter = AiFeedbackReporter()
         self.userSessionProvider = container.userSessionProvider
-        self.isAdmin = container.userSessionProvider.isAdmin().boolValue
+        self.isAdmin = container.userSessionProvider.isAdmin()
 
         // Auto-start for targeted kanji
         if let targetId = targetKanjiId {
