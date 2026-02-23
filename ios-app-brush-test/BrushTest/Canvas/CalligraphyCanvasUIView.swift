@@ -665,45 +665,17 @@ final class CalligraphyCanvasUIView: UIView {
 
     // MARK: - Brush Tip Overlay
 
-    /// Draws a semi-transparent brush footprint preview at the given point.
-    /// Shows elliptical shape (pressure/tilt), bristle indicator lines, and handle direction.
+    /// Simple circle cursor showing the pencil tip position.
     private func drawBrushTipOverlay(at point: CalligraphyPointData, in context: CGContext) {
-        let w = brushEngine.widthForPressure(point.force)
-        let altitudeNorm = min(1.0, max(0.0, point.altitude / (.pi / 2)))
-        let heightRatio = 0.15 + 0.85 * altitudeNorm  // Match flatRatio=0.15
-        let h = w * heightRatio
-
+        let radius: CGFloat = 3.0
         context.saveGState()
-        context.translateBy(x: point.x, y: point.y)
-        context.rotate(by: point.azimuth)
-
-        // Elliptical footprint (alpha ~0.12)
-        context.setFillColor(UIColor.black.withAlphaComponent(0.12).cgColor)
-        context.fillEllipse(in: CGRect(x: -w / 2, y: -h / 2, width: w, height: h))
-
-        // Bristle indicator lines within the ellipse
-        let bristleCount = brushSize.bristleCount
-        let halfCount = CGFloat(bristleCount - 1) / 2.0
-        context.setStrokeColor(UIColor.black.withAlphaComponent(0.25).cgColor)
-        context.setLineWidth(0.3)
-
-        for i in 0..<bristleCount {
-            let normalizedPos = (CGFloat(i) - halfCount) / max(halfCount, 1.0)
-            let bx = normalizedPos * (w / 2.0) * 0.85
-            context.beginPath()
-            context.move(to: CGPoint(x: bx, y: -h * 0.35))
-            context.addLine(to: CGPoint(x: bx, y: h * 0.35))
-            context.strokePath()
-        }
-
-        // Handle direction line (shows pencil azimuth)
-        context.setStrokeColor(UIColor.systemGray3.withAlphaComponent(0.4).cgColor)
-        context.setLineWidth(0.5)
-        context.beginPath()
-        context.move(to: .zero)
-        context.addLine(to: CGPoint(x: 0, y: -(h / 2 + 8)))
-        context.strokePath()
-
+        context.setFillColor(UIColor.black.withAlphaComponent(0.15).cgColor)
+        context.fillEllipse(in: CGRect(
+            x: point.x - radius,
+            y: point.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        ))
         context.restoreGState()
     }
 

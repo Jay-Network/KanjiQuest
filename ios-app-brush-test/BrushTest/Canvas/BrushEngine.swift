@@ -185,9 +185,10 @@ final class FudeBrushEngine: BrushEngine {
                 let baseAlpha = alphaForPressure(pressure, altitude: altitude)
                 let alpha = baseAlpha * inkLevel * opacityCeiling
 
-                // Tilt → ellipse height ratio
+                // Tilt → ellipse height ratio (power curve amplifies effect at moderate angles)
                 let altitudeNorm = min(1.0, max(0.0, altitude / (.pi / 2)))
-                let heightRatio = flatRatio + (1.0 - flatRatio) * altitudeNorm
+                let tiltCurve = pow(altitudeNorm, 2.0)
+                let heightRatio = flatRatio + (1.0 - flatRatio) * tiltCurve
                 let h = w * heightRatio
 
                 // Blend pencil azimuth with movement direction (drag lag)
@@ -293,10 +294,10 @@ final class FudeBrushEngine: BrushEngine {
         let effectiveStripWidth = max(0.3, stripWidth - gap)
         let inkCG = inkUIColor
 
-        // Tilt bias: at low altitude (<~25°), bias bristle survival toward one side
+        // Tilt bias: at moderate-to-low altitude, bias bristle survival toward one side
         // Simulates only one edge of the brush contacting paper (側筆)
         let altNorm = min(1.0, max(0.0, altitude / (.pi / 2)))
-        let tiltBiasStrength: CGFloat = altNorm < 0.55 ? (1.0 - altNorm / 0.55) * 0.5 : 0.0
+        let tiltBiasStrength: CGFloat = altNorm < 0.75 ? (1.0 - altNorm / 0.75) * 0.6 : 0.0
 
         for i in 0..<bristleCount {
             let hash = bristleHash(bristleIndex: i, seed: strokeSeed, stampIndex: stampIndex)
