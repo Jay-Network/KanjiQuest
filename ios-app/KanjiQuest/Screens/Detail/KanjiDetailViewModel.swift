@@ -53,7 +53,7 @@ final class KanjiDetailViewModel: ObservableObject {
             let acc: Float? = (srsCard != nil && srsCard!.totalReviews > 0) ? srsCard!.accuracy : nil
 
             // Flashcard state
-            let inDeck = (try? await flashcardRepository?.isInDeck(kanjiId: kanjiId)) ?? false
+            let inDeck = (try? await flashcardRepository?.isInDeck(kanjiId: kanjiId))?.boolValue ?? false
 
             // Premium/admin check
             let premium = container.userSessionProvider.isPremium()
@@ -89,7 +89,7 @@ final class KanjiDetailViewModel: ObservableObject {
             try? await flashcardRepository?.ensureDefaultDeck()
             let groups = (try? await flashcardRepository?.getAllDeckGroups()) ?? []
             if groups.count <= 1 {
-                let nowInDeck = (try? await flashcardRepository?.toggleInDeck(kanjiId: kanji?.id ?? 0)) ?? false
+                let nowInDeck = (try? await flashcardRepository?.toggleInDeck(kanjiId: kanji?.id ?? 0))?.boolValue ?? false
                 isInFlashcardDeck = nowInDeck
             } else {
                 let decksForKanji = (try? await flashcardRepository?.getDecksForKanji(kanjiId: kanji?.id ?? 0)) ?? []
