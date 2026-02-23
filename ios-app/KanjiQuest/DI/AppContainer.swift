@@ -76,7 +76,7 @@ final class AppContainer: ObservableObject {
         achievementRepository = AchievementRepositoryImpl(database: database)
         vocabSrsRepository = VocabSrsRepositoryImpl(db: database)
         authRepository = AuthRepositoryImpl()
-        jCoinRepository = JCoinRepositoryImpl(database: database, clock: Kotlinx_datetimeClockSystem.shared)
+        jCoinRepository = JCoinRepositoryImpl(database: database)
         flashcardRepository = FlashcardRepositoryImpl(db: database)
         kanaRepository = KanaRepositoryImpl(db: database)
         kanaSrsRepository = KanaSrsRepositoryImpl(db: database)

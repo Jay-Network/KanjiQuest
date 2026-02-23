@@ -27,8 +27,10 @@ import kotlinx.serialization.json.putJsonObject
 
 class JCoinRepositoryImpl(
     private val database: KanjiQuestDatabase,
-    private val clock: Clock = Clock.System
+    private val clock: Clock
 ) : JCoinRepository {
+
+    constructor(database: KanjiQuestDatabase) : this(database, Clock.System)
 
     private val queries get() = database.jCoinQueries
 
