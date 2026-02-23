@@ -222,7 +222,7 @@ class HomeViewModel: ObservableObject {
             tierNameJp: tier.nameJp,
             tierProgress: LevelProgression.shared.getTierProgress(level: playerLevel),
             nextTierName: nextTier?.nameEn,
-            nextTierLevel: nextTier.map { $0.levelRange.start.int32Value },
+            nextTierLevel: nextTier.map { $0.levelRange.first },
             highestUnlockedGrade: highestGrade,
             gradeMasteryList: gradeMasteryList,
             displayLevel: playerLevel,
