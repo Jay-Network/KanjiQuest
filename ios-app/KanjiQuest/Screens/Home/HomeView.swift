@@ -309,7 +309,7 @@ private struct HomeViewContent: View {
 
     var body: some View {
         HomeViewBody(viewModel: viewModel, navigateTo: navigateTo)
-            .onChange(of: scenePhase) { _, newPhase in
+            .onChange(of: scenePhase) { newPhase in
                 if newPhase == .active {
                     viewModel.refresh()
                 }
