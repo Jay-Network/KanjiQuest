@@ -597,7 +597,7 @@ final class CalligraphyCanvasUIView: UIView {
             }
         }
 
-        completedStrokes.append(CompletedStrokeLayer(points: activePoints))
+        completedStrokes.append(CompletedStrokeLayer(points: activePoints, dwellRegions: activeDwellRegions))
     }
 
     func clear() {
@@ -635,6 +635,9 @@ final class CalligraphyCanvasUIView: UIView {
             for stroke in completedStrokes {
                 brushEngine.render(points: stroke.points, in: ctx.cgContext, bounds: bounds)
                 renderInkPooling(points: stroke.points, in: ctx.cgContext)
+                for region in stroke.dwellRegions {
+                    renderSingleDwellBleed(region, in: ctx.cgContext)
+                }
             }
         }
     }
@@ -795,4 +798,5 @@ final class CalligraphyCanvasUIView: UIView {
 
 private struct CompletedStrokeLayer {
     let points: [CalligraphyPointData]
+    let dwellRegions: [DwellRegion]
 }

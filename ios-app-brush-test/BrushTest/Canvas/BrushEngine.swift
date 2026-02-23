@@ -86,8 +86,8 @@ final class FudeBrushEngine: BrushEngine {
     /// Power curve exponent for pressure-to-width mapping (>1 = more range in light pressure)
     private let pressureCurve: CGFloat = 1.8
 
-    /// Minimum height-to-width ratio at flat tilt (0.15 = dramatic side-brush 側筆)
-    private let flatRatio: CGFloat = 0.15
+    /// Minimum height-to-width ratio at flat tilt (0.08 = extreme side-brush 側筆)
+    private let flatRatio: CGFloat = 0.08
 
     /// Base spacing factor (fraction of width between stamps)
     private let baseSpacingFactor: CGFloat = 0.12
@@ -185,11 +185,14 @@ final class FudeBrushEngine: BrushEngine {
                 let baseAlpha = alphaForPressure(pressure, altitude: altitude)
                 let alpha = baseAlpha * inkLevel * opacityCeiling
 
-                // Tilt → ellipse height ratio (power curve amplifies effect at moderate angles)
+                // Tilt → stamp dimensions (cubic curve makes moderate tilts visually dramatic)
                 let altitudeNorm = min(1.0, max(0.0, altitude / (.pi / 2)))
-                let tiltCurve = pow(altitudeNorm, 2.0)
+                let tiltCurve = pow(altitudeNorm, 3.0)
                 let heightRatio = flatRatio + (1.0 - flatRatio) * tiltCurve
-                let h = w * heightRatio
+                // Tilted brush contacts more paper → wider stamp (up to 50%)
+                let tiltWidthBoost = 1.0 + (1.0 - tiltCurve) * 0.5
+                let tiltW = w * tiltWidthBoost
+                let h = tiltW * heightRatio
 
                 // Blend pencil azimuth with movement direction (drag lag)
                 // Low velocity: azimuth dominates; high velocity: movement direction dominates
@@ -211,7 +214,7 @@ final class FudeBrushEngine: BrushEngine {
                 stampBristles(
                     in: context,
                     center: CGPoint(x: x, y: y),
-                    width: w,
+                    width: tiltW,
                     height: effectiveHeight,
                     angle: smoothedAngle,
                     alpha: alpha * absorption,
@@ -294,10 +297,10 @@ final class FudeBrushEngine: BrushEngine {
         let effectiveStripWidth = max(0.3, stripWidth - gap)
         let inkCG = inkUIColor
 
-        // Tilt bias: at moderate-to-low altitude, bias bristle survival toward one side
+        // Tilt bias: bias bristle survival toward one side when tilted
         // Simulates only one edge of the brush contacting paper (側筆)
         let altNorm = min(1.0, max(0.0, altitude / (.pi / 2)))
-        let tiltBiasStrength: CGFloat = altNorm < 0.75 ? (1.0 - altNorm / 0.75) * 0.6 : 0.0
+        let tiltBiasStrength: CGFloat = altNorm < 0.85 ? (1.0 - altNorm / 0.85) * 0.7 : 0.0
 
         for i in 0..<bristleCount {
             let hash = bristleHash(bristleIndex: i, seed: strokeSeed, stampIndex: stampIndex)
@@ -341,7 +344,14 @@ final class FudeBrushEngine: BrushEngine {
             // Height perturbation ±15% from hash
             let heightHash = (hash >> 8) & 0xFF
             let heightPerturb = 1.0 + (CGFloat(heightHash) / 255.0 - 0.5) * 0.3
-            let stripHeight = height * heightPerturb
+
+            // Circular envelope: edge bristles shorter for round footprint
+            // Strong at perpendicular (round contact), fades at tilt (flat contact)
+            let circleEnvelope = max(0.3, sqrt(max(0, 1.0 - normalizedPos * normalizedPos)))
+            let envelopeBlend = altNorm * altNorm
+            let effectiveEnvelope = (1.0 - envelopeBlend) + envelopeBlend * circleEnvelope
+
+            let stripHeight = height * heightPerturb * effectiveEnvelope
 
             let bristleAlpha = alpha * alphaModulation * edgeFactor
 
