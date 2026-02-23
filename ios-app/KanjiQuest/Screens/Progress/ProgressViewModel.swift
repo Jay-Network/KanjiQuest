@@ -81,7 +81,8 @@ class ProgressViewModel: ObservableObject {
                 let unlockedGrades: [Int32] = (tier.unlockedGrades as? [NSNumber])?.map { $0.int32Value } ?? [1]
                 var masteries: [GradeMastery] = []
                 for grade in unlockedGrades {
-                    let totalInGrade = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
+                    let totalInGradeRaw = try await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
+                    let totalInGrade = (totalInGradeRaw as? NSNumber)?.int64Value ?? 0
                     let mastery = try await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: totalInGrade)
                     masteries.append(mastery)
                 }

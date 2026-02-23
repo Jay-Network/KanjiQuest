@@ -197,7 +197,7 @@ struct LoginView: View {
             }
         }
         .background(KanjiQuestTheme.background)
-        .onChange(of: viewModel.isLoggedIn) { _, loggedIn in
+        .onChange(of: viewModel.isLoggedIn) { loggedIn in
             if loggedIn { onLoginSuccess() }
         }
     }

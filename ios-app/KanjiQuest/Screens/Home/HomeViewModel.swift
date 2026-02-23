@@ -136,7 +136,8 @@ class HomeViewModel: ObservableObject {
         // Grade mastery for all unlocked grades
         var gradeMasteryList: [GradeMastery] = []
         for grade in unlockedGrades {
-            let total = (try? await container.kanjiRepository.getKanjiCountByGrade(grade: grade)) ?? 0
+            let totalRaw = try? await container.kanjiRepository.getKanjiCountByGrade(grade: grade)
+            let total: Int64 = (totalRaw as? NSNumber)?.int64Value ?? 0
             if let mastery = try? await container.srsRepository.getGradeMastery(grade: grade, totalKanjiInGrade: total) {
                 gradeMasteryList.append(mastery)
             }
@@ -399,7 +400,8 @@ class HomeViewModel: ObservableObject {
 
     private func loadPracticeCounts(kanjiIds: [Int64]) async -> [Int32: Int32] {
         guard !kanjiIds.isEmpty else { return [:] }
-        guard let cards = try? await container.srsRepository.getCardsByIds(kanjiIds: kanjiIds) else { return [:] }
+        let kotlinIds = kanjiIds.map { KotlinLong(value: $0) }
+        guard let cards = try? await container.srsRepository.getCardsByIds(kanjiIds: kotlinIds) else { return [:] }
         var result: [Int32: Int32] = [:]
         for card in cards { result[card.kanjiId] = card.totalReviews }
         return result
@@ -407,7 +409,8 @@ class HomeViewModel: ObservableObject {
 
     private func loadModeStats(kanjiIds: [Int64]) async -> [Int32: [String: Int32]] {
         guard !kanjiIds.isEmpty else { return [:] }
-        guard let stats = try? await container.srsRepository.getModeStatsByIds(kanjiIds: kanjiIds) else { return [:] }
+        let kotlinIds = kanjiIds.map { KotlinLong(value: $0) }
+        guard let stats = try? await container.srsRepository.getModeStatsByIds(kanjiIds: kotlinIds) else { return [:] }
         // Convert from KMP type to Swift dictionary
         var result: [Int32: [String: Int32]] = [:]
         for (key, value) in stats {
