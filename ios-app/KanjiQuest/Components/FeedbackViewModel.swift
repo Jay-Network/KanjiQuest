@@ -141,10 +141,11 @@ final class FeedbackViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: Self.pollInterval)
                 guard let email = cachedEmail else { continue }
                 do {
+                    let sinceIdParam: KotlinLong? = lastFeedbackId != nil ? KotlinLong(value: lastFeedbackId!) : nil
                     let newFeedback = try await feedbackRepository?.getFeedbackUpdates(
                         email: email,
                         appId: Self.appId,
-                        sinceId: lastFeedbackId.map { KotlinLong(value: $0) }
+                        sinceId: sinceIdParam
                     ) ?? []
 
                     if !newFeedback.isEmpty {

@@ -86,7 +86,7 @@ final class AppContainer: ObservableObject {
         devChatRepository = DevChatRepositoryImpl()
         feedbackRepository = FeedbackRepositoryImpl()
         fieldJournalRepository = FieldJournalRepositoryImpl(db: database)
-        learningSyncRepository = LearningSyncRepositoryImpl(database: database, clock: Kotlinx_datetimeClockSystem.shared)
+        learningSyncRepository = LearningSyncRepositoryImpl(database: database)
 
         // Algorithms
         srsAlgorithm = Sm2Algorithm()

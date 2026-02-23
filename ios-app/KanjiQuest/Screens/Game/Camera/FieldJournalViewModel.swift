@@ -23,8 +23,8 @@ final class FieldJournalViewModel: ObservableObject {
             let caughtRaw = try? await repository?.totalKanjiCaught()
 
             entries = all
-            totalPhotos = (totalRaw as? NSNumber)?.int64Value ?? 0
-            totalKanjiCaught = (caughtRaw as? NSNumber)?.int64Value ?? 0
+            totalPhotos = totalRaw?.int64Value ?? 0
+            totalKanjiCaught = caughtRaw?.int64Value ?? 0
             isLoading = false
         }
     }

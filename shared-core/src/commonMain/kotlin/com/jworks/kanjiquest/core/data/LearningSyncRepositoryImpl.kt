@@ -33,9 +33,10 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 class LearningSyncRepositoryImpl(
-    private val database: KanjiQuestDatabase,
-    private val clock: Clock = Clock.System
+    private val database: KanjiQuestDatabase
 ) : LearningSyncRepository {
+
+    private val clock: Clock = Clock.System
 
     private val syncQueries get() = database.learningSyncQueueQueries
     private val srsQueries get() = database.srsCardQueries

@@ -148,7 +148,8 @@ class HomeViewModel: ObservableObject {
         let practiceCounts = await loadPracticeCounts(kanjiIds: kanjiIds)
         let modeStats = await loadModeStats(kanjiIds: kanjiIds)
 
-        let deckCount = (try? await container.flashcardRepository.getDeckCount())?.int64Value ?? 0
+        let deckCountRaw = try? await container.flashcardRepository.getDeckCount()
+        let deckCount: Int64 = deckCountRaw?.int64Value ?? 0
 
         // Collection data — kanji
         let collectedKanjiItems = (try? await container.collectionRepository.getCollectedByType(type: .kanji)) ?? []
@@ -221,7 +222,7 @@ class HomeViewModel: ObservableObject {
             tierNameJp: tier.nameJp,
             tierProgress: LevelProgression.shared.getTierProgress(level: playerLevel),
             nextTierName: nextTier?.nameEn,
-            nextTierLevel: nextTier.map { ($0.levelRange.first as? NSNumber)?.int32Value ?? 0 },
+            nextTierLevel: nextTier.map { $0.levelRange.start.int32Value },
             highestUnlockedGrade: highestGrade,
             gradeMasteryList: gradeMasteryList,
             displayLevel: playerLevel,
