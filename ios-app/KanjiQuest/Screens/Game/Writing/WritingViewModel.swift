@@ -110,7 +110,7 @@ class WritingViewModel: ObservableObject {
 
             // Auto-select difficulty based on SRS
             let srsState = awaiting.question.srsState
-            let playerLevel = userSessionProvider?.getAdminPlayerLevelOverride()?.intValue ?? 1
+            let playerLevel = userSessionProvider?.getAdminPlayerLevelOverride()?.int32Value ?? 1
             if srsState == "graduated" {
                 writingDifficulty = .blank
             } else if srsState == "review" {

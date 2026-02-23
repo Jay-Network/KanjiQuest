@@ -202,7 +202,7 @@ class HomeViewModel: ObservableObject {
         if !isFirstLoad && !preserveStrokeCounts.isEmpty {
             strokeCounts = preserveStrokeCounts
         } else {
-            strokeCounts = ((try? await container.kanjiRepository.getDistinctStrokeCounts()) ?? []).map { Int32(truncating: $0 as! NSNumber) }
+            strokeCounts = ((try? await container.kanjiRepository.getDistinctStrokeCounts()) ?? []).compactMap { ($0 as? NSNumber)?.int32Value }
         }
 
         uiState = HomeUiState(
@@ -220,7 +220,7 @@ class HomeViewModel: ObservableObject {
             tierNameJp: tier.nameJp,
             tierProgress: LevelProgression.shared.getTierProgress(level: playerLevel),
             nextTierName: nextTier?.nameEn,
-            nextTierLevel: nextTier?.levelRange?.first as? Int32,
+            nextTierLevel: (nextTier?.levelRange?.first as? NSNumber)?.int32Value,
             highestUnlockedGrade: highestGrade,
             gradeMasteryList: gradeMasteryList,
             displayLevel: playerLevel,
@@ -335,7 +335,7 @@ class HomeViewModel: ObservableObject {
                 uiState.selectedMainTab = .kanji
 
             case .strokes:
-                let counts = ((try? await container.kanjiRepository.getDistinctStrokeCounts()) ?? []).map { Int32(truncating: $0 as! NSNumber) }
+                let counts = ((try? await container.kanjiRepository.getDistinctStrokeCounts()) ?? []).compactMap { ($0 as? NSNumber)?.int32Value }
                 let first = counts.first ?? 1
                 let kanji = (try? await container.kanjiRepository.getKanjiByStrokeCount(strokeCount: first)) ?? []
                 let ids = kanji.map { Int64($0.id) }
