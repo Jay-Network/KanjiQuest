@@ -19,12 +19,12 @@ final class FieldJournalViewModel: ObservableObject {
     private func loadEntries() {
         Task {
             let all = (try? await repository?.getAll()) ?? []
-            let total = (try? await repository?.countAll()) ?? 0
-            let caught = (try? await repository?.totalKanjiCaught()) ?? 0
+            let totalRaw = try? await repository?.countAll()
+            let caughtRaw = try? await repository?.totalKanjiCaught()
 
             entries = all
-            totalPhotos = total
-            totalKanjiCaught = caught
+            totalPhotos = (totalRaw as? NSNumber)?.int64Value ?? 0
+            totalKanjiCaught = (caughtRaw as? NSNumber)?.int64Value ?? 0
             isLoading = false
         }
     }

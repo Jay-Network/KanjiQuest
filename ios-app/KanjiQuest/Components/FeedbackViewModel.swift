@@ -144,7 +144,7 @@ final class FeedbackViewModel: ObservableObject {
                     let newFeedback = try await feedbackRepository?.getFeedbackUpdates(
                         email: email,
                         appId: Self.appId,
-                        sinceId: lastFeedbackId
+                        sinceId: lastFeedbackId.map { KotlinLong(value: $0) }
                     ) ?? []
 
                     if !newFeedback.isEmpty {

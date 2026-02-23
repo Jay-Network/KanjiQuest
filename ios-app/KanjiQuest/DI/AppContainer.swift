@@ -76,7 +76,7 @@ final class AppContainer: ObservableObject {
         achievementRepository = AchievementRepositoryImpl(database: database)
         vocabSrsRepository = VocabSrsRepositoryImpl(db: database)
         authRepository = AuthRepositoryImpl()
-        jCoinRepository = JCoinRepositoryImpl(database: database)
+        jCoinRepository = JCoinRepositoryImpl(database: database, clock: Kotlinx_datetimeClockSystem.shared)
         flashcardRepository = FlashcardRepositoryImpl(db: database)
         kanaRepository = KanaRepositoryImpl(db: database)
         kanaSrsRepository = KanaSrsRepositoryImpl(db: database)
@@ -86,7 +86,7 @@ final class AppContainer: ObservableObject {
         devChatRepository = DevChatRepositoryImpl()
         feedbackRepository = FeedbackRepositoryImpl()
         fieldJournalRepository = FieldJournalRepositoryImpl(db: database)
-        learningSyncRepository = LearningSyncRepositoryImpl(database: database)
+        learningSyncRepository = LearningSyncRepositoryImpl(database: database, clock: Kotlinx_datetimeClockSystem.shared)
 
         // Algorithms
         srsAlgorithm = Sm2Algorithm()
