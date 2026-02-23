@@ -70,7 +70,7 @@ struct LoginView: View {
                         .textContentType(.password)
                         .disabled(viewModel.isLoading)
 
-                    if let error = viewModel.error {
+                    if let error = viewModel.errorMessage {
                         Spacer(minLength: 8)
                         Text(error)
                             .font(KanjiQuestTheme.bodySmall)

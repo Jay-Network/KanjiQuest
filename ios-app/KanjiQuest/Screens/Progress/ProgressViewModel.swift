@@ -4,7 +4,7 @@ import SharedCore
 /// Progress & Stats state. Mirrors Android's ProgressViewModel.kt.
 @MainActor
 class ProgressViewModel: ObservableObject {
-    @Published var profile = UserProfile()
+    @Published var profile: UserProfile?
     @Published var masteredCount: Int64 = 0
     @Published var totalKanjiInSrs: Int64 = 0
     @Published var recentSessions: [StudySession] = []
@@ -29,10 +29,10 @@ class ProgressViewModel: ObservableObject {
 
     // MARK: - Computed Convenience Properties
 
-    var level: Int { Int(profile.level) }
-    var totalXp: Int64 { Int64(profile.totalXp) }
-    var currentStreak: Int { Int(profile.currentStreak) }
-    var longestStreak: Int { Int(profile.longestStreak) }
+    var level: Int { Int(profile?.level ?? 1) }
+    var totalXp: Int64 { Int64(profile?.totalXp ?? 0) }
+    var currentStreak: Int { Int(profile?.currentStreak ?? 0) }
+    var longestStreak: Int { Int(profile?.longestStreak ?? 0) }
     var dailyGoal: Int {
         let stored = UserDefaults.standard.integer(forKey: "daily_goal_xp")
         return stored > 0 ? stored : 50
@@ -61,9 +61,12 @@ class ProgressViewModel: ObservableObject {
         Task {
             do {
                 let profile = try await container.userRepository.getProfile()
-                let mastered = try await container.srsRepository.getMasteredCount()
-                let newCount = try await container.srsRepository.getNewCount()
-                let dueCount = try await container.srsRepository.getDueCount(currentTime: Int64(Date().timeIntervalSince1970 * 1000))
+                let masteredRaw = try await container.srsRepository.getMasteredCount()
+                let newCountRaw = try await container.srsRepository.getNewCount()
+                let dueCountRaw = try await container.srsRepository.getDueCount(currentTime: Int64(Date().timeIntervalSince1970 * 1000))
+                let mastered = (masteredRaw as? NSNumber)?.int64Value ?? 0
+                let newCount = (newCountRaw as? NSNumber)?.int64Value ?? 0
+                let dueCount = (dueCountRaw as? NSNumber)?.int64Value ?? 0
                 let total = mastered + newCount + dueCount
                 let sessions = try await container.sessionRepository.getRecentSessions(limit: 10)
 

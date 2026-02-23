@@ -94,7 +94,7 @@ final class KanjiDetailViewModel: ObservableObject {
             } else {
                 let decksForKanji = (try? await flashcardRepository?.getDecksForKanji(kanjiId: kanji?.id ?? 0)) ?? []
                 deckGroups = groups
-                kanjiInDecks = decksForKanji
+                kanjiInDecks = decksForKanji.map { Int64(truncating: $0) }
                 showDeckChooser = true
             }
         }
@@ -105,7 +105,7 @@ final class KanjiDetailViewModel: ObservableObject {
         Task {
             try? await flashcardRepository?.addToDeck(deckId: deckId, kanjiId: kanjiId)
             let decks = (try? await flashcardRepository?.getDecksForKanji(kanjiId: kanjiId)) ?? []
-            kanjiInDecks = decks
+            kanjiInDecks = decks.map { Int64(truncating: $0) }
             isInFlashcardDeck = true
         }
     }
@@ -115,7 +115,7 @@ final class KanjiDetailViewModel: ObservableObject {
         Task {
             try? await flashcardRepository?.removeFromDeck(deckId: deckId, kanjiId: kanjiId)
             let decks = (try? await flashcardRepository?.getDecksForKanji(kanjiId: kanjiId)) ?? []
-            kanjiInDecks = decks
+            kanjiInDecks = decks.map { Int64(truncating: $0) }
             isInFlashcardDeck = !decks.isEmpty
         }
     }
