@@ -6,6 +6,9 @@ import SharedCore
 /// Mirrors Android AppModule.kt with all repositories and engines.
 final class AppContainer: ObservableObject {
 
+    // MARK: - Initialization status
+    @Published var initError: String? = nil
+
     // MARK: - Configuration
     let configuration: Configuration
 
@@ -57,18 +60,27 @@ final class AppContainer: ObservableObject {
     let handwritingChecker: HandwritingChecker
 
     init() {
+        NSLog("KanjiQuest [AppContainer]: init() START")
+
         configuration = Configuration()
+        NSLog("KanjiQuest [AppContainer]: Configuration OK")
 
         // Stage the pre-built DB from the app bundle to Documents/ BEFORE
         // Kotlin/Native's DatabaseDriverFactory touches it.
         Self.stageBundleDatabase()
+        NSLog("KanjiQuest [AppContainer]: stageBundleDatabase() OK")
 
         // Database
+        NSLog("KanjiQuest [AppContainer]: Creating DatabaseDriverFactory...")
         databaseDriverFactory = DatabaseDriverFactory()
+        NSLog("KanjiQuest [AppContainer]: DatabaseDriverFactory OK, creating driver...")
         let driver = databaseDriverFactory.createDriver()
+        NSLog("KanjiQuest [AppContainer]: Driver OK, creating database...")
         database = databaseDriverFactory.createDatabase(driver: driver)
+        NSLog("KanjiQuest [AppContainer]: Database OK")
 
         // Core Repositories
+        NSLog("KanjiQuest [AppContainer]: Creating repositories...")
         kanjiRepository = KanjiRepositoryImpl(db: database)
         srsRepository = SrsRepositoryImpl(db: database)
         userRepository = UserRepositoryImpl(db: database)
@@ -87,25 +99,35 @@ final class AppContainer: ObservableObject {
         feedbackRepository = FeedbackRepositoryImpl()
         fieldJournalRepository = FieldJournalRepositoryImpl(db: database)
         learningSyncRepository = LearningSyncRepositoryImpl(database: database)
+        NSLog("KanjiQuest [AppContainer]: All repositories OK")
 
         // Algorithms
+        NSLog("KanjiQuest [AppContainer]: Creating algorithms...")
         srsAlgorithm = Sm2Algorithm()
         scoringEngine = ScoringEngine()
+        NSLog("KanjiQuest [AppContainer]: Sm2Algorithm + ScoringEngine OK, accessing StrokeMatcher.shared...")
         strokeMatcher = StrokeMatcher.shared
+        NSLog("KanjiQuest [AppContainer]: StrokeMatcher OK")
 
         // Collection Engines
+        NSLog("KanjiQuest [AppContainer]: Creating EncounterEngine...")
         encounterEngine = EncounterEngine(
             collectionRepository: collectionRepository,
             kanjiRepository: kanjiRepository
         )
+        NSLog("KanjiQuest [AppContainer]: Creating ItemLevelEngine...")
         itemLevelEngine = ItemLevelEngine(
             collectionRepository: collectionRepository
         )
+        NSLog("KanjiQuest [AppContainer]: Collection engines OK")
 
         // User Session
+        NSLog("KanjiQuest [AppContainer]: Creating UserSessionProviderImpl...")
         userSessionProvider = UserSessionProviderImpl(authRepository: authRepository)
+        NSLog("KanjiQuest [AppContainer]: UserSessionProvider OK")
 
         // Use Cases
+        NSLog("KanjiQuest [AppContainer]: Creating use cases...")
         wordOfTheDayUseCase = WordOfTheDayUseCase(kanjiRepository: kanjiRepository)
         completeSessionUseCase = CompleteSessionUseCase(
             userRepository: userRepository,
@@ -118,6 +140,7 @@ final class AppContainer: ObservableObject {
             srsRepository: srsRepository,
             kanjiRepository: kanjiRepository
         )
+        NSLog("KanjiQuest [AppContainer]: Use cases OK")
 
         // Preview Trial Manager
         previewTrialManager = PreviewTrialManager()
@@ -125,6 +148,8 @@ final class AppContainer: ObservableObject {
         // Gemini AI
         geminiClient = GeminiClient(apiKey: configuration.geminiApiKey)
         handwritingChecker = HandwritingChecker(geminiClient: geminiClient)
+
+        NSLog("KanjiQuest [AppContainer]: init() COMPLETE - all dependencies initialized")
     }
 
     // MARK: - Factory methods for scoped dependencies
