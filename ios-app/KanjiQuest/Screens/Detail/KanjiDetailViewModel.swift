@@ -56,8 +56,8 @@ final class KanjiDetailViewModel: ObservableObject {
             let inDeck = (try? await flashcardRepository?.isInDeck(kanjiId: kanjiId)) ?? false
 
             // Premium/admin check
-            let premium = container.userSessionProvider.isPremium()
-            let admin = container.userSessionProvider.isAdmin()
+            let premium = container.userSessionProvider.isPremium().boolValue
+            let admin = container.userSessionProvider.isAdmin().boolValue
 
             // Mode trials
             let writingTrials = previewTrialManager?.getRemainingTrials(mode: "WRITING") ?? 0
