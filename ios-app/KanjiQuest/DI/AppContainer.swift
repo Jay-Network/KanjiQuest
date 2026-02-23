@@ -60,75 +60,94 @@ final class AppContainer: ObservableObject {
     let handwritingChecker: HandwritingChecker
 
     init() {
-        NSLog("KanjiQuest [AppContainer]: init() START")
+        CrashDiagnostic.step("AppContainer.init() START")
 
         configuration = Configuration()
-        NSLog("KanjiQuest [AppContainer]: Configuration OK")
+        CrashDiagnostic.step("Configuration OK")
 
         // Stage the pre-built DB from the app bundle to Documents/ BEFORE
         // Kotlin/Native's DatabaseDriverFactory touches it.
         Self.stageBundleDatabase()
-        NSLog("KanjiQuest [AppContainer]: stageBundleDatabase() OK")
+        CrashDiagnostic.step("stageBundleDatabase() OK")
 
         // Database
-        NSLog("KanjiQuest [AppContainer]: Creating DatabaseDriverFactory...")
+        CrashDiagnostic.step("Creating DatabaseDriverFactory...")
         databaseDriverFactory = DatabaseDriverFactory()
-        NSLog("KanjiQuest [AppContainer]: DatabaseDriverFactory OK, creating driver...")
+        CrashDiagnostic.step("DatabaseDriverFactory() OK, creating driver...")
         let driver = databaseDriverFactory.createDriver()
-        NSLog("KanjiQuest [AppContainer]: Driver OK, creating database...")
+        CrashDiagnostic.step("createDriver() OK, creating database...")
         database = databaseDriverFactory.createDatabase(driver: driver)
-        NSLog("KanjiQuest [AppContainer]: Database OK")
+        CrashDiagnostic.step("createDatabase() OK")
 
-        // Core Repositories
-        NSLog("KanjiQuest [AppContainer]: Creating repositories...")
+        // Core Repositories — one by one for crash isolation
+        CrashDiagnostic.step("Creating KanjiRepositoryImpl...")
         kanjiRepository = KanjiRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating SrsRepositoryImpl...")
         srsRepository = SrsRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating UserRepositoryImpl...")
         userRepository = UserRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating SessionRepositoryImpl...")
         sessionRepository = SessionRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating AchievementRepositoryImpl...")
         achievementRepository = AchievementRepositoryImpl(database: database)
+        CrashDiagnostic.step("Creating VocabSrsRepositoryImpl...")
         vocabSrsRepository = VocabSrsRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating AuthRepositoryImpl...")
         authRepository = AuthRepositoryImpl()
+        CrashDiagnostic.step("Creating JCoinRepositoryImpl...")
         jCoinRepository = JCoinRepositoryImpl(database: database)
+        CrashDiagnostic.step("Creating FlashcardRepositoryImpl...")
         flashcardRepository = FlashcardRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating KanaRepositoryImpl...")
         kanaRepository = KanaRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating KanaSrsRepositoryImpl...")
         kanaSrsRepository = KanaSrsRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating RadicalRepositoryImpl...")
         radicalRepository = RadicalRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating RadicalSrsRepositoryImpl...")
         radicalSrsRepository = RadicalSrsRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating CollectionRepositoryImpl...")
         collectionRepository = CollectionRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating DevChatRepositoryImpl...")
         devChatRepository = DevChatRepositoryImpl()
+        CrashDiagnostic.step("Creating FeedbackRepositoryImpl...")
         feedbackRepository = FeedbackRepositoryImpl()
+        CrashDiagnostic.step("Creating FieldJournalRepositoryImpl...")
         fieldJournalRepository = FieldJournalRepositoryImpl(db: database)
+        CrashDiagnostic.step("Creating LearningSyncRepositoryImpl...")
         learningSyncRepository = LearningSyncRepositoryImpl(database: database)
-        NSLog("KanjiQuest [AppContainer]: All repositories OK")
+        CrashDiagnostic.step("All repositories OK")
 
         // Algorithms
-        NSLog("KanjiQuest [AppContainer]: Creating algorithms...")
+        CrashDiagnostic.step("Creating Sm2Algorithm...")
         srsAlgorithm = Sm2Algorithm()
+        CrashDiagnostic.step("Creating ScoringEngine...")
         scoringEngine = ScoringEngine()
-        NSLog("KanjiQuest [AppContainer]: Sm2Algorithm + ScoringEngine OK, accessing StrokeMatcher.shared...")
+        CrashDiagnostic.step("Accessing StrokeMatcher.shared...")
         strokeMatcher = StrokeMatcher.shared
-        NSLog("KanjiQuest [AppContainer]: StrokeMatcher OK")
+        CrashDiagnostic.step("StrokeMatcher OK")
 
         // Collection Engines
-        NSLog("KanjiQuest [AppContainer]: Creating EncounterEngine...")
+        CrashDiagnostic.step("Creating EncounterEngine...")
         encounterEngine = EncounterEngine(
             collectionRepository: collectionRepository,
             kanjiRepository: kanjiRepository
         )
-        NSLog("KanjiQuest [AppContainer]: Creating ItemLevelEngine...")
+        CrashDiagnostic.step("Creating ItemLevelEngine...")
         itemLevelEngine = ItemLevelEngine(
             collectionRepository: collectionRepository
         )
-        NSLog("KanjiQuest [AppContainer]: Collection engines OK")
+        CrashDiagnostic.step("Collection engines OK")
 
         // User Session
-        NSLog("KanjiQuest [AppContainer]: Creating UserSessionProviderImpl...")
+        CrashDiagnostic.step("Creating UserSessionProviderImpl...")
         userSessionProvider = UserSessionProviderImpl(authRepository: authRepository)
-        NSLog("KanjiQuest [AppContainer]: UserSessionProvider OK")
+        CrashDiagnostic.step("UserSessionProvider OK")
 
         // Use Cases
-        NSLog("KanjiQuest [AppContainer]: Creating use cases...")
+        CrashDiagnostic.step("Creating WordOfTheDayUseCase...")
         wordOfTheDayUseCase = WordOfTheDayUseCase(kanjiRepository: kanjiRepository)
+        CrashDiagnostic.step("Creating CompleteSessionUseCase...")
         completeSessionUseCase = CompleteSessionUseCase(
             userRepository: userRepository,
             sessionRepository: sessionRepository,
@@ -140,16 +159,20 @@ final class AppContainer: ObservableObject {
             srsRepository: srsRepository,
             kanjiRepository: kanjiRepository
         )
-        NSLog("KanjiQuest [AppContainer]: Use cases OK")
+        CrashDiagnostic.step("Use cases OK")
 
         // Preview Trial Manager
+        CrashDiagnostic.step("Creating PreviewTrialManager...")
         previewTrialManager = PreviewTrialManager()
 
         // Gemini AI
+        CrashDiagnostic.step("Creating GeminiClient...")
         geminiClient = GeminiClient(apiKey: configuration.geminiApiKey)
+        CrashDiagnostic.step("Creating HandwritingChecker...")
         handwritingChecker = HandwritingChecker(geminiClient: geminiClient)
 
-        NSLog("KanjiQuest [AppContainer]: init() COMPLETE - all dependencies initialized")
+        CrashDiagnostic.step("AppContainer.init() COMPLETE")
+        CrashDiagnostic.complete()
     }
 
     // MARK: - Factory methods for scoped dependencies
