@@ -28,7 +28,7 @@ final class DevChatViewModel: ObservableObject {
         isLoading = true
         error = nil
         do {
-            let msgs = try await devChatRepository?.getMessageHistory(email: email) ?? []
+            let msgs = try await devChatRepository?.getMessageHistory(email: email, limit: 50, offset: 0) ?? []
             messages = msgs.reversed()
             isLoading = false
         } catch {
@@ -103,7 +103,7 @@ final class DevChatViewModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
                 guard let email = cachedEmail else { continue }
-                if let msgs = try? await devChatRepository?.getMessageHistory(email: email) {
+                if let msgs = try? await devChatRepository?.getMessageHistory(email: email, limit: 50, offset: 0) {
                     messages = msgs.reversed()
                 }
             }

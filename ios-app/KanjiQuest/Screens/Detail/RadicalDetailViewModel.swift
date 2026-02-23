@@ -26,11 +26,11 @@ final class RadicalDetailViewModel: ObservableObject {
                         }
                     }
                     kanji.sort { lhs, rhs in
-                        let lGrade = lhs.grade ?? 99
-                        let rGrade = rhs.grade ?? 99
+                        let lGrade = lhs.grade?.int32Value ?? 99
+                        let rGrade = rhs.grade?.int32Value ?? 99
                         if lGrade != rGrade { return lGrade < rGrade }
-                        let lFreq = lhs.frequency ?? 9999
-                        let rFreq = rhs.frequency ?? 9999
+                        let lFreq = lhs.frequency?.int32Value ?? 9999
+                        let rFreq = rhs.frequency?.int32Value ?? 9999
                         return lFreq < rFreq
                     }
                 }

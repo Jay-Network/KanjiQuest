@@ -127,7 +127,7 @@ class HomeViewModel: ObservableObject {
         let playerLevel = container.userSessionProvider.getAdminPlayerLevelOverride()?.int32Value ?? (profile?.level ?? 1)
         let tier = LevelProgression.shared.getTierForLevel(level: playerLevel)
         let nextTier = LevelProgression.shared.getNextTier(level: playerLevel)
-        let unlockedGrades = tier.unlockedGrades as? [Int32] ?? [1]
+        let unlockedGrades: [Int32] = (tier.unlockedGrades as? [NSNumber])?.map { $0.int32Value } ?? [1]
         let highestGrade = unlockedGrades.max() ?? 1
 
         let activeGrade = isFirstLoad ? highestGrade : preserveGrade
