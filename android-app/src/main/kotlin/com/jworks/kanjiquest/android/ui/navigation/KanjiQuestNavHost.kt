@@ -18,7 +18,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.jworks.kanjiquest.android.ui.achievements.AchievementsScreen
-import com.jworks.kanjiquest.android.ui.auth.AuthViewModel
 import com.jworks.kanjiquest.android.ui.auth.LoginScreen
 import com.jworks.kanjiquest.android.ui.detail.KanjiDetailScreen
 import com.jworks.kanjiquest.android.ui.detail.RadicalDetailScreen
@@ -36,13 +35,13 @@ import com.jworks.kanjiquest.android.ui.game.radical.RadicalRecognitionScreen
 import com.jworks.kanjiquest.android.ui.game.vocabulary.VocabularyScreen
 import com.jworks.kanjiquest.android.ui.game.writing.WritingScreen
 import com.jworks.kanjiquest.android.ui.collection.CollectionScreen
-import com.jworks.kanjiquest.android.ui.home.HomeScreen
-import com.jworks.kanjiquest.android.ui.home.HomeViewModel
+import com.jworks.kanjiquest.android.ui.main.MainScaffold
 import com.jworks.kanjiquest.android.ui.progress.ProgressScreen
 import com.jworks.kanjiquest.android.ui.devchat.DevChatScreen
 import com.jworks.kanjiquest.android.ui.flashcard.FlashcardScreen
 import com.jworks.kanjiquest.android.ui.flashcard.FlashcardStudyScreen
 import com.jworks.kanjiquest.android.ui.placement.PlacementTestScreen
+import com.jworks.kanjiquest.android.ui.quiz.TestModeScreen
 import com.jworks.kanjiquest.android.ui.settings.SettingsScreen
 import com.jworks.kanjiquest.android.ui.shop.ShopScreen
 import com.jworks.kanjiquest.android.ui.subscription.SubscriptionScreen
@@ -51,6 +50,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.jworks.kanjiquest.core.domain.model.CollectedItem
 import com.jworks.kanjiquest.core.domain.model.GameMode
 import com.jworks.kanjiquest.core.domain.model.KanaType
+
+private const val MAIN_SCAFFOLD_ROUTE = "main_scaffold"
 
 @Composable
 fun KanjiQuestNavHost(
@@ -75,12 +76,10 @@ fun KanjiQuestNavHost(
 
     val context = LocalContext.current
 
-    // Handle deep link: kanjiquest://collect?kanji_id=XXX&source=kanjilens
-    // Only process after login (not on Splash or Login screens)
+    // Handle deep link
     val deepLinkViewModel: DeepLinkCollectionViewModel = hiltViewModel()
     LaunchedEffect(deepLinkUri, currentRoute) {
         if (deepLinkUri == null) return@LaunchedEffect
-        // Defer until user is past login
         if (currentRoute == NavRoute.Splash.route || currentRoute == NavRoute.Login.route || currentRoute == null) {
             return@LaunchedEffect
         }
@@ -110,25 +109,14 @@ fun KanjiQuestNavHost(
         }
     }
 
-    // Helper to navigate after login: placement test if first time, otherwise home
+    // Helper to navigate after login — always go to main screen
     fun navigateAfterLogin() {
-        val prefs = context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
-        val assessmentDone = prefs.getBoolean("assessment_completed", false)
-        val destination = if (assessmentDone) NavRoute.Home.route else NavRoute.PlacementTest.route
-        navController.navigate(destination) {
+        navController.navigate(MAIN_SCAFFOLD_ROUTE) {
             popUpTo(NavRoute.Login.route) { inclusive = true }
         }
     }
 
-    Scaffold(
-        floatingActionButton = {
-            if (showFAB) {
-                FeedbackFAB(
-                    onClick = { feedbackViewModel.openDialog() }
-                )
-            }
-        }
-    ) { paddingValues ->
+    Scaffold { paddingValues ->
         // Feedback dialog
         if (feedbackUiState.isDialogOpen) {
             FeedbackDialog(
@@ -158,15 +146,28 @@ fun KanjiQuestNavHost(
             )
         }
 
-        composable(NavRoute.Home.route) {
-            val homeViewModel: HomeViewModel = hiltViewModel()
-
-            HomeScreen(
+        // Main scaffold with bottom nav (replaces old Home route)
+        composable(MAIN_SCAFFOLD_ROUTE) {
+            MainScaffold(
+                rootNavController = navController,
+                onFeedbackClick = { feedbackViewModel.openDialog() },
                 onKanjiClick = { kanjiId ->
                     navController.navigate(NavRoute.KanjiDetail.createRoute(kanjiId))
                 },
                 onRadicalClick = { radicalId ->
                     navController.navigate(NavRoute.RadicalDetail.createRoute(radicalId))
+                },
+                onWordOfDayClick = { wordId ->
+                    navController.navigate(NavRoute.WordDetail.createRoute(wordId))
+                },
+                onShopClick = {
+                    navController.navigate(NavRoute.Shop.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(NavRoute.Settings.route)
+                },
+                onSubscriptionClick = {
+                    navController.navigate(NavRoute.Subscription.route)
                 },
                 onGameModeClick = { mode ->
                     when (mode) {
@@ -174,8 +175,8 @@ fun KanjiQuestNavHost(
                         GameMode.WRITING -> navController.navigate(NavRoute.Writing.route)
                         GameMode.VOCABULARY -> navController.navigate(NavRoute.Vocabulary.route)
                         GameMode.CAMERA_CHALLENGE -> navController.navigate(NavRoute.Camera.route)
-                        GameMode.KANA_RECOGNITION -> {} // handled by onKanaModeClick
-                        GameMode.KANA_WRITING -> {} // handled by onKanaModeClick
+                        GameMode.KANA_RECOGNITION -> {}
+                        GameMode.KANA_WRITING -> {}
                         GameMode.RADICAL_RECOGNITION -> navController.navigate(NavRoute.RadicalRecognition.route)
                         GameMode.RADICAL_BUILDER -> navController.navigate(NavRoute.RadicalBuilder.route)
                     }
@@ -187,35 +188,13 @@ fun KanjiQuestNavHost(
                         navController.navigate(NavRoute.KanaRecognition.createRoute(kanaType.name))
                     }
                 },
-                onWordOfDayClick = { wordId ->
-                    navController.navigate(NavRoute.WordDetail.createRoute(wordId))
-                },
                 onPreviewModeClick = { mode ->
-                    // Consume a preview trial then navigate
-                    val success = homeViewModel.usePreviewTrial(mode)
-                    if (success) {
-                        when (mode) {
-                            GameMode.WRITING -> navController.navigate(NavRoute.Writing.route)
-                            GameMode.VOCABULARY -> navController.navigate(NavRoute.Vocabulary.route)
-                            GameMode.CAMERA_CHALLENGE -> navController.navigate(NavRoute.Camera.route)
-                            else -> { /* Recognition is always free */ }
-                        }
+                    when (mode) {
+                        GameMode.WRITING -> navController.navigate(NavRoute.Writing.route)
+                        GameMode.VOCABULARY -> navController.navigate(NavRoute.Vocabulary.route)
+                        GameMode.CAMERA_CHALLENGE -> navController.navigate(NavRoute.Camera.route)
+                        else -> {}
                     }
-                },
-                onShopClick = {
-                    navController.navigate(NavRoute.Shop.route)
-                },
-                onProgressClick = {
-                    navController.navigate(NavRoute.Progress.route)
-                },
-                onAchievementsClick = {
-                    navController.navigate(NavRoute.Achievements.route)
-                },
-                onSettingsClick = {
-                    navController.navigate(NavRoute.Settings.route)
-                },
-                onSubscriptionClick = {
-                    navController.navigate(NavRoute.Subscription.route)
                 },
                 onFlashcardsClick = {
                     navController.navigate(NavRoute.Flashcards.route)
@@ -223,7 +202,18 @@ fun KanjiQuestNavHost(
                 onCollectionClick = {
                     navController.navigate(NavRoute.Collection.route)
                 },
-                viewModel = homeViewModel
+                onProgressClick = {
+                    navController.navigate(NavRoute.Progress.route)
+                },
+                onAchievementsClick = {
+                    navController.navigate(NavRoute.Achievements.route)
+                },
+                onFlashcardStudy = { deckId ->
+                    navController.navigate(NavRoute.FlashcardStudy.createRoute(deckId))
+                },
+                onTestMode = {
+                    navController.navigate(NavRoute.TestMode.route)
+                }
             )
         }
 
@@ -350,10 +340,16 @@ fun KanjiQuestNavHost(
         composable(NavRoute.PlacementTest.route) {
             PlacementTestScreen(
                 onComplete = {
-                    navController.navigate(NavRoute.Home.route) {
+                    navController.navigate(MAIN_SCAFFOLD_ROUTE) {
                         popUpTo(NavRoute.PlacementTest.route) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        composable(NavRoute.TestMode.route) {
+            TestModeScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -465,7 +461,7 @@ fun KanjiQuestNavHost(
         }
         }
 
-        // Deep link discovery overlay (shown on top of any screen)
+        // Deep link discovery overlay
         if (showDeepLinkOverlay && deepLinkCollectedItem != null) {
             DiscoveryOverlay(
                 discoveredItem = deepLinkCollectedItem!!,

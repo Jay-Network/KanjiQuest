@@ -333,8 +333,6 @@ actual class DatabaseDriverFactory(private val context: Context) {
             // Migrate existing SRS data into collection table (upgrade path)
             migrateExistingToCollection(it)
 
-            // Seed starter pack for new players (empty collection)
-            seedStarterPack(it)
         }
     }
 
@@ -417,27 +415,6 @@ actual class DatabaseDriverFactory(private val context: Context) {
         """.trimIndent())
     }
 
-    /**
-     * Seeds a starter pack for brand new players to avoid an empty collection.
-     * Only runs if the collection table is completely empty.
-     */
-    private fun seedStarterPack(db: SQLiteDatabase) {
-        val collectionCount = db.rawQuery("SELECT COUNT(*) FROM collection", null).use { c -> c.moveToFirst(); c.getLong(0) }
-        if (collectionCount > 0L) return
-
-        val now = System.currentTimeMillis() / 1000
-
-        // 5 basic hiragana: あいうえお (IDs 100001-100005)
-        for (id in 100001..100005) {
-            db.execSQL("INSERT OR IGNORE INTO collection VALUES($id, 'hiragana', 'common', 1, 0, $now, 'starter')")
-        }
-        // 5 basic katakana: アイウエオ (IDs 200001-200005)
-        for (id in 200001..200005) {
-            db.execSQL("INSERT OR IGNORE INTO collection VALUES($id, 'katakana', 'common', 1, 0, $now, 'starter')")
-        }
-        // 3 Grade 1 kanji: 一二三 — look up by literal
-        db.execSQL("INSERT OR IGNORE INTO collection SELECT id, 'kanji', 'common', 1, 0, $now, 'starter' FROM kanji WHERE literal IN ('一', '二', '三') LIMIT 3")
-    }
 
     private fun seedKanaData(db: SQLiteDatabase) {
         // Hiragana basic (46)

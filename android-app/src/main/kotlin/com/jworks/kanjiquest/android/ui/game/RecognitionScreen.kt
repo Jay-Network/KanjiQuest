@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.android.ui.components.XpPopup
 import com.jworks.kanjiquest.core.domain.model.Vocabulary
 import com.jworks.kanjiquest.core.engine.DiscoveredKanjiInfo
 import com.jworks.kanjiquest.core.engine.GameState
@@ -208,6 +211,7 @@ private fun QuestionContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -255,7 +259,7 @@ private fun QuestionContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Large kanji display with NEW badge
+        // Large kanji display with NEW badge + XP popup overlay
         Box {
             Card(
                 modifier = Modifier.size(200.dp),
@@ -281,7 +285,7 @@ private fun QuestionContent(
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.TopStart)
                         .padding(4.dp)
                         .background(
                             color = Color(0xFF00BFA5),
@@ -290,24 +294,18 @@ private fun QuestionContent(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
+            // XP popup overlay
+            XpPopup(
+                isCorrect = isCorrect,
+                xpGained = xpGained,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // XP popup on result
+        // Result details
         if (isCorrect != null) {
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn() + scaleIn()
-            ) {
-                Text(
-                    text = if (isCorrect) "+$xpGained XP" else "Incorrect",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isCorrect) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
-                )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Meaning
             if (kanjiMeaning != null) {

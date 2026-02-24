@@ -57,6 +57,7 @@ import com.jworks.kanjiquest.core.engine.GradeMasteryProvider
 import com.jworks.kanjiquest.core.engine.KanaQuestionGenerator
 import com.jworks.kanjiquest.core.engine.QuestionGenerator
 import com.jworks.kanjiquest.core.engine.RadicalQuestionGenerator
+import com.jworks.kanjiquest.android.ui.quiz.QuizQuestionGenerator
 import com.jworks.kanjiquest.core.scoring.ScoringEngine
 import com.jworks.kanjiquest.core.srs.Sm2Algorithm
 import com.jworks.kanjiquest.core.srs.SrsAlgorithm
@@ -226,6 +227,15 @@ object AppModule {
     @Singleton
     fun provideWordOfTheDayUseCase(kanjiRepository: KanjiRepository): WordOfTheDayUseCase {
         return WordOfTheDayUseCase(kanjiRepository)
+    }
+
+    @Provides
+    fun provideQuizQuestionGenerator(
+        kanjiRepository: KanjiRepository,
+        kanaRepository: KanaRepository,
+        radicalRepository: RadicalRepository
+    ): QuizQuestionGenerator {
+        return QuizQuestionGenerator(kanjiRepository, kanaRepository, radicalRepository)
     }
 
     @Provides

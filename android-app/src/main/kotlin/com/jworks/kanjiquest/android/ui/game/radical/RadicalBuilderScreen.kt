@@ -1,8 +1,5 @@
 package com.jworks.kanjiquest.android.ui.game.radical
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.jworks.kanjiquest.android.ui.components.XpPopup
 import com.jworks.kanjiquest.core.engine.GameState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -147,7 +147,7 @@ private fun BuilderQuestionContent(
     onNext: (() -> Unit)? = null
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
@@ -174,51 +174,49 @@ private fun BuilderQuestionContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Radical composition prompt card
-        Card(
-            modifier = Modifier.fillMaxWidth().height(120.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    text = questionText,
-                    fontSize = 48.sp,
-                    textAlign = TextAlign.Center,
-                    letterSpacing = 8.sp,
-                    color = RadicalColor,
-                    fontWeight = FontWeight.Bold
-                )
+        // Radical composition prompt card with XP popup overlay
+        Box {
+            Card(
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = questionText,
+                        fontSize = 48.sp,
+                        textAlign = TextAlign.Center,
+                        letterSpacing = 8.sp,
+                        color = RadicalColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
+            XpPopup(
+                isCorrect = isCorrect,
+                xpGained = xpGained,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (isCorrect != null) {
-            AnimatedVisibility(visible = true, enter = fadeIn() + scaleIn()) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (correctKanji != null && !isCorrect) {
+                Text(
+                    text = "Answer: $correctKanji",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (kanjiBreakdown.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                kanjiBreakdown.forEach { line ->
                     Text(
-                        text = if (isCorrect) "+$xpGained XP" else "Incorrect",
-                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                        color = if (isCorrect) RadicalColor else MaterialTheme.colorScheme.error
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (correctKanji != null && !isCorrect) {
-                        Text(
-                            text = "Answer: $correctKanji",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (kanjiBreakdown.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        kanjiBreakdown.forEach { line ->
-                            Text(
-                                text = line,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

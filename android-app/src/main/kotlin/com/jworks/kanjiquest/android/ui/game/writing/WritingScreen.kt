@@ -56,6 +56,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jworks.kanjiquest.android.ui.game.DiscoveryOverlay
+import com.jworks.kanjiquest.core.domain.model.GameMode
+import com.jworks.kanjiquest.core.domain.model.KanaType
 import com.jworks.kanjiquest.core.engine.GameState
 import com.jworks.kanjiquest.core.engine.SessionStats
 
@@ -64,6 +66,8 @@ import com.jworks.kanjiquest.core.engine.SessionStats
 fun WritingScreen(
     onBack: () -> Unit,
     targetKanjiId: Int? = null,
+    gameMode: GameMode = GameMode.WRITING,
+    kanaType: KanaType? = null,
     viewModel: WritingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -77,7 +81,7 @@ fun WritingScreen(
     // Auto-start for targeted kanji sessions
     LaunchedEffect(targetKanjiId) {
         if (targetKanjiId != null && uiState.gameState is GameState.Idle) {
-            viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId)
+            viewModel.startGame(questionCount = 5, targetKanjiId = targetKanjiId, gameMode = gameMode, kanaType = kanaType)
         }
     }
 
@@ -113,7 +117,7 @@ fun WritingScreen(
                     isAdmin = uiState.isAdmin,
                     adminDifficultyOverride = uiState.adminDifficultyOverride,
                     onAdminDifficultyChange = { viewModel.setAdminDifficultyOverride(it) },
-                    onStart = { viewModel.startGame(questionCount = sessionLength) }
+                    onStart = { viewModel.startGame(questionCount = sessionLength, gameMode = gameMode, kanaType = kanaType) }
                 )
                 is GameState.Preparing -> LoadingContent()
                 is GameState.AwaitingAnswer -> {

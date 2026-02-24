@@ -13,6 +13,9 @@ local.properties
 *.db
 !android-app/src/main/assets/kanjiquest.db
 
+# Kotlin
+.kotlin/
+
 # Signing
 keystore/
 *.jks

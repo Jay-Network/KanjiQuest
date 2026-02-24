@@ -50,4 +50,8 @@ sealed class NavRoute(val route: String) {
     data object RadicalBuilder : NavRoute("game/radical_builder")
     data object FieldJournal : NavRoute("field_journal")
     data object Collection : NavRoute("collection")
+    data object Study : NavRoute("study")
+    data object Games : NavRoute("games")
+    data object CollectionHub : NavRoute("collection_hub")
+    data object TestMode : NavRoute("game/test_mode")
 }

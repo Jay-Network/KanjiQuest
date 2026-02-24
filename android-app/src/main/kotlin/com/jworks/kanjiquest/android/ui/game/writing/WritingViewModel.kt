@@ -127,9 +127,9 @@ class WritingViewModel @Inject constructor(
         }
     }
 
-    fun startGame(questionCount: Int = 10, targetKanjiId: Int? = null) {
+    fun startGame(questionCount: Int = 10, targetKanjiId: Int? = null, gameMode: GameMode = GameMode.WRITING, kanaType: com.jworks.kanjiquest.core.domain.model.KanaType? = null) {
         viewModelScope.launch {
-            gameEngine.onEvent(GameEvent.StartSession(GameMode.WRITING, questionCount, targetKanjiId))
+            gameEngine.onEvent(GameEvent.StartSession(gameMode, questionCount, targetKanjiId, kanaType = kanaType))
         }
     }
 
