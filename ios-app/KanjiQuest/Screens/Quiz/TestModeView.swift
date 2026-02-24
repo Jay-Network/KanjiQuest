@@ -119,9 +119,8 @@ private struct TestModeContent: View {
 
     @ViewBuilder
     private func quizContent(state: TestModeUiState) -> some View {
-        guard let question = state.currentQuestion else { return }
-
-        VStack(spacing: 0) {
+        if let question = state.currentQuestion {
+            VStack(spacing: 0) {
             // Progress bar
             ProgressView(value: Double(state.currentIndex + 1) / Double(state.totalQuestions))
                 .tint(testBlue)
@@ -220,7 +219,8 @@ private struct TestModeContent: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
-        }
+            } // VStack
+        } // if let question
     }
 
     // MARK: - Results Content

@@ -32,7 +32,7 @@ class StudyViewModel: ObservableObject {
 
         // Load flashcard decks
         let decksList: [(id: Int64, name: String)]
-        if let decks = try? await container.flashcardRepository.getAllDecks() {
+        if let decks = try? await container.flashcardRepository.getAllDeckGroups() {
             decksList = decks.map { (id: $0.id, name: $0.name) }
         } else {
             decksList = []
