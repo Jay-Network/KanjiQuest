@@ -50,6 +50,9 @@ enum NavRoute: Hashable {
     // Word detail
     case wordDetail(wordId: Int64)
 
+    // Test Mode (Games hub)
+    case testMode
+
     // Dev & Feedback
     case devChat
     case fieldJournal

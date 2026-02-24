@@ -22,7 +22,7 @@ struct AppNavigation: View {
                             showSplash = false
                         })
                     } else if isAuthenticated {
-                        HomeView(navigateTo: navigate)
+                        MainTabView(navigateTo: navigate)
                     } else {
                         LoginView(
                             onLoginSuccess: { navigateAfterLogin() },
@@ -105,7 +105,7 @@ struct AppNavigation: View {
             )
 
         case .home:
-            HomeView(navigateTo: navigate)
+            MainTabView(navigateTo: navigate)
 
         case .placementTest:
             PlacementTestView(
@@ -225,6 +225,10 @@ struct AppNavigation: View {
                 onBack: { navigateBack() },
                 onKanjiClick: { kanjiId in navigate(to: .kanjiDetail(kanjiId: kanjiId)) }
             )
+
+        // MARK: - Test Mode
+        case .testMode:
+            TestModeView(onBack: { navigateBack() })
 
         // MARK: - Dev & Feedback
         case .devChat:
