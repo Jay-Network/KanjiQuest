@@ -5,6 +5,7 @@ import SharedCore
 /// Handles all 23+ routes, feedback FAB, and post-login routing.
 struct AppNavigation: View {
     @EnvironmentObject var container: AppContainer
+    @Environment(\.scenePhase) private var scenePhase
     @State private var path = NavigationPath()
     @State private var showSplash = true
     @State private var isAuthenticated = false
@@ -57,6 +58,13 @@ struct AppNavigation: View {
         .task {
             feedbackViewModel.configure(container: container)
             isAuthenticated = (try? await container.authRepository.getCurrentUserId()) != nil
+        }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active {
+                container.syncService.syncOnAppOpen()
+            } else if newPhase == .background {
+                container.syncService.scheduleBackgroundSync()
+            }
         }
         .environmentObject(container)
     }
