@@ -21,11 +21,11 @@ struct SplashView: View {
             VStack(spacing: 0) {
                 // Logo with shimmer
                 ZStack {
-                    AssetImage(
-                        filename: "ic_jworks_logo.png",
-                        contentDescription: "JWorks Logo"
-                    )
-                    .frame(width: 240, height: 240)
+                    Image("JWorksLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 240, height: 240)
+                        .accessibilityLabel("JWorks Logo")
                     .opacity(logoAlpha)
                     .scaleEffect(logoScale)
 

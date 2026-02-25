@@ -84,30 +84,28 @@ struct AppRootView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            Text("漢字")
-                .font(.system(size: 72, weight: .bold))
-                .foregroundColor(.blue)
-            Text("KanjiQuest")
-                .font(.title)
-                .bold()
-            ProgressView("Loading...")
-                .padding(.top, 8)
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-            // Live diagnostic log
-            if !appState.diagnosticLog.isEmpty {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(appState.diagnosticLog, id: \.self) { line in
-                            Text(line)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 200)
-                .padding(.horizontal, 24)
+            VStack(spacing: 16) {
+                Image("JWorksLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 240, height: 240)
+
+                Text("KanjiQuest")
+                    .font(.system(size: 32, weight: .bold))
+                    .tracking(1)
+                    .foregroundColor(Color(red: 0.05, green: 0.58, blue: 0.53)) // teal
+
+                Text("by JWorks")
+                    .font(.system(size: 16, weight: .medium))
+                    .tracking(0.5)
+                    .foregroundColor(.white.opacity(0.6))
+
+                ProgressView()
+                    .tint(.white.opacity(0.5))
+                    .padding(.top, 12)
             }
         }
     }
