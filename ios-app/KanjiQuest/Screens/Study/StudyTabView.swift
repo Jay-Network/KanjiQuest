@@ -190,18 +190,6 @@ private struct StudyTabViewContent: View {
             .padding(16)
         }
         .background(KanjiQuestTheme.background)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Text("Study")
-                    .font(KanjiQuestTheme.titleSmall)
-                    .foregroundColor(.white)
-            }
-        }
-        .toolbarBackground(KanjiQuestTheme.primary, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
     }
 
     private func routeForMode(_ mode: GameModeEnum, kanaFilter: KanaFilter) -> NavRoute {
