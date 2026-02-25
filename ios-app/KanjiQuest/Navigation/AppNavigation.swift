@@ -59,7 +59,7 @@ struct AppNavigation: View {
             feedbackViewModel.configure(container: container)
             isAuthenticated = (try? await container.authRepository.getCurrentUserId()) != nil
         }
-        .onChange(of: scenePhase) {
+        .onChange(of: scenePhase) { _ in
             if scenePhase == .active {
                 container.syncService.syncOnAppOpen()
             } else if scenePhase == .background {
