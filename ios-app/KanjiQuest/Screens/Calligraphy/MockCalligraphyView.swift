@@ -24,6 +24,7 @@ struct MockCalligraphyView: View {
     @State private var strokes: [[CalligraphyPointData]] = []
     @State private var activeStroke: [CalligraphyPointData] = []
     @State private var canvasVersion = 0
+    @State private var undoVersion = 0
     @State private var showResult = false
     @State private var isAILoading = false
     @State private var feedback: CalligraphyFeedbackService.CalligraphyFeedback?
@@ -79,6 +80,7 @@ struct MockCalligraphyView: View {
                 activeStroke: $activeStroke,
                 referenceStrokePaths: currentKanji.strokePaths,
                 canvasVersion: canvasVersion,
+                undoVersion: undoVersion,
                 onStrokeComplete: { _ in }
             )
             .aspectRatio(1.0, contentMode: .fit)
@@ -108,6 +110,7 @@ struct MockCalligraphyView: View {
                 Button("Undo") {
                     if !strokes.isEmpty {
                         strokes.removeLast()
+                        undoVersion += 1
                         showResult = false
                         feedback = nil
                     }

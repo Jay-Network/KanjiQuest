@@ -7,6 +7,7 @@ struct CalligraphyCanvasView: UIViewRepresentable {
     @Binding var activeStroke: [CalligraphyPointData]
     let referenceStrokePaths: [String]  // SVG path strings for ghost overlay
     var canvasVersion: Int = 0
+    var undoVersion: Int = 0
     var onStrokeComplete: (([CalligraphyPointData]) -> Void)?
 
     func makeUIView(context: Context) -> CalligraphyCanvasUIView {
@@ -22,6 +23,10 @@ struct CalligraphyCanvasView: UIViewRepresentable {
             context.coordinator.lastCanvasVersion = canvasVersion
             uiView.clearDrawing()
         }
+        if context.coordinator.lastUndoVersion != undoVersion {
+            context.coordinator.lastUndoVersion = undoVersion
+            uiView.undo()
+        }
         uiView.referenceStrokePaths = referenceStrokePaths
     }
 
@@ -32,6 +37,7 @@ struct CalligraphyCanvasView: UIViewRepresentable {
     final class Coordinator: NSObject, CalligraphyCanvasDelegate {
         let parent: CalligraphyCanvasView
         var lastCanvasVersion: Int = 0
+        var lastUndoVersion: Int = 0
 
         init(_ parent: CalligraphyCanvasView) {
             self.parent = parent
