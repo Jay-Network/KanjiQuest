@@ -158,6 +158,7 @@ struct AppRootView: View {
 struct MockHomeView: View {
     @EnvironmentObject var appState: AppState
     @State private var isInitializing = false
+    @State private var showCalligraphy = false
 
     private let teal = Color(red: 0.05, green: 0.58, blue: 0.53)
 
@@ -182,22 +183,32 @@ struct MockHomeView: View {
                     .background(teal.opacity(0.1))
                     .cornerRadius(16)
 
-                    // Game modes (static preview)
+                    // Game modes
                     Text("Game Modes")
                         .font(.title3).bold()
 
-                    mockModeCard(title: "Recognition", desc: "Identify kanji from choices", color: Color(red: 0.13, green: 0.59, blue: 0.95), icon: "eye.fill")
-                    mockModeCard(title: "Writing", desc: "Practice writing kanji", color: Color(red: 0.30, green: 0.69, blue: 0.31), icon: "pencil.tip")
-                    mockModeCard(title: "Vocabulary", desc: "Learn words using kanji", color: Color(red: 1.0, green: 0.60, blue: 0.0), icon: "book.fill")
-                    mockModeCard(title: "Camera Challenge", desc: "Find kanji in the real world", color: Color(red: 0.61, green: 0.15, blue: 0.69), icon: "camera.fill")
+                    mockModeCard(title: "Recognition", desc: "Identify kanji from choices", color: Color(red: 0.13, green: 0.59, blue: 0.95), icon: "eye.fill", available: false)
+
+                    #if IPAD_TARGET
+                    // Writing → Calligraphy (works without KMP!)
+                    Button(action: { showCalligraphy = true }) {
+                        mockModeCardContent(title: "書道 Writing", desc: "Practice calligraphy with AI feedback", color: Color(red: 0.30, green: 0.69, blue: 0.31), icon: "pencil.tip", available: true)
+                    }
+                    .buttonStyle(.plain)
+                    #else
+                    mockModeCard(title: "Writing", desc: "Practice writing kanji", color: Color(red: 0.30, green: 0.69, blue: 0.31), icon: "pencil.tip", available: false)
+                    #endif
+
+                    mockModeCard(title: "Vocabulary", desc: "Learn words using kanji", color: Color(red: 1.0, green: 0.60, blue: 0.0), icon: "book.fill", available: false)
+                    mockModeCard(title: "Camera Challenge", desc: "Find kanji in the real world", color: Color(red: 0.61, green: 0.15, blue: 0.69), icon: "camera.fill", available: false)
 
                     Text("Study")
                         .font(.title3).bold()
 
-                    mockModeCard(title: "Kana", desc: "Learn Hiragana & Katakana", color: Color(red: 0.91, green: 0.12, blue: 0.39), icon: "textformat.abc")
-                    mockModeCard(title: "Radicals", desc: "Master kanji building blocks", color: Color(red: 0.47, green: 0.33, blue: 0.28), icon: "square.grid.3x3.fill")
+                    mockModeCard(title: "Kana", desc: "Learn Hiragana & Katakana", color: Color(red: 0.91, green: 0.12, blue: 0.39), icon: "textformat.abc", available: false)
+                    mockModeCard(title: "Radicals", desc: "Master kanji building blocks", color: Color(red: 0.47, green: 0.33, blue: 0.28), icon: "square.grid.3x3.fill", available: false)
 
-                    // Initialize button
+                    // Initialize full app button
                     Spacer().frame(height: 16)
 
                     Button(action: {
@@ -210,7 +221,7 @@ struct MockHomeView: View {
                             } else {
                                 Image(systemName: "play.fill")
                             }
-                            Text(isInitializing ? "Loading database..." : "Start Learning")
+                            Text(isInitializing ? "Loading database..." : "Unlock All Modes")
                         }
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
@@ -255,10 +266,22 @@ struct MockHomeView: View {
             .toolbarBackground(teal, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            #if IPAD_TARGET
+            .fullScreenCover(isPresented: $showCalligraphy) {
+                NavigationStack {
+                    MockCalligraphyView()
+                }
+            }
+            #endif
         }
     }
 
-    private func mockModeCard(title: String, desc: String, color: Color, icon: String) -> some View {
+    private func mockModeCard(title: String, desc: String, color: Color, icon: String, available: Bool) -> some View {
+        mockModeCardContent(title: title, desc: desc, color: color, icon: icon, available: available)
+            .opacity(available ? 1.0 : 0.6)
+    }
+
+    private func mockModeCardContent(title: String, desc: String, color: Color, icon: String, available: Bool = true) -> some View {
         HStack {
             Image(systemName: icon)
                 .font(.system(size: 24))
@@ -267,15 +290,26 @@ struct MockHomeView: View {
                 .background(color)
                 .cornerRadius(12)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 16, weight: .bold))
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold))
+                    if available {
+                        Text("READY")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green)
+                            .cornerRadius(4)
+                    }
+                }
                 Text(desc)
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
             }
             Spacer()
             Image(systemName: "chevron.right")
-                .foregroundColor(.secondary)
+                .foregroundColor(available ? color : .secondary)
         }
         .padding(12)
         .background(Color(.secondarySystemBackground))
