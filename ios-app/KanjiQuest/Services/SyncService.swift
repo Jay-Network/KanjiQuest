@@ -24,7 +24,7 @@ final class SyncService: ObservableObject {
 
     func syncOnAppOpen() {
         Task {
-            guard let userId = getUserId() else { return }
+            guard let userId = await getUserId() else { return }
             do {
                 let result = try await learningSyncRepository.syncAll(
                     userId: userId,
@@ -41,19 +41,16 @@ final class SyncService: ObservableObject {
 
     // MARK: - Background App Refresh
 
-    func registerBackgroundTask() {
-        // Wrap in do/catch — BGTaskScheduler.register can crash if called
-        // before the app finishes launching or if identifiers mismatch Info.plist
-        do {
-            BGTaskScheduler.shared.register(
-                forTaskWithIdentifier: Self.backgroundTaskIdentifier,
-                using: nil
-            ) { [weak self] task in
-                self?.handleBackgroundSync(task: task as! BGAppRefreshTask)
-            }
-        } catch {
-            NSLog("KanjiQuest [Sync]: BGTaskScheduler registration failed: \(error.localizedDescription)")
+    @discardableResult
+    func registerBackgroundTask() -> Bool {
+        let ok = BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.backgroundTaskIdentifier,
+            using: nil
+        ) { [weak self] task in
+            self?.handleBackgroundSync(task: task as! BGAppRefreshTask)
         }
+        NSLog("KanjiQuest [Sync]: BGTask register=%@", ok ? "true" : "false")
+        return ok
     }
 
     func scheduleBackgroundSync() {
@@ -72,7 +69,7 @@ final class SyncService: ObservableObject {
         scheduleBackgroundSync()
 
         let syncTask = Task {
-            guard let userId = getUserId() else {
+            guard let userId = await getUserId() else {
                 task.setTaskCompleted(success: true)
                 return
             }
@@ -99,15 +96,15 @@ final class SyncService: ObservableObject {
 
     func registerDeviceIfNeeded() {
         Task {
-            guard let userId = getUserId() else { return }
+            guard let userId = await getUserId() else { return }
             let deviceInfo = DeviceInfoProvider.deviceInfo()
             do {
                 let deviceId = try await learningSyncRepository.registerDevice(
                     userId: userId,
                     deviceInfo: deviceInfo
                 )
-                if let deviceId = deviceId as? String {
-                    NSLog("KanjiQuest [Sync]: Device registered: \(deviceId)")
+                if let deviceId = deviceId {
+                    NSLog("KanjiQuest [Sync]: Device registered: %@", deviceId)
                 }
             } catch {
                 NSLog("KanjiQuest [Sync]: Device registration failed: \(error.localizedDescription)")
@@ -117,12 +114,17 @@ final class SyncService: ObservableObject {
 
     // MARK: - Helpers
 
-    private func getUserId() -> String? {
-        let userId = userSessionProvider.getUserId()
-        // "local_user" is the default for non-authenticated users
-        if userId == nil || userId == "local_user" {
+    private func getUserId() async -> String? {
+        do {
+            let userId = try await userSessionProvider.getUserId()
+            // "local_user" is the default for non-authenticated users
+            if userId == "local_user" {
+                return nil
+            }
+            return userId
+        } catch {
+            NSLog("KanjiQuest [Sync]: getUserId() failed: %@", error.localizedDescription)
             return nil
         }
-        return userId
     }
 }
