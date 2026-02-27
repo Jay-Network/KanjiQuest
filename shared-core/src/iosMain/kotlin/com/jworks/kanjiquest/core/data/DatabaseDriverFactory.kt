@@ -155,6 +155,14 @@ actual class DatabaseDriverFactory {
                 total_reviews INTEGER NOT NULL DEFAULT 0,
                 correct_count INTEGER NOT NULL DEFAULT 0
             )""",
+            """CREATE TABLE IF NOT EXISTS sync_version (
+                user_id TEXT PRIMARY KEY NOT NULL,
+                device_id TEXT,
+                server_version INTEGER NOT NULL DEFAULT 0,
+                last_push_at INTEGER NOT NULL DEFAULT 0,
+                last_pull_at INTEGER NOT NULL DEFAULT 0,
+                last_full_pull_at INTEGER NOT NULL DEFAULT 0
+            )""",
             // Indexes
             "CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON coin_sync_queue(sync_status, created_at)",
             "CREATE INDEX IF NOT EXISTS idx_unlocks_user ON premium_content_unlocks(user_id, content_type)",

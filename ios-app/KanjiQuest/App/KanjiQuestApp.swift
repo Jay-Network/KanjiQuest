@@ -37,7 +37,18 @@ class AppState: ObservableObject {
 
         log("Creating AppContainer...")
         CrashDiagnostic.begin()
-        let container = AppContainer()
+
+        // Catch ObjC/KMP exceptions that Swift can't normally catch
+        let container: AppContainer
+        do {
+            container = try ObjCExceptionCatcher.catch { AppContainer() }
+        } catch {
+            CrashDiagnostic.step("AppContainer EXCEPTION: \(error.localizedDescription)")
+            log("AppContainer EXCEPTION: \(error.localizedDescription)")
+            phase = .failed("KMP initialization failed:\n\(error.localizedDescription)")
+            return
+        }
+
         CrashDiagnostic.complete()
 
         if let error = container.initError {
@@ -45,6 +56,8 @@ class AppState: ObservableObject {
             phase = .failed(error)
         } else {
             log("AppContainer OK — switching to full app")
+            // Register background task here (during init phase, not later)
+            container.syncService.registerBackgroundTask()
             phase = .ready(container)
         }
     }

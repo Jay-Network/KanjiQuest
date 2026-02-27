@@ -1,0 +1,18 @@
+import Foundation
+
+extension ObjCExceptionCatcher {
+    /// Catch Objective-C NSExceptions as Swift errors.
+    /// KMP/Kotlin-Native can throw NSExceptions that Swift `do/catch` can't handle.
+    static func `catch`<T: AnyObject>(_ block: () -> T) throws -> T {
+        var error: NSError?
+        let result = catchException({ block() }, error: &error)
+        if let error = error {
+            throw error
+        }
+        guard let typedResult = result as? T else {
+            throw NSError(domain: "com.jworks.kanjiquest", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "ObjC block returned nil"])
+        }
+        return typedResult
+    }
+}

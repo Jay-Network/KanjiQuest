@@ -47,8 +47,11 @@ struct GameResultState {
     let isCorrect: Bool
     let xpGained: Int32
     let sessionXp: Int32
-    let discoveredItem: CollectedItem?
+    let discoveredItems: [CollectedItem]
     let comboCount: Int32
+
+    /// Convenience for code that only needs the first discovered item
+    var discoveredItem: CollectedItem? { discoveredItems.first }
 
     var kanjiLiteral: String { question.kanjiLiteral }
     var correctAnswer: String { question.correctAnswer }
@@ -58,7 +61,7 @@ struct GameResultState {
         self.isCorrect = state.isCorrect
         self.xpGained = state.xpGained
         self.sessionXp = state.sessionXp
-        self.discoveredItem = state.discoveredItem
+        self.discoveredItems = state.discoveredItems as? [CollectedItem] ?? []
         self.comboCount = state.currentCombo
     }
 }

@@ -73,12 +73,17 @@ extension GameEngine {
         return nil
     }
 
-    /// Get the last discovered item from the most recent result state.
-    var lastDiscoveredItem: CollectedItem? {
+    /// Get the last discovered items from the most recent result state.
+    var lastDiscoveredItems: [CollectedItem] {
         if let result = state.value as? GameState.ShowingResult {
-            return result.discoveredItem
+            return result.discoveredItems as? [CollectedItem] ?? []
         }
-        return nil
+        return []
+    }
+
+    /// Get the first discovered item (convenience for single-item screens).
+    var lastDiscoveredItem: CollectedItem? {
+        return lastDiscoveredItems.first
     }
 
     /// Get the XP gained from the most recent result.

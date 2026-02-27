@@ -30,7 +30,7 @@ final class SyncService: ObservableObject {
                     userId: userId,
                     trigger: .appOpen
                 )
-                if let success = result as? SyncResultSuccess {
+                if let success = result as? SyncResult.Success {
                     NSLog("KanjiQuest [Sync]: App open sync complete — pushed=\(success.pushed), pulled=\(success.pulled)")
                 }
             } catch {
@@ -42,11 +42,17 @@ final class SyncService: ObservableObject {
     // MARK: - Background App Refresh
 
     func registerBackgroundTask() {
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: Self.backgroundTaskIdentifier,
-            using: nil
-        ) { [weak self] task in
-            self?.handleBackgroundSync(task: task as! BGAppRefreshTask)
+        // Wrap in do/catch — BGTaskScheduler.register can crash if called
+        // before the app finishes launching or if identifiers mismatch Info.plist
+        do {
+            BGTaskScheduler.shared.register(
+                forTaskWithIdentifier: Self.backgroundTaskIdentifier,
+                using: nil
+            ) { [weak self] task in
+                self?.handleBackgroundSync(task: task as! BGAppRefreshTask)
+            }
+        } catch {
+            NSLog("KanjiQuest [Sync]: BGTaskScheduler registration failed: \(error.localizedDescription)")
         }
     }
 
@@ -75,7 +81,7 @@ final class SyncService: ObservableObject {
                     userId: userId,
                     trigger: .backgroundPeriodic
                 )
-                let success = result is SyncResultSuccess
+                let success = result is SyncResult.Success
                 task.setTaskCompleted(success: success)
                 NSLog("KanjiQuest [Sync]: Background sync \(success ? "succeeded" : "failed")")
             } catch {
@@ -113,7 +119,8 @@ final class SyncService: ObservableObject {
 
     private func getUserId() -> String? {
         let userId = userSessionProvider.getUserId()
-        if userId == nil || userId == LOCAL_USER_ID {
+        // "local_user" is the default for non-authenticated users
+        if userId == nil || userId == "local_user" {
             return nil
         }
         return userId

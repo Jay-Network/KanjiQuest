@@ -170,8 +170,10 @@ final class AppContainer: ObservableObject {
             learningSyncRepository: learningSyncRepository,
             userSessionProvider: userSessionProvider
         )
-        syncService.registerBackgroundTask()
-        CrashDiagnostic.step("SyncService OK")
+        // NOTE: BGTaskScheduler.register must be called during app launch (didFinishLaunching).
+        // Deferring to avoid crashes when AppContainer is created after launch.
+        // registerBackgroundTask() is called from KanjiQuestApp.init or .task.
+        CrashDiagnostic.step("SyncService OK (background task deferred)")
 
         // Preview Trial Manager
         CrashDiagnostic.step("Creating PreviewTrialManager...")
