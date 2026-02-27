@@ -17,12 +17,29 @@ class KanaQuestionGenerator(
 ) {
     private var questionQueue: MutableList<KanaQueueEntry> = mutableListOf()
     private var distractorPool: List<Kana> = emptyList()
+    private var lastGeneratedKana: Kana? = null
+
+    /** Returns the kana model for the most recently generated question. */
+    fun getLastKana(): Kana? = lastGeneratedKana
 
     data class KanaQueueEntry(
         val kana: Kana,
         val isNew: Boolean,
         val srsState: String = "new"
     )
+
+    suspend fun prepareTargetedSession(targetKanaId: Int, questionCount: Int): Boolean {
+        questionQueue.clear()
+        val kana = kanaRepository.getKanaById(targetKanaId) ?: return false
+        kanaSrsRepository.ensureCardExists(kana.id)
+        val card = kanaSrsRepository.getCard(kana.id)
+        val srsState = card?.state?.value ?: "new"
+        repeat(questionCount) {
+            questionQueue.add(KanaQueueEntry(kana, isNew = card == null, srsState = srsState))
+        }
+        distractorPool = kanaRepository.getKanaByTypeAndVariant(kana.type, "basic")
+        return true
+    }
 
     suspend fun prepareSession(questionCount: Int, currentTime: Long, kanaType: KanaType): Boolean {
         questionQueue.clear()
@@ -89,6 +106,7 @@ class KanaQuestionGenerator(
     fun generateRecognitionQuestion(): Question? {
         val entry = questionQueue.removeFirstOrNull() ?: return null
         val kana = entry.kana
+        lastGeneratedKana = kana
 
         val correctAnswer = kana.romanization
         val distractors = generateDistractors(kana, correctAnswer, 3)
@@ -108,6 +126,7 @@ class KanaQuestionGenerator(
     fun generateWritingQuestion(): Question? {
         val entry = questionQueue.removeFirstOrNull() ?: return null
         val kana = entry.kana
+        lastGeneratedKana = kana
 
         // Parse stroke SVG if available
         val strokePaths = if (!kana.strokeSvg.isNullOrBlank()) {

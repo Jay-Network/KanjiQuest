@@ -166,8 +166,17 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideLearningSyncRepository(db: KanjiQuestDatabase): LearningSyncRepository {
-        return LearningSyncRepositoryImpl(db)
+    fun provideSyncEngine(db: KanjiQuestDatabase): com.jworks.kanjiquest.core.data.sync.SyncEngine {
+        return com.jworks.kanjiquest.core.data.sync.SyncEngine(db)
+    }
+
+    @Provides
+    @Singleton
+    fun provideLearningSyncRepository(
+        db: KanjiQuestDatabase,
+        syncEngine: com.jworks.kanjiquest.core.data.sync.SyncEngine
+    ): LearningSyncRepository {
+        return LearningSyncRepositoryImpl(db, syncEngine)
     }
 
     @Provides

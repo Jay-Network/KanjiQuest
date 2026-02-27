@@ -1,6 +1,10 @@
 package com.jworks.kanjiquest.core.data
 
 import com.jworks.kanjiquest.core.data.remote.SupabaseClientFactory
+import com.jworks.kanjiquest.core.data.sync.DeviceInfo
+import com.jworks.kanjiquest.core.data.sync.SyncEngine
+import com.jworks.kanjiquest.core.data.sync.SyncResult
+import com.jworks.kanjiquest.core.data.sync.SyncTrigger
 import com.jworks.kanjiquest.core.domain.model.Achievement
 import com.jworks.kanjiquest.core.domain.model.CloudLearningData
 import com.jworks.kanjiquest.core.domain.model.DailyStatsData
@@ -34,10 +38,45 @@ import kotlinx.serialization.json.put
 
 class LearningSyncRepositoryImpl(
     private val database: KanjiQuestDatabase,
-    private val clock: Clock
+    private val clock: Clock,
+    private val syncEngine: SyncEngine
 ) : LearningSyncRepository {
 
-    constructor(database: KanjiQuestDatabase) : this(database, Clock.System)
+    constructor(database: KanjiQuestDatabase) : this(database, Clock.System, SyncEngine(database))
+
+    constructor(database: KanjiQuestDatabase, syncEngine: SyncEngine) : this(database, Clock.System, syncEngine)
+
+    // --- V2 methods ---
+
+    override suspend fun syncAll(userId: String, trigger: SyncTrigger): SyncResult =
+        syncEngine.sync(userId, trigger)
+
+    override suspend fun pushSessionData(userId: String): SyncResult {
+        val meta = database.syncVersionQueries.getByUserId(userId).executeAsOneOrNull()
+        val version = meta?.server_version ?: 0L
+        val result = syncEngine.pushChanges(userId, version)
+        return if (result != null) {
+            SyncResult.Success(pushed = 1, pulled = 0, newVersion = result.newVersion)
+        } else {
+            SyncResult.Error("Push failed")
+        }
+    }
+
+    override suspend fun pullLatest(userId: String): SyncResult {
+        val meta = database.syncVersionQueries.getByUserId(userId).executeAsOneOrNull()
+        val version = meta?.server_version ?: 0L
+        val delta = syncEngine.pullChanges(userId, version)
+        return if (delta != null) {
+            SyncResult.Success(pushed = 0, pulled = 1, newVersion = delta.serverVersion)
+        } else {
+            SyncResult.Error("Pull failed")
+        }
+    }
+
+    override suspend fun registerDevice(userId: String, deviceInfo: DeviceInfo): String? =
+        syncEngine.registerDevice(userId, deviceInfo)
+
+    // --- V1 methods (kept during migration) ---
 
     private val syncQueries get() = database.learningSyncQueueQueries
     private val srsQueries get() = database.srsCardQueries

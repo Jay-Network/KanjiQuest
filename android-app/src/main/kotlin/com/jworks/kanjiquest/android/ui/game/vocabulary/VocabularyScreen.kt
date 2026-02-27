@@ -62,7 +62,9 @@ fun VocabularyScreen(
     viewModel: VocabularyViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showDiscoveryOverlay by remember { mutableStateOf(false) }
+    // Track sequential discovery overlay: which index in the list we're currently showing
+    var discoveryQueueIndex by remember { mutableStateOf(0) }
+    var lastDiscoveryQuestionNumber by remember { mutableStateOf(-1) }
     val context = LocalContext.current
     val sessionLength = remember {
         context.getSharedPreferences("kanjiquest_settings", android.content.Context.MODE_PRIVATE)
@@ -103,7 +105,6 @@ fun VocabularyScreen(
             when (val state = uiState.gameState) {
                 is GameState.Idle, is GameState.Preparing -> LoadingContent()
                 is GameState.AwaitingAnswer -> {
-                    showDiscoveryOverlay = false
                     VocabQuestionContent(
                         question = state.question,
                         questionNumber = state.questionNumber,
@@ -116,11 +117,12 @@ fun VocabularyScreen(
                     )
                 }
                 is GameState.ShowingResult -> {
-                    LaunchedEffect(state.discoveredItem) {
-                        if (state.discoveredItem != null) {
-                            showDiscoveryOverlay = true
-                        }
+                    // Reset queue index when a new question's result appears
+                    if (state.questionNumber != lastDiscoveryQuestionNumber) {
+                        discoveryQueueIndex = 0
+                        lastDiscoveryQuestionNumber = state.questionNumber
                     }
+                    val currentDiscovery = state.discoveredItems.getOrNull(discoveryQueueIndex)
                     VocabQuestionContent(
                         question = state.question,
                         questionNumber = state.questionNumber,
@@ -132,15 +134,27 @@ fun VocabularyScreen(
                         onAnswerClick = {},
                         xpGained = state.xpGained,
                         isCorrect = state.isCorrect,
-                        onNext = { viewModel.nextQuestion() }
+                        onNext = {
+                            discoveryQueueIndex = state.discoveredItems.size // skip remaining
+                            viewModel.nextQuestion()
+                        }
                     )
-                    val discovered = state.discoveredItem
-                    if (showDiscoveryOverlay && discovered != null) {
+                    if (currentDiscovery != null) {
+                        // Find this kanji's literal from the breakdown (format: "学 = study (Grade 1)")
+                        val breakdownEntry = state.question.kanjiBreakdown.firstOrNull { entry ->
+                            val literal = entry.substringBefore("=").trim()
+                            literal.length == 1 && literal[0].code == currentDiscovery.itemId
+                        }
+                        val kanjiLiteral = breakdownEntry?.substringBefore("=")?.trim()
+                            ?: String(intArrayOf(currentDiscovery.itemId), 0, 1)
+                        val kanjiMeaning = breakdownEntry
+                            ?.substringAfter("=", "")?.trim()
+                            ?.substringBefore("(")?.trim()
                         DiscoveryOverlay(
-                            discoveredItem = discovered,
-                            kanjiLiteral = state.question.kanjiLiteral,
-                            kanjiMeaning = null,
-                            onDismiss = { showDiscoveryOverlay = false }
+                            discoveredItem = currentDiscovery,
+                            kanjiLiteral = kanjiLiteral,
+                            kanjiMeaning = kanjiMeaning,
+                            onDismiss = { discoveryQueueIndex++ }
                         )
                     }
                 }
@@ -491,6 +505,53 @@ private fun VocabSessionCompleteContent(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.secondary
                         )
+                    }
+                }
+            }
+        }
+
+        // New Discoveries section
+        if (stats.newlyCollectedKanji.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF00BFA5).copy(alpha = 0.1f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "New Discoveries",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00BFA5)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        stats.newlyCollectedKanji.forEach { discovered ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                com.jworks.kanjiquest.android.ui.theme.KanjiText(
+                                    text = discovered.literal,
+                                    fontSize = 36.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = discovered.meaning,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
                 }
             }

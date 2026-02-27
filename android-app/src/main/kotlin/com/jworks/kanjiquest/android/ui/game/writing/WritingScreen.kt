@@ -137,8 +137,8 @@ fun WritingScreen(
                 )
                 }
                 is GameState.ShowingResult -> {
-                    LaunchedEffect(state.discoveredItem) {
-                        if (state.discoveredItem != null) {
+                    LaunchedEffect(state.discoveredItems) {
+                        if (state.discoveredItems.isNotEmpty()) {
                             showDiscoveryOverlay = true
                         }
                     }
@@ -151,7 +151,7 @@ fun WritingScreen(
                         onReportAi = { viewModel.reportAiFeedback() },
                         onNext = { viewModel.nextQuestion() }
                     )
-                    val discovered = state.discoveredItem
+                    val discovered = state.discoveredItems.firstOrNull()
                     if (showDiscoveryOverlay && discovered != null) {
                         DiscoveryOverlay(
                             discoveredItem = discovered,

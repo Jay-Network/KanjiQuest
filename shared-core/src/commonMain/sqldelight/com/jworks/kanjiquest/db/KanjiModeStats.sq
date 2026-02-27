@@ -12,6 +12,9 @@ SELECT * FROM kanji_mode_stats WHERE kanji_id = ?;
 getByKanjiIds:
 SELECT * FROM kanji_mode_stats WHERE kanji_id IN ?;
 
+getAllNonZero:
+SELECT * FROM kanji_mode_stats WHERE review_count > 0;
+
 incrementReview:
 INSERT INTO kanji_mode_stats(kanji_id, game_mode, review_count, correct_count)
     VALUES (?, ?, 1, ?)

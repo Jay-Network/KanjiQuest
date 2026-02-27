@@ -134,6 +134,9 @@ fun MainScaffold(
                     onFeedbackClick = onFeedbackClick,
                     onKanjiClick = onKanjiClick,
                     onRadicalClick = onRadicalClick,
+                    onKanaClick = { kanaId, kanaType ->
+                        rootNavController.navigate(NavRoute.KanaWritingTargeted.createRoute(kanaId, kanaType))
+                    },
                     onFlashcardStudy = onFlashcardStudy,
                     onKanjiDetailClick = onKanjiClick
                 )

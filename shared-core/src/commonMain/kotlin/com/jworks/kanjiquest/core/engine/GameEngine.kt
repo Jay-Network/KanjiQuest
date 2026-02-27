@@ -94,6 +94,9 @@ class GameEngine(
                 ?: userRepository?.getProfile()?.level ?: 1
 
             when {
+                gameMode.isKanaMode && event.targetKanjiId != null -> {
+                    kanaQuestionGenerator?.prepareTargetedSession(event.targetKanjiId, totalQuestions) ?: false
+                }
                 gameMode.isKanaMode -> {
                     val kanaType = event.kanaType ?: KanaType.HIRAGANA
                     kanaQuestionGenerator?.prepareSession(totalQuestions, timeProvider(), kanaType) ?: false
@@ -143,7 +146,7 @@ class GameEngine(
         val isCorrect: Boolean
         val quality: Int
 
-        if (gameMode == GameMode.WRITING) {
+        if (gameMode == GameMode.WRITING || gameMode == GameMode.KANA_WRITING) {
             // Writing mode: answer is "true|4" or "false|1" (isCorrect|quality)
             val parts = event.answer.split("|")
             isCorrect = parts.getOrNull(0)?.toBooleanStrictOrNull() ?: false
@@ -230,52 +233,84 @@ class GameEngine(
         }
 
         // Collection system: item XP + encounter rolls
-        var discoveredItem: CollectedItem? = null
+        val discoveredItems = mutableListOf<CollectedItem>()
         var itemLevelUp = false
 
         if (collectionRepository != null) {
             withContext(Dispatchers.IO) {
                 val itemType = when {
-                    gameMode.isKanaMode -> null // Kana encounters handled separately if needed
+                    gameMode.isKanaMode -> {
+                        val kana = kanaQuestionGenerator?.getLastKana()
+                        if (kana?.type == KanaType.KATAKANA) CollectionItemType.KATAKANA
+                        else CollectionItemType.HIRAGANA
+                    }
                     gameMode.isRadicalMode -> CollectionItemType.RADICAL
                     else -> CollectionItemType.KANJI
                 }
 
-                if (itemType != null && itemLevelEngine != null) {
-                    // Add XP to collected items
-                    val levelResult = itemLevelEngine.addXp(
-                        question.kanjiId, itemType, isCorrect, currentCombo
-                    )
-                    if (levelResult != null) {
-                        itemLevelUp = levelResult.leveledUp
-                    }
+                // For vocabulary mode, collect each component kanji individually
+                val kanjiIdsToCollect = if (gameMode == GameMode.VOCABULARY && question.vocabKanjiIds.isNotEmpty()) {
+                    question.vocabKanjiIds.map { it.toInt() }
+                } else if (question.kanjiId != 0) {
+                    listOf(question.kanjiId)
+                } else {
+                    emptyList()
                 }
 
-                // Roll for encounter on correct answer (kanji modes only)
-                if (isCorrect && itemType == CollectionItemType.KANJI && encounterEngine != null) {
-                    val isUncollected = !collectionRepository.isCollected(question.kanjiId, CollectionItemType.KANJI)
-                    if (isUncollected) {
-                        // The question itself was uncollected — auto-collect it on correct answer
-                        val rarity = com.jworks.kanjiquest.core.collection.RarityCalculator.calculateKanjiRarity(
-                            question.kanjiGrade, question.kanjiFrequency, question.kanjiStrokeCount
+                for (kid in kanjiIdsToCollect) {
+                    if (itemLevelEngine != null) {
+                        val levelResult = itemLevelEngine.addXp(
+                            kid, itemType, isCorrect, currentCombo
                         )
-                        val newItem = CollectedItem(
-                            itemId = question.kanjiId,
-                            itemType = CollectionItemType.KANJI,
-                            rarity = rarity,
-                            itemLevel = 1,
-                            itemXp = 0,
-                            discoveredAt = timeProvider(),
-                            source = "gameplay"
-                        )
-                        collectionRepository.collect(newItem)
-                        discoveredItem = newItem
-                    } else {
-                        // Already collected — roll for a bonus encounter of a new kanji
-                        val unlockedGrades = LevelProgression.getUnlockedGrades(playerLevel)
-                        val encounter = encounterEngine.rollEncounter(unlockedGrades, timeProvider())
-                        if (encounter != null) {
-                            discoveredItem = encounter.collectedItem
+                        if (levelResult != null && levelResult.leveledUp) {
+                            itemLevelUp = true
+                        }
+                    }
+
+                    if (isCorrect) {
+                        val isUncollected = !collectionRepository.isCollected(kid, itemType)
+                        if (isUncollected) {
+                            // For vocab component kanji, look up grade/freq/stroke from the DB
+                            val rarity = when (itemType) {
+                                CollectionItemType.HIRAGANA, CollectionItemType.KATAKANA -> {
+                                    val variant = kanaQuestionGenerator?.getLastKana()?.variant?.value ?: "basic"
+                                    com.jworks.kanjiquest.core.collection.RarityCalculator.calculateKanaRarity(variant)
+                                }
+                                CollectionItemType.KANJI -> {
+                                    if (gameMode == GameMode.VOCABULARY) {
+                                        // Look up kanji details for proper rarity
+                                        val k = questionGenerator.kanjiRepository.getKanjiById(kid)
+                                        com.jworks.kanjiquest.core.collection.RarityCalculator.calculateKanjiRarity(
+                                            k?.grade, k?.frequency, k?.strokeCount ?: 0
+                                        )
+                                    } else {
+                                        com.jworks.kanjiquest.core.collection.RarityCalculator.calculateKanjiRarity(
+                                            question.kanjiGrade, question.kanjiFrequency, question.kanjiStrokeCount
+                                        )
+                                    }
+                                }
+                                CollectionItemType.RADICAL -> {
+                                    com.jworks.kanjiquest.core.collection.RarityCalculator.calculateRadicalRarity(1)
+                                }
+                            }
+                            val newItem = CollectedItem(
+                                itemId = kid,
+                                itemType = itemType,
+                                rarity = rarity,
+                                itemLevel = 1,
+                                itemXp = 0,
+                                discoveredAt = timeProvider(),
+                                source = "gameplay"
+                            )
+                            collectionRepository.collect(newItem)
+                            discoveredItems.add(newItem)
+                        } else if (itemType == CollectionItemType.KANJI && encounterEngine != null && discoveredItems.isEmpty()) {
+                            // Already collected kanji — roll for a bonus encounter (only once per question)
+                            val unlockedGrades = LevelProgression.getUnlockedGrades(playerLevel)
+                            val encounter = encounterEngine.rollEncounter(unlockedGrades, timeProvider())
+                            if (encounter != null) {
+                                discoveredItems.add(encounter.collectedItem)
+                            }
                         }
                     }
                 }
@@ -283,12 +318,27 @@ class GameEngine(
         }
 
         // Track newly collected kanji for session-end summary
-        if (discoveredItem != null && question.kanjiId != 0) {
-            newlyCollected.add(DiscoveredKanjiInfo(
-                kanjiId = question.kanjiId,
-                literal = question.kanjiLiteral,
-                meaning = question.kanjiMeaning ?: question.correctAnswer
-            ))
+        if (discoveredItems.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                for (item in discoveredItems) {
+                    if (gameMode == GameMode.VOCABULARY) {
+                        val k = questionGenerator.kanjiRepository.getKanjiById(item.itemId)
+                        if (k != null) {
+                            newlyCollected.add(DiscoveredKanjiInfo(
+                                kanjiId = item.itemId,
+                                literal = k.literal,
+                                meaning = k.primaryMeaning
+                            ))
+                        }
+                    } else if (question.kanjiId != 0) {
+                        newlyCollected.add(DiscoveredKanjiInfo(
+                            kanjiId = question.kanjiId,
+                            literal = question.kanjiLiteral,
+                            meaning = question.kanjiMeaning ?: question.correctAnswer
+                        ))
+                    }
+                }
+            }
         }
 
         _state.value = GameState.ShowingResult(
@@ -301,7 +351,7 @@ class GameEngine(
             questionNumber = current.questionNumber,
             totalQuestions = current.totalQuestions,
             sessionXp = sessionXp,
-            discoveredItem = discoveredItem,
+            discoveredItems = discoveredItems,
             itemLevelUp = itemLevelUp
         )
     }

@@ -73,7 +73,18 @@ Focus on these 3 aspects IN ORDER OF IMPORTANCE:
 
 1. OVERALL BALANCE (バランス): Are the components proportioned correctly? Is the kanji centered? Are radicals/parts spaced properly relative to each other?
 
-2. STROKE ORDER (筆順): The numbered labels show the order the student drew each stroke. Check if the stroke order follows standard Japanese conventions (top-to-bottom, left-to-right, horizontal before vertical). IMPORTANT: Read the numbers carefully from the image. The number at the START of each colored line indicates when that stroke was drawn.
+2. STROKE ORDER (筆順): The numbered labels show the order the student drew each stroke. IMPORTANT: Read the numbers carefully from the image. The number at the START of each colored line indicates when that stroke was drawn.
+
+CRITICAL STROKE ORDER RULES for Japanese kanji (文部科学省 standard):
+- General: top-to-bottom, left-to-right
+- Enclosures (口, 国, 回, 四, etc.): LEFT VERTICAL FIRST, then top-right angle, then bottom. For 口: stroke 1 = left vertical (|), stroke 2 = top horizontal + right vertical (フ), stroke 3 = bottom horizontal (一). NEVER say horizontal comes first in box shapes.
+- 十-type crosses: horizontal first, then vertical
+- Complex enclosures (門, 間): outer left, then outer right, then inner parts
+- Through-strokes (中, 車, 書): the vertical stroke that passes through goes LAST
+- 辶 (shinnyou/shinnyuu): inner component first, then the sweeping bottom stroke last
+- 道, 近, 週, etc.: write the inner part fully, then shinnyou last
+- DO NOT apply "horizontal before vertical" to enclosures — it only applies to crosses like 十
+- When in doubt about a specific kanji's stroke order, do NOT guess — skip commenting on order
 
 3. STROKE ENDINGS (止め・はね・はらい): Check if strokes end correctly:
    - 止め (tome): firm stop where required
@@ -91,6 +102,7 @@ Rules:
 - Reference strokes by their number and color (e.g., "stroke 1 (red)", "stroke 3 (green)") so the student can identify them in the color-coded image.
 - If the writing looks good, the "strokes" array should be empty.
 - Be encouraging. Praise what is done well before noting issues.
+- NEVER give stroke order advice you are not 100% certain about. Wrong stroke order teaching is worse than no feedback.
 
 Respond with ONLY this JSON (no other text):
 {"rating":3,"overall":"one sentence summary","strokes":["specific feedback for stroke N"]}

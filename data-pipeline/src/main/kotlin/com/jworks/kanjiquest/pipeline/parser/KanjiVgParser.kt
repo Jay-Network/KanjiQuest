@@ -12,15 +12,22 @@ import org.xml.sax.helpers.DefaultHandler
  * Parses the combined KanjiVG XML file (kanjivg.xml) to extract stroke path data.
  * Format: <kanji id="kvg:kanji_XXXXX"> containing <path d="..."> elements.
  * The XXXXX is the hex Unicode codepoint (e.g., 04e00 for 一).
+ *
+ * Handles both kanji (CJK Unified Ideographs, U+3400+) and kana
+ * (Hiragana U+3040-U+309F, Katakana U+30A0-U+30FF).
  */
 object KanjiVgParser {
 
     fun parse(file: File, conn: Connection): Int {
-        val stmt = conn.prepareStatement(
+        val kanjiStmt = conn.prepareStatement(
             "UPDATE kanji SET stroke_svg = ? WHERE id = ?"
         )
+        val kanaStmt = conn.prepareStatement(
+            "UPDATE kana SET stroke_svg = ? WHERE literal = ?"
+        )
 
-        var count = 0
+        var kanjiCount = 0
+        var kanaCount = 0
 
         val factory = SAXParserFactory.newInstance()
         factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
@@ -56,17 +63,26 @@ object KanjiVgParser {
             override fun endElement(uri: String, localName: String, qName: String) {
                 if ((qName == "kanji" || localName == "kanji") && currentCodepoint != null && currentPaths.isNotEmpty()) {
                     val cp = currentCodepoint!!
-                    // Only store CJK Unified Ideographs (skip ASCII punctuation etc.)
-                    if (cp >= 0x3400) {
-                        val strokeJson = Json.encodeToString(currentPaths.toList())
-                        stmt.setString(1, strokeJson)
-                        stmt.setInt(2, cp)
-                        val updated = stmt.executeUpdate()
-                        if (updated > 0) count++
+                    val strokeJson = Json.encodeToString(currentPaths.toList())
 
-                        if (count % 500 == 0 && count > 0) {
-                            conn.commit()
-                            print("\r  Processed $count kanji stroke entries...")
+                    when {
+                        // Hiragana (U+3040-U+309F) or Katakana (U+30A0-U+30FF)
+                        cp in 0x3040..0x30FF -> {
+                            val literal = cp.toChar().toString()
+                            kanaStmt.setString(1, strokeJson)
+                            kanaStmt.setString(2, literal)
+                            if (kanaStmt.executeUpdate() > 0) kanaCount++
+                        }
+                        // CJK Unified Ideographs
+                        cp >= 0x3400 -> {
+                            kanjiStmt.setString(1, strokeJson)
+                            kanjiStmt.setInt(2, cp)
+                            if (kanjiStmt.executeUpdate() > 0) kanjiCount++
+
+                            if (kanjiCount % 500 == 0 && kanjiCount > 0) {
+                                conn.commit()
+                                print("\r  Processed $kanjiCount kanji stroke entries...")
+                            }
                         }
                     }
                     currentCodepoint = null
@@ -76,8 +92,9 @@ object KanjiVgParser {
         }
 
         saxParser.parse(file, handler)
-        stmt.close()
-        println("\r  Processed $count kanji stroke entries total")
-        return count
+        kanjiStmt.close()
+        kanaStmt.close()
+        println("\r  Processed $kanjiCount kanji + $kanaCount kana stroke entries")
+        return kanjiCount + kanaCount
     }
 }

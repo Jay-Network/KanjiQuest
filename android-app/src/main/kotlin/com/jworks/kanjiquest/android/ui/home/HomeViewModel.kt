@@ -251,13 +251,13 @@ class HomeViewModel @Inject constructor(
             // Radicals
             val radicals = try { radicalRepository.getAllRadicals() } catch (_: Exception) { emptyList() }
 
-            // Kana & radical progress
-            val hiraganaTotal = hiraganaList.size.toLong()
-            val hiraganaStudied = try { kanaSrsRepository.getTypeStudiedCount("HIRAGANA") } catch (_: Exception) { 0L }
-            val katakanaTotal = katakanaList.size.toLong()
-            val katakanaStudied = try { kanaSrsRepository.getTypeStudiedCount("KATAKANA") } catch (_: Exception) { 0L }
-            val radicalTotal = radicals.size.toLong()
-            val radicalStudied = try { radicalSrsRepository.getStudiedCount() } catch (_: Exception) { 0L }
+            // Kana & radical progress (based on collection, not SRS)
+            val hiraganaTotal = hiraganaList.size
+            val hiraganaCollected = collectedHiraganaItems.size
+            val katakanaTotal = katakanaList.size
+            val katakanaCollected = collectedKatakanaItems.size
+            val radicalTotal = radicals.size
+            val radicalCollected = collectedRadicalItems.size
 
             // Stroke counts (preserve on refresh)
             val strokeCounts = if (!isFirstLoad && preserveStrokeCounts.isNotEmpty()) {
@@ -292,9 +292,9 @@ class HomeViewModel @Inject constructor(
                 allGrades = listOf(1, 2, 3, 4, 5, 6, 8),
                 gradesWithCollection = gradesWithCollection,
                 selectedGrade = activeGrade,
-                hiraganaProgress = if (hiraganaTotal > 0) hiraganaStudied.toFloat() / hiraganaTotal else 0f,
-                katakanaProgress = if (katakanaTotal > 0) katakanaStudied.toFloat() / katakanaTotal else 0f,
-                radicalProgress = if (radicalTotal > 0) radicalStudied.toFloat() / radicalTotal else 0f,
+                hiraganaProgress = if (hiraganaTotal > 0) hiraganaCollected.toFloat() / hiraganaTotal else 0f,
+                katakanaProgress = if (katakanaTotal > 0) katakanaCollected.toFloat() / katakanaTotal else 0f,
+                radicalProgress = if (radicalTotal > 0) radicalCollected.toFloat() / radicalTotal else 0f,
                 selectedMainTab = if (isFirstLoad) MainTab.KANJI else preserveMainTab,
                 collectedKanjiCount = collectedKanjiCount,
                 totalKanjiInGrades = totalKanjiInGrades,

@@ -378,6 +378,24 @@ fun KanjiQuestNavHost(
         }
 
         composable(
+            route = NavRoute.KanaWritingTargeted.route,
+            arguments = listOf(
+                navArgument("kanaId") { type = NavType.IntType },
+                navArgument("kanaType") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val kanaId = backStackEntry.arguments?.getInt("kanaId") ?: return@composable
+            val kanaTypeStr = backStackEntry.arguments?.getString("kanaType") ?: "HIRAGANA"
+            val kanaType = KanaType.valueOf(kanaTypeStr)
+            WritingScreen(
+                onBack = { navController.popBackStack() },
+                targetKanjiId = kanaId,
+                gameMode = GameMode.KANA_WRITING,
+                kanaType = kanaType
+            )
+        }
+
+        composable(
             route = NavRoute.RadicalDetail.route,
             arguments = listOf(navArgument("radicalId") { type = NavType.IntType })
         ) { backStackEntry ->

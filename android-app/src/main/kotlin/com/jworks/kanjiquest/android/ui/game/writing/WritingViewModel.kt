@@ -17,6 +17,7 @@ import com.jworks.kanjiquest.core.writing.Point
 import com.jworks.kanjiquest.core.writing.StrokeMatcher
 import com.jworks.kanjiquest.core.writing.SvgPathParser
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,6 +63,7 @@ class WritingViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(WritingUiState(isAdmin = userSessionProvider.isAdmin()))
     val uiState: StateFlow<WritingUiState> = _uiState.asStateFlow()
+    private var aiJob: Job? = null
 
     init {
         // Also refresh admin status async in case email wasn't cached at construction time
@@ -225,6 +227,9 @@ class WritingViewModel @Inject constructor(
         val srsState = state.question.srsState
         val result = StrokeMatcher.validateWriting(drawnStrokes, referenceStrokes, srsState)
 
+        android.util.Log.d("KQ_WRITING", "=== ${state.question.kanjiLiteral} | drawn=${drawnStrokes.size} ref=${referenceStrokes.size} | sim=${result.overallSimilarity} correct=${result.isCorrect} q=${result.quality} srs=$srsState")
+        result.strokeResults.forEachIndexed { i, sr -> android.util.Log.d("KQ_WRITING", "  s$i: sim=${sr.similarity} ok=${sr.isCorrect}") }
+
         // Encode result as "isCorrect|quality" for GameEngine
         val answer = "${result.isCorrect}|${result.quality}"
 
@@ -238,7 +243,8 @@ class WritingViewModel @Inject constructor(
 
         // Fire-and-forget AI check (runs in parallel, updates UI when done)
         if (_uiState.value.aiEnabled) {
-            viewModelScope.launch {
+            aiJob?.cancel()
+            aiJob = viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(aiLoading = true)
                 try {
                     val feedback = handwritingChecker.evaluate(
@@ -249,7 +255,10 @@ class WritingViewModel @Inject constructor(
                         language = _uiState.value.aiFeedbackLanguage
                     )
                     _uiState.value = _uiState.value.copy(aiFeedback = feedback, aiLoading = false)
-                } catch (_: Exception) {
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e // don't swallow cancellation
+                } catch (e: Exception) {
+                    android.util.Log.e("KQ_WRITING", "AI feedback failed", e)
                     _uiState.value = _uiState.value.copy(
                         aiFeedback = HandwritingFeedback(
                             overallComment = "",
@@ -265,6 +274,16 @@ class WritingViewModel @Inject constructor(
     }
 
     fun nextQuestion() {
+        aiJob?.cancel()
+        aiJob = null
+        _uiState.value = _uiState.value.copy(
+            aiFeedback = null,
+            aiLoading = false,
+            aiReportSubmitted = false,
+            analyzedImageBase64 = null,
+            completedStrokes = emptyList(),
+            activeStroke = emptyList()
+        )
         viewModelScope.launch {
             gameEngine.onEvent(GameEvent.NextQuestion)
         }

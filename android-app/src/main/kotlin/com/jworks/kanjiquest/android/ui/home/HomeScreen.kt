@@ -325,27 +325,6 @@ fun HomeScreen(
                 }
             }
 
-            // Grade Mastery Badges
-            if (uiState.gradeMasteryList.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Grade Mastery",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    uiState.gradeMasteryList.forEach { mastery ->
-                        GradeMasteryBadge(mastery = mastery)
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(12.dp))
 
             // Word of the Day
@@ -435,7 +414,26 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Grade Mastery Badges
+            if (uiState.gradeMasteryList.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Grade Mastery",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    uiState.gradeMasteryList.forEach { mastery ->
+                        GradeMasteryBadge(mastery = mastery)
+                    }
+                }
+            }
 
             // Bottom padding
             Spacer(modifier = Modifier.height(16.dp))

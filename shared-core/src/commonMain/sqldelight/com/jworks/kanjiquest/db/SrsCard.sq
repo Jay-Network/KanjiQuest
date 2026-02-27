@@ -46,6 +46,9 @@ INSERT OR IGNORE INTO srs_card(kanji_id) VALUES (?);
 getAllNonNewCards:
 SELECT * FROM srs_card WHERE state != 'new';
 
+getAll:
+SELECT * FROM srs_card WHERE state != 'new';
+
 getCardsByIds:
 SELECT * FROM srs_card WHERE kanji_id IN ?;
 

@@ -52,6 +52,9 @@ final class AppContainer: ObservableObject {
     let wordOfTheDayUseCase: WordOfTheDayUseCase
     let completeSessionUseCase: CompleteSessionUseCase
 
+    // MARK: - Sync Service
+    let syncService: SyncService
+
     // MARK: - Preview Trial Manager (UserDefaults-based, like Android SharedPreferences)
     let previewTrialManager: PreviewTrialManager
 
@@ -160,6 +163,15 @@ final class AppContainer: ObservableObject {
             kanjiRepository: kanjiRepository
         )
         CrashDiagnostic.step("Use cases OK")
+
+        // Sync Service
+        CrashDiagnostic.step("Creating SyncService...")
+        syncService = SyncService(
+            learningSyncRepository: learningSyncRepository,
+            userSessionProvider: userSessionProvider
+        )
+        syncService.registerBackgroundTask()
+        CrashDiagnostic.step("SyncService OK")
 
         // Preview Trial Manager
         CrashDiagnostic.step("Creating PreviewTrialManager...")

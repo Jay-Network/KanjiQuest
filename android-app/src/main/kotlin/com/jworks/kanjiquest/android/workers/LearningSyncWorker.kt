@@ -11,6 +11,10 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.jworks.kanjiquest.core.data.sync.SyncResult
+import com.jworks.kanjiquest.core.data.sync.SyncTrigger
+import com.jworks.kanjiquest.core.domain.UserSessionProvider
+import com.jworks.kanjiquest.core.domain.model.LOCAL_USER_ID
 import com.jworks.kanjiquest.core.domain.repository.LearningSyncRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -20,25 +24,37 @@ import java.util.concurrent.TimeUnit
 class LearningSyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val learningSyncRepository: LearningSyncRepository
+    private val learningSyncRepository: LearningSyncRepository,
+    private val userSessionProvider: UserSessionProvider
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         return try {
-            Log.d(TAG, "Starting learning data background sync...")
-
-            val syncedCount = learningSyncRepository.syncPendingEvents()
-
-            if (syncedCount > 0) {
-                Log.i(TAG, "Successfully synced $syncedCount learning events")
+            val userId = userSessionProvider.getUserId()
+            if (userId == null || userId == LOCAL_USER_ID) {
+                Log.d(TAG, "No logged-in user, skipping sync")
+                return Result.success()
             }
 
-            val pendingCount = learningSyncRepository.getPendingSyncCount()
-            if (pendingCount > 0) {
-                Log.w(TAG, "$pendingCount learning events still pending")
-                Result.retry()
-            } else {
-                Result.success()
+            Log.d(TAG, "Starting cross-device sync...")
+
+            when (val result = learningSyncRepository.syncAll(userId, SyncTrigger.BACKGROUND_PERIODIC)) {
+                is SyncResult.Success -> {
+                    Log.i(TAG, "Sync complete: pushed=${result.pushed}, pulled=${result.pulled}, version=${result.newVersion}")
+                    Result.success()
+                }
+                is SyncResult.Error -> {
+                    Log.w(TAG, "Sync error: ${result.message}")
+                    Result.retry()
+                }
+                is SyncResult.NotLoggedIn -> {
+                    Log.d(TAG, "Not logged in, skipping sync")
+                    Result.success()
+                }
+                is SyncResult.AlreadySyncing -> {
+                    Log.d(TAG, "Sync already in progress")
+                    Result.success()
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Learning sync failed: ${e.message}", e)

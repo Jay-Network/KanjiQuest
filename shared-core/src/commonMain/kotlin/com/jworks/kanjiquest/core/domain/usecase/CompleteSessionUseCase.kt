@@ -109,30 +109,13 @@ class CompleteSessionUseCase(
             0
         }
 
-        // 6. Queue learning data sync (for logged-in users)
+        // 6. Push learning data sync (for logged-in users)
         val userId = userSessionProvider?.getUserId()
         if (userId != null && userId != LOCAL_USER_ID) {
             try {
-                val updatedProfile = userRepository.getProfile()
-                val dailyStatsData = DailyStatsData(
-                    date = today,
-                    cardsReviewed = stats.cardsStudied,
-                    xpEarned = totalXpEarned,
-                    studyTimeSec = stats.durationSec
-                )
-                val achievements = achievementRepository?.getAllAchievements() ?: emptyList()
-
-                learningSyncRepository?.queueSessionSync(
-                    userId = userId,
-                    touchedKanjiIds = stats.touchedKanjiIds,
-                    touchedVocabIds = stats.touchedVocabIds,
-                    profile = updatedProfile,
-                    session = session,
-                    dailyStats = dailyStatsData,
-                    achievements = achievements
-                )
+                learningSyncRepository?.pushSessionData(userId)
             } catch (_: Exception) {
-                // Sync queueing is best-effort; don't fail the session
+                // Sync is best-effort; don't fail the session
             }
         }
 

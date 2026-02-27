@@ -113,9 +113,9 @@ class JCoinRepositoryImpl(
 
         for (event in pending) {
             try {
-                // Call Supabase Edge Function: coin-earn
+                // Call Supabase Edge Function: jcoin-unified-earn
                 val response = supabase.functions.invoke(
-                    function = "coin-earn",
+                    function = "jcoin-unified-earn",
                     body = buildJsonObject {
                         put("customer_id", event.user_id)
                         put("source_business", event.source_business)

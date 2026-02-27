@@ -17,7 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.random.Random
 
 class QuestionGenerator(
-    private val kanjiRepository: KanjiRepository,
+    internal val kanjiRepository: KanjiRepository,
     private val srsRepository: SrsRepository,
     private val vocabSrsRepository: VocabSrsRepository? = null,
     private val gradeMasteryProvider: GradeMasteryProvider? = null
@@ -397,16 +397,17 @@ class QuestionGenerator(
         } else sessionPool
 
         return when (questionType) {
-            VocabQuestionType.MEANING -> buildMeaningQuestion(vocab, entry, pool, breakdown)
-            VocabQuestionType.READING -> buildReadingQuestion(vocab, entry, pool, breakdown)
+            VocabQuestionType.MEANING -> buildMeaningQuestion(vocab, entry, pool, breakdown, kanjiIds)
+            VocabQuestionType.READING -> buildReadingQuestion(vocab, entry, pool, breakdown, kanjiIds)
             VocabQuestionType.KANJI_FILL -> buildKanjiFillQuestion(vocab, entry, pool, breakdown, kanjiIds)
-            VocabQuestionType.SENTENCE -> buildSentenceQuestion(vocab, entry, pool, breakdown)
+            VocabQuestionType.SENTENCE -> buildSentenceQuestion(vocab, entry, pool, breakdown, kanjiIds)
         }
     }
 
     private fun buildMeaningQuestion(
         vocab: Vocabulary, entry: VocabQueueEntry,
-        pool: List<Vocabulary>, breakdown: List<String>
+        pool: List<Vocabulary>, breakdown: List<String>,
+        kanjiIds: List<Long>
     ): Question {
         val correct = vocab.primaryMeaning
         val correctLen = correct.length
@@ -447,13 +448,15 @@ class QuestionGenerator(
             vocabQuestionType = "meaning",
             exampleSentenceJa = entry.exampleSentence?.japanese,
             exampleSentenceEn = entry.exampleSentence?.english,
-            kanjiBreakdown = breakdown
+            kanjiBreakdown = breakdown,
+            vocabKanjiIds = kanjiIds
         )
     }
 
     private fun buildReadingQuestion(
         vocab: Vocabulary, entry: VocabQueueEntry,
-        pool: List<Vocabulary>, breakdown: List<String>
+        pool: List<Vocabulary>, breakdown: List<String>,
+        kanjiIds: List<Long>
     ): Question {
         val correct = vocab.reading
         val correctLen = correct.length
@@ -490,7 +493,8 @@ class QuestionGenerator(
             vocabQuestionType = "reading",
             exampleSentenceJa = entry.exampleSentence?.japanese,
             exampleSentenceEn = entry.exampleSentence?.english,
-            kanjiBreakdown = breakdown
+            kanjiBreakdown = breakdown,
+            vocabKanjiIds = kanjiIds
         )
     }
 
@@ -500,7 +504,7 @@ class QuestionGenerator(
         kanjiIds: List<Long>
     ): Question {
         if (vocab.kanjiForm.length < 2 || kanjiIds.isEmpty()) {
-            return buildMeaningQuestion(vocab, entry, pool, breakdown)
+            return buildMeaningQuestion(vocab, entry, pool, breakdown, kanjiIds)
         }
 
         val firstKanjiLiteral = vocab.kanjiForm.first().toString()
@@ -547,17 +551,19 @@ class QuestionGenerator(
             vocabQuestionType = "kanji_fill",
             exampleSentenceJa = entry.exampleSentence?.japanese,
             exampleSentenceEn = entry.exampleSentence?.english,
-            kanjiBreakdown = breakdown
+            kanjiBreakdown = breakdown,
+            vocabKanjiIds = kanjiIds
         )
     }
 
     private fun buildSentenceQuestion(
         vocab: Vocabulary, entry: VocabQueueEntry,
-        pool: List<Vocabulary>, breakdown: List<String>
+        pool: List<Vocabulary>, breakdown: List<String>,
+        kanjiIds: List<Long>
     ): Question {
         val sentence = entry.exampleSentence
         if (sentence == null) {
-            return buildMeaningQuestion(vocab, entry, pool, breakdown)
+            return buildMeaningQuestion(vocab, entry, pool, breakdown, kanjiIds)
         }
 
         val blankedJa = sentence.japanese.replace(vocab.kanjiForm, "___")
@@ -594,7 +600,8 @@ class QuestionGenerator(
             vocabQuestionType = "sentence",
             exampleSentenceJa = sentence.japanese,
             exampleSentenceEn = sentence.english,
-            kanjiBreakdown = breakdown
+            kanjiBreakdown = breakdown,
+            vocabKanjiIds = kanjiIds
         )
     }
 }

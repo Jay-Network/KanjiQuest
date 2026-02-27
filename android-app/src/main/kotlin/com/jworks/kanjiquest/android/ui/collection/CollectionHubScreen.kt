@@ -31,8 +31,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,11 +61,23 @@ fun CollectionHubScreen(
     onFeedbackClick: () -> Unit = {},
     onKanjiClick: (Int) -> Unit = {},
     onRadicalClick: (Int) -> Unit = {},
+    onKanaClick: (Int, String) -> Unit = { _, _ -> },
     onFlashcardStudy: (Long) -> Unit = {},
     onKanjiDetailClick: (Int) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         topBar = {
@@ -113,7 +129,7 @@ fun CollectionHubScreen(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "${uiState.collectedHiraganaIds.size}",
+                            text = "${uiState.collectedHiraganaIds.size}/${uiState.hiraganaList.size}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE91E63)
@@ -122,7 +138,7 @@ fun CollectionHubScreen(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "${uiState.collectedKatakanaIds.size}",
+                            text = "${uiState.collectedKatakanaIds.size}/${uiState.katakanaList.size}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF00BCD4)
@@ -131,7 +147,7 @@ fun CollectionHubScreen(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "${uiState.collectedRadicalIds.size}",
+                            text = "${uiState.collectedRadicalIds.size}/${uiState.radicals.size}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF795548)
@@ -348,6 +364,7 @@ fun CollectionHubScreen(
                                 KanaGridItem(
                                     kana = kana,
                                     collectedItem = collected,
+                                    onClick = { onKanaClick(kana.id, "HIRAGANA") },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -370,6 +387,7 @@ fun CollectionHubScreen(
                                 KanaGridItem(
                                     kana = kana,
                                     collectedItem = collected,
+                                    onClick = { onKanaClick(kana.id, "KATAKANA") },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -561,6 +579,7 @@ private fun RadicalGridItem(
 private fun KanaGridItem(
     kana: com.jworks.kanjiquest.core.domain.model.Kana,
     collectedItem: CollectedItem? = null,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isCollected = collectedItem != null
@@ -572,7 +591,11 @@ private fun KanaGridItem(
     Card(
         modifier = modifier
             .height(64.dp)
-            .then(borderMod),
+            .then(borderMod)
+            .then(
+                if (isCollected) Modifier.clickable { onClick() }
+                else Modifier
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (isCollected)
                 MaterialTheme.colorScheme.surface

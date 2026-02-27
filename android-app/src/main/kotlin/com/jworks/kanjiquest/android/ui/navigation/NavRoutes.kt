@@ -43,6 +43,9 @@ sealed class NavRoute(val route: String) {
     data object KanaWriting : NavRoute("game/kana_writing/{kanaType}") {
         fun createRoute(kanaType: String) = "game/kana_writing/$kanaType"
     }
+    data object KanaWritingTargeted : NavRoute("game/kana_writing_targeted/{kanaId}/{kanaType}") {
+        fun createRoute(kanaId: Int, kanaType: String) = "game/kana_writing_targeted/$kanaId/$kanaType"
+    }
     data object RadicalDetail : NavRoute("radical/{radicalId}") {
         fun createRoute(radicalId: Int) = "radical/$radicalId"
     }

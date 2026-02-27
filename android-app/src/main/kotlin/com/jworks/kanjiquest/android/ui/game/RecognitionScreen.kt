@@ -118,8 +118,8 @@ fun RecognitionScreen(
                 }
                 is GameState.ShowingResult -> {
                     // Trigger discovery overlay if a new item was found
-                    LaunchedEffect(state.discoveredItem) {
-                        if (state.discoveredItem != null) {
+                    LaunchedEffect(state.discoveredItems) {
+                        if (state.discoveredItems.isNotEmpty()) {
                             showDiscoveryOverlay = true
                         }
                     }
@@ -143,7 +143,7 @@ fun RecognitionScreen(
                         kanjiMeaning = state.question.kanjiMeaning
                     )
                     // Discovery overlay
-                    val discovered = state.discoveredItem
+                    val discovered = state.discoveredItems.firstOrNull()
                     if (showDiscoveryOverlay && discovered != null) {
                         DiscoveryOverlay(
                             discoveredItem = discovered,

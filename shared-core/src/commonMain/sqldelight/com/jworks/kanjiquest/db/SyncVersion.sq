@@ -1,0 +1,30 @@
+CREATE TABLE sync_version (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    device_id TEXT,
+    server_version INTEGER NOT NULL DEFAULT 0,
+    last_push_at INTEGER NOT NULL DEFAULT 0,
+    last_pull_at INTEGER NOT NULL DEFAULT 0,
+    last_full_pull_at INTEGER NOT NULL DEFAULT 0
+);
+
+getByUserId:
+SELECT * FROM sync_version WHERE user_id = ?;
+
+upsert:
+INSERT OR REPLACE INTO sync_version(user_id, device_id, server_version, last_push_at, last_pull_at, last_full_pull_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateServerVersion:
+UPDATE sync_version SET server_version = ?, last_pull_at = ? WHERE user_id = ?;
+
+updateAfterPush:
+UPDATE sync_version SET server_version = ?, last_push_at = ? WHERE user_id = ?;
+
+updateDeviceId:
+UPDATE sync_version SET device_id = ? WHERE user_id = ?;
+
+getDeviceId:
+SELECT device_id FROM sync_version WHERE user_id = ?;
+
+getServerVersion:
+SELECT server_version FROM sync_version WHERE user_id = ?;

@@ -20,6 +20,7 @@ data class Question(
     val exampleSentenceJa: String? = null,
     val exampleSentenceEn: String? = null,
     val kanjiBreakdown: List<String> = emptyList(),
+    val vocabKanjiIds: List<Long> = emptyList(),
     val radicalNameJp: String? = null,
     val kanjiGrade: Int? = null,
     val kanjiFrequency: Int? = null,
@@ -73,7 +74,7 @@ sealed class GameState {
         val questionNumber: Int,
         val totalQuestions: Int,
         val sessionXp: Int,
-        val discoveredItem: CollectedItem? = null,
+        val discoveredItems: List<CollectedItem> = emptyList(),
         val itemLevelUp: Boolean = false
     ) : GameState()
 
