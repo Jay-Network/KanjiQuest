@@ -32,7 +32,13 @@ class AppState: ObservableObject {
 
     func tryKMPInit() {
         log("KMPBridge.initialize()...")
-        KMPBridge.initialize()
+        do {
+            try ObjCExceptionCatcher.catchVoid { KMPBridge.initialize() }
+        } catch {
+            log("KMPBridge EXCEPTION: \(error.localizedDescription)")
+            phase = .failed("KMP bridge init failed:\n\(error.localizedDescription)")
+            return
+        }
         log("KMPBridge OK")
 
         log("Creating AppContainer...")
@@ -56,8 +62,14 @@ class AppState: ObservableObject {
             phase = .failed(error)
         } else {
             log("AppContainer OK — switching to full app")
-            // Register background task here (during init phase, not later)
-            container.syncService.registerBackgroundTask()
+            // Register background task — wrap in exception catcher too
+            do {
+                try ObjCExceptionCatcher.catchVoid { container.syncService.registerBackgroundTask() }
+                log("BGTask registered OK")
+            } catch {
+                log("BGTask registration failed (non-fatal): \(error.localizedDescription)")
+                // Non-fatal — app can still work without background sync
+            }
             phase = .ready(container)
         }
     }

@@ -15,4 +15,16 @@ extension ObjCExceptionCatcher {
         }
         return typedResult
     }
+
+    /// Void overload — catch NSExceptions from void calls (e.g. KMPBridge.initialize()).
+    static func catchVoid(_ block: () -> Void) throws {
+        var error: NSError?
+        _ = catchException({
+            block()
+            return NSNull()
+        }, error: &error)
+        if let error = error {
+            throw error
+        }
+    }
 }
