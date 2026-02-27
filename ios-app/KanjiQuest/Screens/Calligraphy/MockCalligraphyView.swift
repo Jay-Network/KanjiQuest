@@ -79,11 +79,7 @@ struct MockCalligraphyView: View {
                 activeStroke: $activeStroke,
                 referenceStrokePaths: currentKanji.strokePaths,
                 canvasVersion: canvasVersion,
-                onStrokeComplete: { _ in
-                    if strokes.count == currentKanji.strokePaths.count {
-                        submitDrawing()
-                    }
-                }
+                onStrokeComplete: { _ in }
             )
             .aspectRatio(1.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 16))
